@@ -2,7 +2,6 @@ import './DashboardTable.css'
 
 function DashboardTable({ inventory, onFlashSale }) {
   const getStatusClass = (status, daysLeft) => {
-    // Handle undefined or null values
     if (status === 'expired' || (daysLeft !== undefined && daysLeft < 0)) return 'status-critical'
     if (daysLeft !== undefined && daysLeft <= 3) return 'status-warning'
     if (daysLeft !== undefined && daysLeft <= 7) return 'status-warning'
@@ -10,14 +9,14 @@ function DashboardTable({ inventory, onFlashSale }) {
   }
 
   const getStatusText = (status, daysLeft) => {
-    // Handle undefined or null values
     if (status === 'expired' || (daysLeft !== undefined && daysLeft < 0)) return 'Expired'
-    if (daysLeft !== undefined && daysLeft <= 3) return '🔥 Critical (48h)'
-    if (daysLeft !== undefined && daysLeft <= 7) return '⚠️ Near Expiry'
+    if (daysLeft !== undefined && daysLeft <= 3) return 'Critical (48h)'
+    if (daysLeft !== undefined && daysLeft <= 7) return 'Near Expiry'
     return 'Healthy'
   }
 
   const getExpiringCount = () => {
+    if (!inventory) return 0
     return inventory.filter(item => 
       item.daysLeft !== undefined && 
       item.daysLeft <= 7 && 
@@ -26,6 +25,7 @@ function DashboardTable({ inventory, onFlashSale }) {
   }
 
   const getPotentialLoss = () => {
+    if (!inventory) return 0
     const expiringItems = inventory.filter(item => 
       item.daysLeft !== undefined && 
       item.daysLeft <= 7 && 
@@ -34,13 +34,16 @@ function DashboardTable({ inventory, onFlashSale }) {
     return expiringItems.length * 450
   }
 
-  // Check if inventory is valid
   if (!inventory || inventory.length === 0) {
     return (
-      <div className="dashboard-preview">
-        <div className="dashboard-header">
-          <h3><i className="fas fa-chart-line"></i> Smart Inventory Monitor</h3>
-          <div className="tech-badge"><i className="fas fa-cloud-upload-alt"></i> Live Sync | AI Alerts</div>
+      <div className="dashboard-wrap">
+        <div className="dash-header">
+          <div className="dash-title">
+            <i className="fas fa-chart-line"></i> Smart Inventory Monitor
+          </div>
+          <div className="live-badge">
+            <span className="live-dot"></span> Live Sync | AI Alerts
+          </div>
         </div>
         <div className="ai-insight">
           <i className="fas fa-robot"></i>
@@ -51,18 +54,18 @@ function DashboardTable({ inventory, onFlashSale }) {
   }
 
   return (
-    <div className="dashboard-preview">
-      <div className="dashboard-header">
-        <h3>
+    <div className="dashboard-wrap">
+      <div className="dash-header">
+        <div className="dash-title">
           <i className="fas fa-chart-line"></i> Smart Inventory Monitor
-        </h3>
-        <div className="tech-badge">
-          <i className="fas fa-cloud-upload-alt"></i> Live Sync | AI Alerts
+        </div>
+        <div className="live-badge">
+          <span className="live-dot"></span> Live Sync | AI Alerts
         </div>
       </div>
       
-      <div className="table-wrapper">
-        <table className="expiry-table">
+      <div className="table-scroll">
+        <table className="inv-table">
           <thead>
             <tr>
               <th>Product</th>
@@ -75,24 +78,24 @@ function DashboardTable({ inventory, onFlashSale }) {
           </thead>
           <tbody>
             {inventory.map(item => {
-              // Safely check values with fallbacks
               const isExpired = item.status === 'expired' || (item.daysLeft !== undefined && item.daysLeft < 0)
               const daysLeftValue = item.daysLeft !== undefined ? item.daysLeft : 999
               const expiryDateValue = item.expiryDate ? new Date(item.expiryDate) : new Date()
               
               return (
                 <tr key={item.id}>
-                  <td className="product-name">{item.name || 'Unknown'}</td>
-                  <td>{item.batch || 'N/A'}</td>
-                  <td>{expiryDateValue.toLocaleDateString()}</td>
+                  <td className="cell-product">{item.name || 'Unknown'}</td>
+                  <td className="cell-batch">{item.batch || 'N/A'}</td>
+                  <td className="cell-date">{expiryDateValue.toLocaleDateString()}</td>
                   <td>
                     <span className={`status-badge ${getStatusClass(item.status, daysLeftValue)}`}>
+                      {daysLeftValue <= 3 && daysLeftValue > 0 && <span className="critical-dot"></span>}
                       {getStatusText(item.status, daysLeftValue)}
                     </span>
                   </td>
                   <td>
                     {item.suggestion && (
-                      <span className="action-suggest">
+                      <span className="suggestion-pill">
                         <i className="fas fa-bullhorn"></i> {item.suggestion}
                       </span>
                     )}
@@ -101,9 +104,9 @@ function DashboardTable({ inventory, onFlashSale }) {
                     {!isExpired && daysLeftValue <= 7 && onFlashSale && (
                       <button 
                         onClick={() => onFlashSale(item.id)} 
-                        className="flash-sale-btn"
+                        className="btn-flash"
                       >
-                        <i className="fas fa-tags"></i> Apply Flash Sale
+                        <i className="fas fa-tags"></i> Flash Sale
                       </button>
                     )}
                   </td>
@@ -116,8 +119,8 @@ function DashboardTable({ inventory, onFlashSale }) {
       
       <div className="ai-insight">
         <i className="fas fa-robot"></i>
-        <strong>AI Insight:</strong> {getExpiringCount()} products near expiry → 
-        potential loss ~ LKR {getPotentialLoss().toLocaleString()}. 
+        <strong>AI Insight:</strong> <span className="highlight">{getExpiringCount()} products</span> near expiry → 
+        potential loss ~ <span className="highlight">LKR {getPotentialLoss().toLocaleString()}</span>. 
         Flash sale recommended for expiring items.
       </div>
     </div>
