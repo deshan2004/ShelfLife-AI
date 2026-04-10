@@ -1,6 +1,7 @@
 import './Navbar.css'
+import UserMenu from './UserMenu'
 
-export default function Navbar({ onScanClick, onLoginClick, user }) {
+export default function Navbar({ onScanClick, onLoginClick, user, onLogout, activeTab, onTabChange }) {
   return (
     <nav className="navbar">
       <div className="container nav-inner">
@@ -14,16 +15,29 @@ export default function Navbar({ onScanClick, onLoginClick, user }) {
         </div>
 
         <div className="nav-links">
-          <a href="#" className="nav-link hide-mobile">Dashboard</a>
-          <a href="#" className="nav-link hide-mobile">Inventory</a>
-          <a href="#" className="nav-link hide-mobile">Analytics</a>
+          <button 
+            className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => onTabChange('dashboard')}
+          >
+            Dashboard
+          </button>
+          <button 
+            className={`nav-link ${activeTab === 'batches' ? 'active' : ''}`}
+            onClick={() => onTabChange('batches')}
+          >
+            Batches
+          </button>
+          <button 
+            className={`nav-link ${activeTab === 'analytics' ? 'active' : ''}`}
+            onClick={() => onTabChange('analytics')}
+          >
+            Analytics
+          </button>
           <button className="btn-nav-outline" onClick={onScanClick}>
             <i className="fas fa-camera" /> Scan
           </button>
           {user ? (
-            <div className="user-menu-placeholder">
-              {/* UserMenu component will be rendered here from App */}
-            </div>
+            <UserMenu user={user} onLogout={onLogout} />
           ) : (
             <button className="btn-nav-solid" onClick={onLoginClick}>
               <i className="fas fa-user-shield" /> Sign In

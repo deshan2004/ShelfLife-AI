@@ -1,0 +1,249 @@
+.analytics-section {
+  margin: 3rem 0;
+}
+
+.analytics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.period-selector {
+  display: flex;
+  gap: 0.5rem;
+  background: var(--bg-panel);
+  border-radius: var(--r-pill);
+  padding: 0.25rem;
+}
+
+.period-btn {
+  background: transparent;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: var(--r-pill);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 600;
+}
+
+.period-btn.active {
+  background: var(--green-deep);
+  color: var(--green-neon);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: transform 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-accent);
+}
+
+.stat-icon {
+  width: 50px;
+  height: 50px;
+  background: var(--bg-raised);
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon i {
+  font-size: 1.5rem;
+  color: var(--green-neon);
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0.25rem 0;
+}
+
+.stat-change {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.stat-change.positive {
+  color: var(--green-bright);
+}
+
+.chart-container {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.chart-container h3 {
+  margin-bottom: 1.5rem;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  height: 250px;
+  padding: 1rem 0;
+}
+
+.bar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bar {
+  width: 100%;
+  background: linear-gradient(180deg, var(--green-mid), var(--green-neon));
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  position: relative;
+  transition: height 0.5s ease;
+  min-height: 4px;
+  cursor: pointer;
+}
+
+.bar:hover {
+  background: linear-gradient(180deg, var(--green-neon), var(--green-bright));
+}
+
+.bar-value {
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--green-neon);
+  white-space: nowrap;
+  display: none;
+}
+
+.bar:hover .bar-value {
+  display: block;
+}
+
+.bar-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.roi-calculator {
+  background: linear-gradient(135deg, var(--bg-panel), var(--bg-card));
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.5rem;
+}
+
+.roi-calculator h3 {
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.roi-calculator h3 i {
+  color: var(--green-neon);
+  margin-right: 0.5rem;
+}
+
+.roi-inputs {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.input-group {
+  flex: 1;
+  min-width: 150px;
+}
+
+.input-group label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.input-group input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--r-md);
+  padding: 0.6rem;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.input-group input:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn-calc-roi {
+  background: var(--green-deep);
+  border: none;
+  border-radius: var(--r-md);
+  padding: 0.6rem 1.2rem;
+  font-weight: 700;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-calc-roi:hover {
+  background: var(--green-mid);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .bar-chart {
+    height: 200px;
+  }
+  
+  .bar-value {
+    font-size: 0.6rem;
+    top: -20px;
+  }
+}

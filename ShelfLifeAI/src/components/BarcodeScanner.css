@@ -40,6 +40,147 @@
   background: var(--red-bg);
 }
 
+/* Camera Selector */
+.camera-selector {
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background: var(--bg-raised);
+  border-radius: var(--r-md);
+}
+
+.camera-selector label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-right: 0.5rem;
+}
+
+.camera-select {
+  background: var(--bg-input);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--r-sm);
+  padding: 0.4rem 0.8rem;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+/* Start Camera Button */
+.btn-start-camera {
+  width: 100%;
+  background: linear-gradient(135deg, var(--green-dark), var(--green-deep));
+  border: none;
+  border-radius: var(--r-md);
+  padding: 0.8rem;
+  font-weight: 700;
+  color: var(--green-bright);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.btn-start-camera:hover {
+  background: linear-gradient(135deg, var(--green-deep), var(--green-mid));
+  color: #030a03;
+  transform: translateY(-1px);
+}
+
+/* Camera Container */
+.camera-container {
+  position: relative;
+  margin-bottom: 1rem;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: #000;
+}
+
+.camera-preview {
+  width: 100%;
+  height: auto;
+  min-height: 300px;
+  background: #000;
+}
+
+.scan-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.scan-frame {
+  width: 80%;
+  height: 40%;
+  border: 2px solid var(--green-neon);
+  border-radius: var(--r-md);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    border-color: var(--green-neon);
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  }
+  50% {
+    border-color: var(--green-bright);
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+  }
+}
+
+.btn-stop-camera {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--red);
+  border: none;
+  border-radius: var(--r-pill);
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  z-index: 10;
+}
+
+.btn-stop-camera:hover {
+  background: #dc2626;
+  transform: translateX(-50%) scale(1.05);
+}
+
+.scanner-divider {
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin: 1rem 0;
+  position: relative;
+}
+
+.scanner-divider::before,
+.scanner-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: var(--border);
+}
+
+.scanner-divider::before { left: 0; }
+.scanner-divider::after { right: 0; }
+
 .scanner-form {
   display: flex;
   gap: 0.75rem;

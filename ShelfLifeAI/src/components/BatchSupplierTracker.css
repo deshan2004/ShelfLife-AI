@@ -1,0 +1,255 @@
+.batch-tracker {
+  margin: 3rem 0;
+}
+
+.tracker-header {
+  margin-bottom: 2rem;
+}
+
+.tracker-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.supplier-group {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+
+.supplier-header {
+  background: var(--bg-raised);
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.supplier-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.supplier-info i {
+  font-size: 1.5rem;
+  color: var(--green-neon);
+}
+
+.supplier-info h3 {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.supplier-contact {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  display: block;
+}
+
+.supplier-stats {
+  display: flex;
+  gap: 1rem;
+}
+
+.batch-count, .total-value {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.75rem;
+  background: var(--bg-panel);
+  border-radius: var(--r-pill);
+}
+
+.batch-list {
+  padding: 0.5rem;
+}
+
+.batch-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem;
+  margin: 0.5rem 0;
+  background: var(--bg-card);
+  border-radius: var(--r-md);
+  border-left: 3px solid var(--green-mid);
+  transition: transform 0.2s;
+}
+
+.batch-item:hover {
+  transform: translateX(4px);
+}
+
+.batch-item.warning {
+  border-left-color: var(--amber);
+}
+
+.batch-item.expired {
+  border-left-color: var(--red);
+  opacity: 0.7;
+}
+
+.batch-info {
+  flex: 1;
+}
+
+.batch-name {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.batch-name strong {
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.batch-code, .batch-date {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.batch-details {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+
+.stock-info, .expiry-info {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-secondary);
+}
+
+.days-badge {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+}
+
+.days-badge.urgent {
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+
+.batch-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-return, .btn-dispose, .btn-view-batch {
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--r-pill);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-return {
+  background: var(--amber-bg);
+  color: var(--amber);
+  border: 1px solid var(--amber-border);
+}
+
+.btn-return:hover {
+  background: var(--amber);
+  color: white;
+}
+
+.btn-dispose {
+  background: var(--red-bg);
+  color: var(--red);
+  border: 1px solid var(--red-border);
+}
+
+.btn-dispose:hover {
+  background: var(--red);
+  color: white;
+}
+
+.btn-view-batch {
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.btn-view-batch:hover {
+  border-color: var(--green-mid);
+  color: var(--green-neon);
+}
+
+/* Return Modal */
+.return-modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 1.5rem;
+  max-width: 450px;
+  width: 90%;
+}
+
+.return-modal h3 {
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.return-details p {
+  margin: 0.75rem 0;
+  color: var(--text-secondary);
+}
+
+.return-qty, .return-reason {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--r-md);
+  padding: 0.5rem;
+  color: var(--text-primary);
+  margin-top: 0.25rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.btn-cancel, .btn-confirm-return {
+  flex: 1;
+  padding: 0.6rem;
+  border-radius: var(--r-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancel {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.btn-confirm-return {
+  background: var(--green-deep);
+  border: none;
+  color: white;
+}
+
+.btn-confirm-return:hover {
+  background: var(--green-mid);
+}
