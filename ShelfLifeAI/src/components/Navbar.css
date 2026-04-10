@@ -1,0 +1,126 @@
+/* ── Navbar ── */
+.navbar {
+  background: rgba(7, 14, 7, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+
+.nav-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.9rem 0;
+  gap: 1rem;
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  font-size: 1.45rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  cursor: default;
+}
+
+.logo-mark {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--green-deep), var(--green-neon));
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  color: #030a03;
+  box-shadow: 0 0 18px rgba(57, 231, 95, 0.35);
+  flex-shrink: 0;
+}
+
+.logo-ai {
+  color: var(--green-neon);
+}
+
+/* Links */
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.nav-link {
+  font-weight: 500;
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'Outfit', sans-serif;
+}
+
+.nav-link:hover {
+  color: var(--green-neon);
+}
+
+/* Buttons */
+.btn-nav-outline {
+  border: 1px solid var(--border-bright);
+  background: transparent;
+  padding: 0.42rem 1.05rem;
+  border-radius: var(--r-pill);
+  font-weight: 600;
+  color: var(--green-bright);
+  cursor: pointer;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.88rem;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.btn-nav-outline:hover {
+  border-color: var(--green-neon);
+  background: var(--green-glow);
+  color: var(--green-neon);
+}
+
+.btn-nav-solid {
+  background: var(--green-mid);
+  color: #030d03;
+  border: none;
+  padding: 0.48rem 1.2rem;
+  border-radius: var(--r-pill);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.88rem;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  box-shadow: 0 0 18px rgba(34, 197, 94, 0.28);
+}
+
+.btn-nav-solid:hover {
+  background: var(--green-neon);
+  transform: translateY(-1px);
+  box-shadow: 0 0 28px rgba(57, 231, 95, 0.4);
+}
+
+@media (max-width: 768px) {
+  .nav-links { gap: 0.8rem; }
+  .nav-link.hide-mobile { display: none; }
+}
+
+@media (max-width: 480px) {
+  .logo span.logo-name { display: none; }
+}

@@ -1,0 +1,129 @@
+/* ── Edge Section ── */
+.edge-section {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 2.5rem;
+}
+
+.edge-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3rem;
+  align-items: center;
+}
+
+/* ── List ── */
+.edge-list {
+  list-style: none;
+  margin-top: 1.2rem;
+}
+
+.edge-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.edge-list li:last-child {
+  border-bottom: none;
+}
+
+.edge-item-icon {
+  width: 38px;
+  height: 38px;
+  background: rgba(57, 231, 95, 0.08);
+  border: 1px solid rgba(57, 231, 95, 0.16);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  transition: background 0.2s;
+}
+
+.edge-list li:hover .edge-item-icon {
+  background: rgba(57, 231, 95, 0.15);
+}
+
+.edge-item-icon i {
+  font-size: 0.95rem;
+  color: var(--green-neon);
+}
+
+.edge-item-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.edge-item-desc {
+  font-size: 0.87rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* Tech pill */
+.tech-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--r-pill);
+  padding: 0.42rem 1rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 1.3rem;
+}
+
+.tech-pill i {
+  color: var(--green-mid);
+}
+
+/* ── Stat box ── */
+.edge-stat-box {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--r-lg);
+  padding: 2rem 1.5rem;
+  text-align: center;
+  min-width: 155px;
+}
+
+.stat-big-number {
+  font-family: 'DM Mono', monospace;
+  font-size: 3.2rem;
+  font-weight: 500;
+  color: var(--green-neon);
+  line-height: 1;
+  text-shadow: 0 0 28px rgba(57, 231, 95, 0.4);
+}
+
+.stat-big-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+}
+
+.sqa-badge {
+  display: inline-block;
+  background: var(--green-dark);
+  border: 1px solid rgba(57, 231, 95, 0.3);
+  color: var(--green-neon);
+  border-radius: var(--r-pill);
+  padding: 0.28rem 0.85rem;
+  font-size: 0.73rem;
+  font-weight: 700;
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .edge-grid    { grid-template-columns: 1fr; }
+  .edge-stat-box { display: none; }
+}

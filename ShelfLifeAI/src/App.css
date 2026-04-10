@@ -1,0 +1,90 @@
+/* Section Title */
+.section-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+  color: var(--primary-dark);
+  position: relative;
+  display: inline-block;
+}
+
+.section-title:after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 0;
+  width: 60%;
+  height: 4px;
+  background: var(--primary-light);
+  border-radius: 4px;
+}
+
+/* Features Section */
+.features-section {
+  margin: 2rem 0 3rem;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  margin: 2rem 0;
+}
+
+/* Toast Notification */
+.toast-notification {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: var(--primary-dark);
+  color: white;
+  padding: 0.8rem 1.5rem;
+  border-radius: 50px;
+  z-index: 100;
+  box-shadow: var(--shadow-md);
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Vision Section */
+.vision-section {
+  margin: 3rem 0;
+  text-align: center;
+}
+
+.vision-quote {
+  font-size: 1.2rem;
+  font-style: italic;
+  color: var(--primary-dark);
+  font-weight: 500;
+}
+
+.tech-stack {
+  margin-top: 1rem;
+  color: var(--gray-600);
+}
+
+.tech-stack i {
+  color: var(--primary-green);
+  margin-right: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .section-title {
+    font-size: 1.5rem;
+  }
+  
+  .vision-quote {
+    font-size: 1rem;
+  }
+}

@@ -1,0 +1,139 @@
+/* ─────────────────────────────────────────
+   ShelfLife AI  ·  Global Styles & Tokens
+───────────────────────────────────────── */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* ── Palette ── */
+  --bg-void:      #030a03;
+  --bg-base:      #070e07;
+  --bg-panel:     #0c190c;
+  --bg-card:      #101e10;
+  --bg-raised:    #152515;
+  --bg-input:     #0f1c0f;
+
+  --green-neon:   #39e75f;
+  --green-bright: #4ade80;
+  --green-mid:    #22c55e;
+  --green-deep:   #16a34a;
+  --green-dark:   #14532d;
+  --green-glow:   rgba(57, 231, 95, 0.14);
+  --green-glow-sm:rgba(57, 231, 95, 0.07);
+
+  --amber:        #f59e0b;
+  --amber-bg:     rgba(245, 158, 11, 0.12);
+  --amber-border: rgba(245, 158, 11, 0.25);
+
+  --red:          #ef4444;
+  --red-bg:       rgba(239, 68, 68, 0.12);
+  --red-border:   rgba(239, 68, 68, 0.25);
+
+  /* ── Text ── */
+  --text-primary:   #dff0df;
+  --text-secondary: #7aaa7a;
+  --text-muted:     #3d603d;
+
+  /* ── Borders ── */
+  --border:         #162416;
+  --border-bright:  #254025;
+  --border-accent:  rgba(57, 231, 95, 0.22);
+
+  /* ── Shadows ── */
+  --shadow-card:    0 4px 24px rgba(0, 0, 0, 0.5);
+  --shadow-green:   0 0 40px rgba(57, 231, 95, 0.12);
+  --shadow-glow:    0 0 60px rgba(57, 231, 95, 0.18);
+
+  /* ── Radii ── */
+  --r-sm:   0.5rem;
+  --r-md:   0.875rem;
+  --r-lg:   1.25rem;
+  --r-xl:   1.75rem;
+  --r-pill: 9999px;
+
+  /* ── Spacing ── */
+  --section-pad: 4.5rem 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Outfit', system-ui, sans-serif;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  line-height: 1.65;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* Ambient background glow */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 70% 40% at 15% 5%,  rgba(57,231,95,0.055) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 35% at 85% 95%,  rgba(34,197,94,0.04)  0%, transparent 55%);
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Shared container ── */
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Section labels ── */
+.section-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--green-mid);
+  margin-bottom: 0.5rem;
+}
+
+.section-heading {
+  font-size: 2.1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.15;
+  margin-bottom: 0.6rem;
+}
+
+.section-sub {
+  color: var(--text-secondary);
+  font-size: 0.97rem;
+  margin-bottom: 2.5rem;
+  max-width: 560px;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar        { width: 5px; }
+::-webkit-scrollbar-track  { background: var(--bg-panel); }
+::-webkit-scrollbar-thumb  { background: var(--green-dark); border-radius: 3px; }
+
+/* ── Utility ── */
+.monospace { font-family: 'DM Mono', monospace; }
+
+@media (max-width: 600px) {
+  .container { padding: 0 1rem; }
+  .section-heading { font-size: 1.65rem; }
+}
