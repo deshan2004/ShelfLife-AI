@@ -68,3 +68,5 @@ const PORT = 5000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
+// server.cjs අන්තිමට මේක දාන්න
+module.exports = app;
