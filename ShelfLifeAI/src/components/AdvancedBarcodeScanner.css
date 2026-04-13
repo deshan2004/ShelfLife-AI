@@ -1,9 +1,8 @@
-.barcode-scanner {
+.advanced-barcode-scanner {
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 1.25rem;
-  margin: 0;
 }
 
 .scanner-header {
@@ -40,31 +39,33 @@
   background: var(--red-bg);
 }
 
-/* Camera Selector */
 .camera-selector {
   margin-bottom: 1rem;
-  padding: 0.5rem;
+  padding: 0.75rem;
   background: var(--bg-raised);
   border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .camera-selector label {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: var(--text-secondary);
-  margin-right: 0.5rem;
+  font-weight: 600;
 }
 
 .camera-select {
+  flex: 1;
   background: var(--bg-input);
   border: 1px solid var(--border-bright);
   border-radius: var(--r-sm);
-  padding: 0.4rem 0.8rem;
+  padding: 0.5rem;
   color: var(--text-primary);
-  font-size: 0.8rem;
   cursor: pointer;
 }
 
-/* Start Camera Button */
 .btn-start-camera {
   width: 100%;
   background: linear-gradient(135deg, var(--green-dark), var(--green-deep));
@@ -82,13 +83,16 @@
   margin-bottom: 1rem;
 }
 
-.btn-start-camera:hover {
+.btn-start-camera:hover:not(:disabled) {
   background: linear-gradient(135deg, var(--green-deep), var(--green-mid));
-  color: #030a03;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
-/* Camera Container */
+.btn-start-camera:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .camera-container {
   position: relative;
   margin-bottom: 1rem;
@@ -111,6 +115,7 @@
   right: 0;
   bottom: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   pointer-events: none;
@@ -121,19 +126,46 @@
   height: 40%;
   border: 2px solid var(--green-neon);
   border-radius: var(--r-md);
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-  animation: pulse 1.5s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    border-color: var(--green-neon);
-    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+.scan-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--green-neon);
+  animation: scan 2s linear infinite;
+}
+
+@keyframes scan {
+  0% {
+    top: 0;
   }
   50% {
-    border-color: var(--green-bright);
-    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+    top: 100%;
   }
+  100% {
+    top: 0;
+  }
+}
+
+.scan-instruction {
+  margin-top: 1rem;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 0.5rem 1rem;
+  border-radius: var(--r-pill);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: white;
+  font-size: 0.8rem;
+}
+
+.scan-instruction i {
+  color: var(--green-neon);
 }
 
 .btn-stop-camera {
@@ -158,6 +190,19 @@
 .btn-stop-camera:hover {
   background: #dc2626;
   transform: translateX(-50%) scale(1.05);
+}
+
+.camera-error {
+  margin: 0.5rem 0;
+  padding: 0.75rem;
+  background: var(--red-bg);
+  border: 1px solid var(--red-border);
+  border-radius: var(--r-md);
+  color: var(--red);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
 }
 
 .scanner-divider {
@@ -197,7 +242,6 @@
   font-family: 'DM Mono', monospace;
   font-size: 0.85rem;
   outline: none;
-  transition: border-color 0.2s;
 }
 
 .scanner-input:focus {
@@ -234,13 +278,36 @@
 
 .scan-success {
   margin-top: 0.8rem;
-  padding: 0.5rem;
-  background: rgba(57, 231, 95, 0.1);
-  border: 1px solid rgba(57, 231, 95, 0.2);
+  padding: 0.75rem;
   border-radius: var(--r-sm);
-  font-size: 0.8rem;
-  color: var(--green-bright);
+  font-size: 0.85rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
+}
+
+.scan-success.success {
+  background: rgba(57, 231, 95, 0.1);
+  border: 1px solid rgba(57, 231, 95, 0.2);
+  color: var(--green-bright);
+}
+
+.scan-success.error {
+  background: var(--red-bg);
+  border: 1px solid var(--red-border);
+  color: var(--red);
+}
+
+.product-preview {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.product-preview p {
+  font-weight: 600;
+  margin-bottom: 0.1rem;
+}
+
+.product-preview small {
+  color: var(--text-muted);
 }

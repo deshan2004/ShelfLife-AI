@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import BarcodeScanner from '../components/BarcodeScanner'
-import OCRScanner from '../components/OCRScanner'
+import BarcodeScanner from '../components/AdvancedBarcodeScanner'
+import OCRScanner from '../components/AdvancedOCRScanner'
 import './Pages.css'
 
 function Inventory({ inventory, onUpdateInventory, showToast }) {
