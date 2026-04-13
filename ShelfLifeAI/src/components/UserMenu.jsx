@@ -1,10 +1,17 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './UserMenu.css'
 
 function UserMenu({ user, onLogout }) {
   const [isOpen, setIsOpen] = useState(false)
+  const navigate = useNavigate()
 
   if (!user) return null
+
+  const handleNavigation = (path) => {
+    navigate(path)
+    setIsOpen(false)
+  }
 
   return (
     <div className="user-menu">
@@ -28,14 +35,17 @@ function UserMenu({ user, onLogout }) {
             </div>
           </div>
           <div className="menu-divider"></div>
-          <button className="menu-item">
+          <button className="menu-item" onClick={() => handleNavigation('/dashboard')}>
             <i className="fas fa-chart-line"></i> Dashboard
           </button>
-          <button className="menu-item">
+          <button className="menu-item" onClick={() => handleNavigation('/inventory')}>
             <i className="fas fa-box"></i> My Inventory
           </button>
-          <button className="menu-item">
-            <i className="fas fa-cog"></i> Settings
+          <button className="menu-item" onClick={() => handleNavigation('/suppliers')}>
+            <i className="fas fa-truck"></i> Suppliers
+          </button>
+          <button className="menu-item" onClick={() => handleNavigation('/analytics')}>
+            <i className="fas fa-chart-pie"></i> Analytics
           </button>
           <div className="menu-divider"></div>
           <button className="menu-item logout" onClick={onLogout}>

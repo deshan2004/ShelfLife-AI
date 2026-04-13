@@ -2,6 +2,7 @@
   "name": "shelflife-ai",
   "private": true,
   "version": "1.0.0",
+  "proxy": "http://localhost:5000",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,8 +11,14 @@
   },
   "dependencies": {
     "@zxing/library": "^0.21.3",
+    "axios": "^1.15.0",
+    "chart.js": "^4.5.1",
+    "cors": "^2.8.6",
+    "firebase": "^12.12.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^7.14.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",

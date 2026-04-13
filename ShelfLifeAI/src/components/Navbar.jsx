@@ -1,41 +1,49 @@
+import { Link, useLocation } from 'react-router-dom'
 import './Navbar.css'
 import UserMenu from './UserMenu'
 
-export default function Navbar({ onScanClick, onLoginClick, user, onLogout, activeTab, onTabChange }) {
+export default function Navbar({ onLoginClick, user, onLogout }) {
+  const location = useLocation()
+
+  const isActive = (path) => location.pathname === path
+
   return (
     <nav className="navbar">
       <div className="container nav-inner">
-        <div className="logo">
+        <Link to="/dashboard" className="logo">
           <div className="logo-mark">
             <i className="fas fa-leaf" />
           </div>
           <span className="logo-name">
             ShelfLife <span className="logo-ai">AI</span>
           </span>
-        </div>
+        </Link>
 
         <div className="nav-links">
-          <button 
-            className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => onTabChange('dashboard')}
+          <Link 
+            to="/dashboard" 
+            className={`nav-link ${isActive('/dashboard') ? 'active' : ''}`}
           >
             Dashboard
-          </button>
-          <button 
-            className={`nav-link ${activeTab === 'batches' ? 'active' : ''}`}
-            onClick={() => onTabChange('batches')}
+          </Link>
+          <Link 
+            to="/inventory" 
+            className={`nav-link ${isActive('/inventory') ? 'active' : ''}`}
           >
-            Batches
-          </button>
-          <button 
-            className={`nav-link ${activeTab === 'analytics' ? 'active' : ''}`}
-            onClick={() => onTabChange('analytics')}
+            Inventory
+          </Link>
+          <Link 
+            to="/suppliers" 
+            className={`nav-link ${isActive('/suppliers') ? 'active' : ''}`}
+          >
+            Suppliers
+          </Link>
+          <Link 
+            to="/analytics" 
+            className={`nav-link ${isActive('/analytics') ? 'active' : ''}`}
           >
             Analytics
-          </button>
-          <button className="btn-nav-outline" onClick={onScanClick}>
-            <i className="fas fa-camera" /> Scan
-          </button>
+          </Link>
           {user ? (
             <UserMenu user={user} onLogout={onLogout} />
           ) : (

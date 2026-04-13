@@ -1,10 +1,6 @@
-import { useState } from 'react'
 import './DashboardTable.css'
 
-function DashboardTable({ inventory, onFlashSale, onDeleteItem, onUpdateItem }) {
-  const [editingId, setEditingId] = useState(null)
-  const [editValue, setEditValue] = useState('')
-
+function DashboardTable({ inventory, onFlashSale, onDeleteItem }) {
   const getStatusClass = (daysLeft) => {
     if (daysLeft <= 0) return 'status-critical'
     if (daysLeft <= 3) return 'status-warning'
@@ -44,21 +40,7 @@ function DashboardTable({ inventory, onFlashSale, onDeleteItem, onUpdateItem }) 
       item.daysLeft <= 7 && 
       item.daysLeft > 0
     )
-    // Calculate based on actual selling prices
     return expiringItems.reduce((sum, item) => sum + (item.sellingPrice * Math.min(item.stock, 5)), 0)
-  }
-
-  const handleEdit = (item) => {
-    setEditingId(item.id)
-    setEditValue(item.name)
-  }
-
-  const handleSaveEdit = (id) => {
-    if (onUpdateItem) {
-      onUpdateItem(id, editValue)
-    }
-    setEditingId(null)
-    setEditValue('')
   }
 
   if (!inventory || inventory.length === 0) {
@@ -116,46 +98,32 @@ function DashboardTable({ inventory, onFlashSale, onDeleteItem, onUpdateItem }) 
               return (
                 <tr key={item.id} className={isExpired ? 'row-expired' : isCritical ? 'row-critical' : isNearExpiry ? 'row-warning' : ''}>
                   <td className="cell-product">
-                    {editingId === item.id ? (
-                      <input
-                        type="text"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onBlur={() => handleSaveEdit(item.id)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit(item.id)}
-                        className="edit-input"
-                        autoFocus
-                      />
-                    ) : (
-                      <span onDoubleClick={() => handleEdit(item)} title="Double-click to edit">
-                        {item.name || 'Unknown'}
-                      </span>
-                    )}
-                  </td>
+                    <span>{item.name || 'Unknown'}</span>
+                   </td>
                   <td className="cell-batch">
                     <span className="batch-code">{item.batch || 'N/A'}</span>
-                  </td>
+                   </td>
                   <td className="cell-date">
                     {expiryDateValue.toLocaleDateString()}
-                  </td>
+                   </td>
                   <td className="cell-days">
                     <span className={`days-badge ${isExpired ? 'expired' : isCritical ? 'critical' : isNearExpiry ? 'urgent' : ''}`}>
                       {isExpired ? 'Expired' : `${daysLeftValue} day${daysLeftValue !== 1 ? 's' : ''}`}
                     </span>
-                  </td>
+                   </td>
                   <td>
                     <span className={`status-badge ${getStatusClass(daysLeftValue)}`}>
                       {isCritical && <span className="critical-dot"></span>}
                       {getStatusText(daysLeftValue)}
                     </span>
-                  </td>
+                   </td>
                   <td>
                     {item.suggestion && (
                       <span className="suggestion-pill">
                         <i className="fas fa-bullhorn"></i> {item.suggestion}
                       </span>
                     )}
-                  </td>
+                   </td>
                   <td>
                     <div className="action-buttons">
                       {!isExpired && daysLeftValue <= 7 && onFlashSale && (
