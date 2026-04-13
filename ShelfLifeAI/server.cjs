@@ -25,7 +25,7 @@ app.get('/', (req, res) => {
 });
 
 // Signup API
-app.post('/api/signup', async (req, res) => {
+app.post('https://shelf-life-ai.vercel.app//api/signup', async (req, res) => {
     console.log("Signup Request Received:", req.body); // Terminal එකේ වැටෙන්න මේක ඕනේ
     try {
         const { email, password, name } = req.body;
@@ -50,7 +50,7 @@ app.post('/api/signup', async (req, res) => {
 });
 
 // Login API
-app.post('/api/login', async (req, res) => {
+app.post('https://shelf-life-ai.vercel.app//api/login', async (req, res) => {
     try {
         const { idToken } = req.body;
         const decodedToken = await admin.auth().verifyIdToken(idToken);
