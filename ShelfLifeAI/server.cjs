@@ -5,18 +5,18 @@ const serviceAccount = require('./serviceAccountKey.json');
 
 const app = express();
 
-// Middleware
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: true, 
     methods: ['GET', 'POST'],
     credentials: true
 }));
 app.use(express.json());
 
-// Firebase Admin Initialize
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-});
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+}
 
 const db = admin.firestore();
 
@@ -24,9 +24,8 @@ app.get('/', (req, res) => {
     res.send('ShelfLife AI Backend is running!');
 });
 
-// Signup API
-app.post('https://shelf-life-ai.vercel.app//api/signup', async (req, res) => {
-    console.log("Signup Request Received:", req.body); // Terminal එකේ වැටෙන්න මේක ඕනේ
+app.post('/api/signup', async (req, res) => {
+    console.log("Signup Request Received:", req.body);
     try {
         const { email, password, name } = req.body;
         const userRecord = await admin.auth().createUser({
@@ -49,8 +48,7 @@ app.post('https://shelf-life-ai.vercel.app//api/signup', async (req, res) => {
     }
 });
 
-// Login API
-app.post('https://shelf-life-ai.vercel.app//api/login', async (req, res) => {
+app.post('/api/login', async (req, res) => {
     try {
         const { idToken } = req.body;
         const decodedToken = await admin.auth().verifyIdToken(idToken);
@@ -60,13 +58,16 @@ app.post('https://shelf-life-ai.vercel.app//api/login', async (req, res) => {
 
         res.status(200).json({ message: 'Login successful!', user: userDoc.data() });
     } catch (error) {
+        console.error("Login Error:", error.message);
         res.status(401).json({ error: 'Unauthorized access' });
     }
 });
 
-const PORT = 5000;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
-// server.cjs අන්තිමට මේක දාන්න
+const PORT = process.env.PORT || 5000;
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
+}
+
 module.exports = app;
