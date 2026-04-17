@@ -186,4 +186,43 @@ button,
     transform: scale(0.98);
     transition: transform 0.05s;
   }
+}/* Add to src/index.css - Hide any rogue keyboard */
+.osk, 
+.on-screen-keyboard,
+.virtual-keyboard,
+.keyboard-container,
+[class*="keyboard"],
+[class*="Keyboard"],
+#keyboard,
+div[role="keyboard"],
+.keypad,
+.virtual-keypad,
+div[style*="keyboard"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  z-index: -9999 !important;
+}/* Add to src/index.css */
+/* Add to src/index.css - This forces video visibility */
+video {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 300px !important;
+  background: #000000 !important;
+  object-fit: cover !important;
+}
+
+.camera-container {
+  display: block !important;
+  min-height: 320px !important;
+  background: #000 !important;
+}
+
+.camera-preview {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }

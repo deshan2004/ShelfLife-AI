@@ -1,11 +1,24 @@
+// src/pages/Dashboard.jsx (updated)
+
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Hero from '../components/Hero'
 import FeatureCard from '../components/FeatureCard'
 import DashboardTable from '../components/DashboardTable'
 import QuickStats from '../components/QuickStats'
+import SubscriptionGuard from '../components/subscription/SubscriptionGuard'
 import './Pages.css'
 
-function Dashboard({ inventory, onUpdateInventory, showToast }) {
+function Dashboard({ 
+  inventory, 
+  onUpdateInventory, 
+  showToast, 
+  canAddProduct,
+  onLimitReached,
+  subscriptionStatus,
+  trialDaysLeft 
+}) {
+  const navigate = useNavigate()
   const [lowStockAlerts, setLowStockAlerts] = useState([])
   const [expiringCount, setExpiringCount] = useState(0)
   const [criticalCount, setCriticalCount] = useState(0)
@@ -65,9 +78,37 @@ function Dashboard({ inventory, onUpdateInventory, showToast }) {
     { icon: "fa-cloud-upload-alt", title: "Cloud Sync", desc: "Access shop data anywhere, offline-first PWA syncs when back online." }
   ]
 
+  // Check if user is on trial (no subscription or trial_active)
+  const isOnTrial = subscriptionStatus === 'trial_active' || subscriptionStatus === 'free_trial' || !subscriptionStatus
+  const showFreeTrialBanner = isOnTrial && trialDaysLeft > 0
+
   return (
     <div className="page-container">
       <Hero />
+      
+      {/* Start Free Trial Banner - Only show for trial users */}
+      {showFreeTrialBanner && (
+        <div className="free-trial-banner">
+          <div className="free-trial-content">
+            <div className="free-trial-icon">
+              <i className="fas fa-gift"></i>
+            </div>
+            <div className="free-trial-text">
+              <h3>Start Your Free Trial</h3>
+              <p>Get 14 days free access to all premium features. No credit card required.</p>
+              {trialDaysLeft > 0 && trialDaysLeft <= 14 && (
+                <span className="trial-days-badge">{trialDaysLeft} days left in trial</span>
+              )}
+            </div>
+            <button 
+              className="btn-start-free-trial" 
+              onClick={() => navigate('/billing')}
+            >
+              Start Free Trial <i className="fas fa-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+      )}
       
       <QuickStats inventory={inventory} />
 
@@ -79,6 +120,8 @@ function Dashboard({ inventory, onUpdateInventory, showToast }) {
             {lowStockAlerts.length > 0 && `⚠️ ${lowStockAlerts.length} item(s) need restocking. `}
             {expiringCount > 0 && `${expiringCount} item(s) near expiry (${criticalCount} critical). `}
             {expiringCount === 0 && lowStockAlerts.length === 0 && 'All systems healthy!'}
+            {isOnTrial && trialDaysLeft > 0 && ` 🎉 ${trialDaysLeft} days left in your free trial.`}
+            {subscriptionStatus === 'trial_expired' && ` ⚠️ Trial expired. Please upgrade to continue.`}
           </p>
         </div>
       </div>
@@ -105,11 +148,22 @@ function Dashboard({ inventory, onUpdateInventory, showToast }) {
         </div>
       </section>
 
-      <DashboardTable 
-        inventory={inventory} 
-        onFlashSale={handleFlashSale}
-        onDeleteItem={handleDeleteItem}
-      />
+      <SubscriptionGuard feature="basic-inventory" fallback={
+        <div className="upgrade-prompt-card">
+          <i className="fas fa-lock"></i>
+          <h3>Upgrade to View Your Inventory</h3>
+          <p>Your free trial has ended. Upgrade to continue managing your inventory.</p>
+          <button className="btn-upgrade" onClick={() => navigate('/billing')}>
+            View Plans
+          </button>
+        </div>
+      }>
+        <DashboardTable 
+          inventory={inventory} 
+          onFlashSale={handleFlashSale}
+          onDeleteItem={handleDeleteItem}
+        />
+      </SubscriptionGuard>
 
       <div className="cloud-sync-status">
         <i className="fas fa-cloud-upload-alt"></i>

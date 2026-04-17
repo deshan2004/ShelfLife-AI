@@ -1,5 +1,5 @@
+// src/components/AdvancedOCRScanner.jsx
 import { useState, useRef } from 'react'
-import { detectExpiryDateFromImage, calculateDaysLeft, getExpiryStatus } from '../utils/advancedOCRHelper'
 import './AdvancedOCRScanner.css'
 
 function AdvancedOCRScanner({ onScan, onClose }) {
@@ -7,8 +7,9 @@ function AdvancedOCRScanner({ onScan, onClose }) {
   const [manualExpiry, setManualExpiry] = useState('')
   const [scanResult, setScanResult] = useState(null)
   const [cameraActive, setCameraActive] = useState(false)
-  const [ocrProgress, setOcrProgress] = useState({ stage: '', message: '', progress: 0 })
+  const [ocrProgress, setOcrProgress] = useState('')
   const [capturedImage, setCapturedImage] = useState(null)
+  const [detectedText, setDetectedText] = useState('')
   
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -16,15 +17,21 @@ function AdvancedOCRScanner({ onScan, onClose }) {
 
   const startCamera = async () => {
     try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'environment' } 
       })
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         streamRef.current = stream
         setCameraActive(true)
         setCapturedImage(null)
         setScanResult(null)
+        setDetectedText('')
       }
     } catch (err) {
       console.error('Camera access error:', err)
@@ -38,14 +45,11 @@ function AdvancedOCRScanner({ onScan, onClose }) {
       const canvas = canvasRef.current
       const context = canvas.getContext('2d')
       
-      // Set canvas dimensions to match video
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
       
-      // Draw video frame to canvas
       context.drawImage(video, 0, 0, canvas.width, canvas.height)
       
-      // Get image data as base64
       const imageData = canvas.toDataURL('image/jpeg', 0.8)
       setCapturedImage(imageData)
       
@@ -54,58 +58,145 @@ function AdvancedOCRScanner({ onScan, onClose }) {
     return null
   }
 
-  const processImage = async (imageData) => {
-    setScanning(true)
-    setOcrProgress({ stage: 'starting', message: 'Starting OCR processing...', progress: 0 })
+  const parseExpiryDate = (text) => {
+    const patterns = [
+      /(\d{4})[-/](\d{1,2})[-/](\d{1,2})/,
+      /(\d{1,2})[-/](\d{1,2})[-/](\d{4})/,
+      /(?:exp|expiry|expiration|best before|use by)[:\s]*(\d{4}[-/]\d{1,2}[-/]\d{1,2})/i,
+      /(?:exp|expiry|expiration|best before|use by)[:\s]*(\d{1,2}[-/]\d{1,2}[-/]\d{4})/i,
+      /(?:exp|expiry)[:\s]*(\d{2})[-/](\d{2})[-/](\d{4})/i,
+    ]
     
-    try {
-      const result = await detectExpiryDateFromImage(imageData, (progress) => {
-        setOcrProgress(progress)
-      })
-      
-      if (result.isValid) {
-        const daysLeft = calculateDaysLeft(result.formatted)
-        const status = getExpiryStatus(daysLeft)
+    for (const pattern of patterns) {
+      const match = text.match(pattern)
+      if (match) {
+        let year, month, day
         
-        const scanData = {
-          type: 'ocr',
-          value: result.formatted,
-          daysLeft: daysLeft,
-          status: status,
-          confidence: result.confidence,
-          rawText: result.raw
+        if (match[1] && match[1].length === 4) {
+          year = parseInt(match[1])
+          month = parseInt(match[2])
+          day = parseInt(match[3])
+        } else if (match[3] && match[3].length === 4) {
+          day = parseInt(match[1])
+          month = parseInt(match[2])
+          year = parseInt(match[3])
+        } else if (match[1] && match[2] && match[3]) {
+          // Try to determine format
+          if (parseInt(match[1]) > 31 && parseInt(match[1]) < 2100) {
+            year = parseInt(match[1])
+            month = parseInt(match[2])
+            day = parseInt(match[3])
+          } else if (parseInt(match[3]) > 31 && parseInt(match[3]) < 2100) {
+            day = parseInt(match[1])
+            month = parseInt(match[2])
+            year = parseInt(match[3])
+          } else {
+            continue
+          }
+        } else {
+          continue
         }
         
-        onScan(scanData)
-        setScanResult({ 
-          success: true, 
-          expiryDate: result.formatted,
+        if (year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+          const date = new Date(year, month - 1, day)
+          if (!isNaN(date.getTime())) {
+            return date.toISOString().split('T')[0]
+          }
+        }
+      }
+    }
+    return null
+  }
+
+  const processImage = async (imageData) => {
+    setScanning(true)
+    setOcrProgress('Initializing OCR...')
+    
+    try {
+      setOcrProgress('Loading OCR engine...')
+      const TesseractModule = await import('tesseract.js')
+      const Tesseract = TesseractModule.default
+      
+      setOcrProgress('Reading text from image...')
+      const result = await Tesseract.recognize(
+        imageData,
+        'eng',
+        {
+          logger: (m) => {
+            if (m.status === 'recognizing text') {
+              setOcrProgress(`Reading: ${Math.round(m.progress * 100)}%`)
+            }
+          }
+        }
+      )
+      
+      const extractedText = result.data.text
+      setDetectedText(extractedText)
+      setOcrProgress('Parsing expiry date...')
+      
+      const expiryDate = parseExpiryDate(extractedText)
+      
+      if (expiryDate) {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const expiry = new Date(expiryDate)
+        expiry.setHours(0, 0, 0, 0)
+        const daysLeft = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24))
+        
+        let status = ''
+        let statusColor = ''
+        if (daysLeft <= 0) {
+          status = 'Expired'
+          statusColor = '#ef4444'
+        } else if (daysLeft <= 3) {
+          status = 'Critical'
+          statusColor = '#ef4444'
+        } else if (daysLeft <= 7) {
+          status = 'Near Expiry'
+          statusColor = '#f59e0b'
+        } else if (daysLeft <= 30) {
+          status = 'Expiring Soon'
+          statusColor = '#eab308'
+        } else {
+          status = 'Healthy'
+          statusColor = '#22c55e'
+        }
+        
+        onScan({ 
+          type: 'ocr', 
+          value: expiryDate,
           daysLeft: daysLeft,
-          status: status,
-          rawText: result.raw
+          status: { text: status, color: statusColor }
         })
         
-        // Auto-close after 5 seconds on success
+        setScanResult({ 
+          success: true, 
+          expiryDate: expiryDate,
+          daysLeft: daysLeft,
+          status: { text: status, color: statusColor },
+          detectedText: extractedText.slice(0, 300)
+        })
+        
         setTimeout(() => {
           stopCamera()
           onClose()
-        }, 5000)
+        }, 3000)
       } else {
         setScanResult({ 
           success: false, 
-          error: result.error || 'Could not detect expiry date',
-          rawText: result.raw
+          error: 'No valid expiry date found in image',
+          detectedText: extractedText.slice(0, 300)
         })
       }
     } catch (error) {
       console.error('OCR processing error:', error)
       setScanResult({ 
         success: false, 
-        error: 'Failed to process image. Please try again or enter manually.'
+        error: 'Failed to process image. Please try again with better lighting.'
       })
     } finally {
       setScanning(false)
-      setOcrProgress({ stage: '', message: '', progress: 0 })
+      setOcrProgress('')
     }
   }
 
@@ -141,22 +232,41 @@ function AdvancedOCRScanner({ onScan, onClose }) {
   const handleManualSubmit = (e) => {
     e.preventDefault()
     if (manualExpiry) {
-      // Validate date format
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/
       if (dateRegex.test(manualExpiry)) {
-        const daysLeft = calculateDaysLeft(manualExpiry)
-        const status = getExpiryStatus(daysLeft)
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const expiry = new Date(manualExpiry)
+        expiry.setHours(0, 0, 0, 0)
+        const daysLeft = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24))
+        
+        let status = ''
+        let statusColor = ''
+        if (daysLeft <= 0) {
+          status = 'Expired'
+          statusColor = '#ef4444'
+        } else if (daysLeft <= 3) {
+          status = 'Critical'
+          statusColor = '#ef4444'
+        } else if (daysLeft <= 7) {
+          status = 'Near Expiry'
+          statusColor = '#f59e0b'
+        } else {
+          status = 'Healthy'
+          statusColor = '#22c55e'
+        }
+        
         onScan({ 
           type: 'ocr', 
           value: manualExpiry,
           daysLeft: daysLeft,
-          status: status
+          status: { text: status, color: statusColor }
         })
         setScanResult({ 
           success: true, 
           expiryDate: manualExpiry,
           daysLeft: daysLeft,
-          status: status
+          status: { text: status, color: statusColor }
         })
         setManualExpiry('')
         setTimeout(() => setScanResult(null), 3000)
@@ -177,7 +287,6 @@ function AdvancedOCRScanner({ onScan, onClose }) {
         </button>
       </div>
 
-      {/* Camera OCR */}
       {!cameraActive && !capturedImage ? (
         <div className="ocr-options">
           <button onClick={startCamera} className="btn-start-camera-ocr">
@@ -196,18 +305,24 @@ function AdvancedOCRScanner({ onScan, onClose }) {
         </div>
       ) : cameraActive && !capturedImage ? (
         <div className="camera-ocr-container">
-          <video ref={videoRef} className="camera-preview-ocr" autoPlay playsInline />
+          <video 
+            ref={videoRef} 
+            className="camera-preview-ocr" 
+            autoPlay 
+            playsInline 
+            style={{ width: '100%', height: 'auto', minHeight: '300px', background: '#000' }}
+          />
           <canvas ref={canvasRef} style={{ display: 'none' }} />
           <div className="ocr-overlay">
             <div className="ocr-instruction">
               <i className="fas fa-calendar-alt"></i>
-              <span>Position expiry date clearly in frame</span>
+              <span>Position expiry date clearly, then tap Capture</span>
             </div>
           </div>
           <div className="ocr-actions">
             <button onClick={handleCaptureAndScan} className="btn-capture" disabled={scanning}>
               {scanning ? (
-                <><i className="fas fa-spinner fa-pulse"></i> Processing...</>
+                <><i className="fas fa-spinner fa-pulse"></i> {ocrProgress || 'Processing...'}</>
               ) : (
                 <><i className="fas fa-camera"></i> Capture & Read</>
               )}
@@ -224,9 +339,9 @@ function AdvancedOCRScanner({ onScan, onClose }) {
             {scanning && (
               <div className="processing-overlay">
                 <div className="processing-spinner"></div>
-                <div className="processing-text">{ocrProgress.message}</div>
+                <div className="processing-text">{ocrProgress}</div>
                 <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${ocrProgress.progress}%` }}></div>
+                  <div className="progress-fill" style={{ width: ocrProgress.includes('%') ? (ocrProgress.match(/\d+/)?.[0] || '50') + '%' : '50%' }}></div>
                 </div>
               </div>
             )}
@@ -235,6 +350,7 @@ function AdvancedOCRScanner({ onScan, onClose }) {
             <button onClick={() => {
               setCapturedImage(null)
               setScanResult(null)
+              setDetectedText('')
               if (cameraActive) startCamera()
             }} className="btn-retry">
               <i className="fas fa-redo"></i> Take Another
@@ -248,7 +364,6 @@ function AdvancedOCRScanner({ onScan, onClose }) {
 
       <div className="ocr-divider">or enter manually</div>
 
-      {/* Manual Entry */}
       <form onSubmit={handleManualSubmit} className="ocr-form">
         <input
           type="text"
@@ -264,38 +379,40 @@ function AdvancedOCRScanner({ onScan, onClose }) {
       
       <div className="ocr-feature">
         <i className="fas fa-magic"></i>
-        <span>AI-powered OCR reads expiry dates from any packaging - even handwritten dates!</span>
+        <span>AI-powered OCR reads expiry dates from any packaging! Upload a photo of a product label.</span>
       </div>
       
       {scanResult && (
-        <div className={`ocr-success ${scanResult.success ? '' : 'error'}`}>
+        <div className={`ocr-success ${scanResult.success ? 'success' : 'error'}`}>
           <i className={`fas ${scanResult.success ? 'fa-check-circle' : 'fa-exclamation-circle'}`}></i>
           {scanResult.success ? (
             <div>
-              <strong>Expiry Date: {scanResult.expiryDate}</strong>
-              <div className="expiry-details">
-                <span className={`days-badge ${scanResult.status?.severity}`}>
-                  {scanResult.daysLeft > 0 ? `${scanResult.daysLeft} days remaining` : 'EXPIRED'}
-                </span>
-                <span className="status-text" style={{ color: scanResult.status?.color }}>
-                  {scanResult.status?.text}
-                </span>
-              </div>
-              {scanResult.rawText && (
-                <div className="raw-text">
-                  <small>Detected text: "{scanResult.rawText.slice(0, 100)}"</small>
-                </div>
+              <strong>✓ Expiry Date Detected!</strong>
+              <p>Date: {scanResult.expiryDate}</p>
+              <p>Status: <span style={{ color: scanResult.status?.color }}>{scanResult.status?.text}</span></p>
+              {scanResult.daysLeft > 0 ? (
+                <p>{scanResult.daysLeft} days remaining</p>
+              ) : (
+                <p>Product has expired!</p>
+              )}
+              {scanResult.detectedText && (
+                <details>
+                  <summary>Detected Text</summary>
+                  <small>{scanResult.detectedText}</small>
+                </details>
               )}
             </div>
           ) : (
             <div>
               <strong>Detection Failed</strong>
               <p>{scanResult.error}</p>
-              {scanResult.rawText && (
-                <div className="raw-text">
-                  <small>Raw text: "{scanResult.rawText.slice(0, 100)}"</small>
-                </div>
+              {scanResult.detectedText && (
+                <details>
+                  <summary>Raw Text</summary>
+                  <small>{scanResult.detectedText}</small>
+                </details>
               )}
+              <p style={{ marginTop: '8px' }}>💡 Tip: Make sure the expiry date is clearly visible in good lighting.</p>
             </div>
           )}
         </div>

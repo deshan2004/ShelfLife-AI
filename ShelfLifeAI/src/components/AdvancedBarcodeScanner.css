@@ -1,3 +1,4 @@
+/* src/components/AdvancedBarcodeScanner.css */
 .advanced-barcode-scanner {
   background: var(--bg-panel);
   border: 1px solid var(--border);
@@ -93,19 +94,37 @@
   cursor: not-allowed;
 }
 
+/* CRITICAL - Camera Container */
 .camera-container {
   position: relative;
-  margin-bottom: 1rem;
-  border-radius: var(--r-md);
-  overflow: hidden;
+  width: 100%;
+  min-height: 320px;
   background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border);
 }
 
+/* CRITICAL - Video Element - THIS MUST BE VISIBLE */
 .camera-preview {
   width: 100%;
   height: auto;
-  min-height: 300px;
+  min-height: 320px;
   background: #000;
+  display: block;
+  object-fit: cover;
+}
+
+/* CRITICAL - Make sure video is visible */
+.camera-container video {
+  width: 100% !important;
+  height: auto !important;
+  min-height: 320px !important;
+  background: #000 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .scan-overlay {
@@ -141,15 +160,9 @@
 }
 
 @keyframes scan {
-  0% {
-    top: 0;
-  }
-  50% {
-    top: 100%;
-  }
-  100% {
-    top: 0;
-  }
+  0% { top: 0; }
+  50% { top: 100%; }
+  100% { top: 0; }
 }
 
 .scan-instruction {
@@ -290,24 +303,4 @@
   background: rgba(57, 231, 95, 0.1);
   border: 1px solid rgba(57, 231, 95, 0.2);
   color: var(--green-bright);
-}
-
-.scan-success.error {
-  background: var(--red-bg);
-  border: 1px solid var(--red-border);
-  color: var(--red);
-}
-
-.product-preview {
-  margin-top: 0.25rem;
-  font-size: 0.75rem;
-}
-
-.product-preview p {
-  font-weight: 600;
-  margin-bottom: 0.1rem;
-}
-
-.product-preview small {
-  color: var(--text-muted);
 }

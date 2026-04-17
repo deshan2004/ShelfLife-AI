@@ -1,9 +1,22 @@
+// src/pages/Inventory.jsx (updated scanner section)
 import { useState } from 'react'
 import BarcodeScanner from '../components/AdvancedBarcodeScanner'
 import OCRScanner from '../components/AdvancedOCRScanner'
+import SubscriptionGuard from '../components/subscription/SubscriptionGuard'
 import './Pages.css'
 
-function Inventory({ inventory, onUpdateInventory, showToast }) {
+function Inventory({ 
+  inventory, 
+  onUpdateInventory, 
+  showToast, 
+  features,
+  usage,
+  canAddProduct,
+  onLimitReached,
+  subscriptionStatus,
+  isTrialActive,
+  isTrialExpired 
+}) {
   const [showScanner, setShowScanner] = useState(false)
   const [scanType, setScanType] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -32,8 +45,18 @@ function Inventory({ inventory, onUpdateInventory, showToast }) {
   }
 
   const handleAddProduct = (productData) => {
-    const newId = Math.max(...inventory.map(i => i.id), 0) + 1
-    const daysLeft = Math.ceil((new Date(productData.expiryDate || new Date(Date.now() + 30 * 86400000)) - new Date()) / (1000 * 60 * 60 * 24))
+    if (!canAddProduct) {
+      if (isTrialActive) {
+        onLimitReached('products', usage.productsUsed, usage.productsLimit);
+      } else if (isTrialExpired) {
+        showToast('⚠️ Your free trial has ended. Please upgrade to add more products.');
+        window.location.href = '/billing';
+      }
+      return;
+    }
+
+    const newId = Math.max(...inventory.map(i => i.id), 0) + 1;
+    const daysLeft = Math.ceil((new Date(productData.expiryDate || new Date(Date.now() + 30 * 86400000)) - new Date()) / (1000 * 60 * 60 * 24));
     
     const newProduct = {
       id: newId,
@@ -51,54 +74,42 @@ function Inventory({ inventory, onUpdateInventory, showToast }) {
       lowStockThreshold: 10,
       costPrice: productData.costPrice || 100,
       sellingPrice: productData.sellingPrice || 150
-    }
+    };
     
-    onUpdateInventory([...inventory, newProduct])
-    showToast(`✅ ${newProduct.name} added to inventory!`)
-  }
-
-  const handleUpdateProduct = (updatedProduct) => {
-    const updatedInventory = inventory.map(item => 
-      item.id === updatedProduct.id ? updatedProduct : item
-    )
-    onUpdateInventory(updatedInventory)
-    showToast(`✏️ ${updatedProduct.name} updated successfully`)
-    setShowEditModal(false)
-    setSelectedProduct(null)
-  }
-
-  const handleDeleteProduct = (product) => {
-    if (window.confirm(`Delete ${product.name} from inventory? This action cannot be undone.`)) {
-      const updatedInventory = inventory.filter(item => item.id !== product.id)
-      onUpdateInventory(updatedInventory)
-      showToast(`🗑️ ${product.name} removed from inventory`)
-    }
-  }
+    onUpdateInventory([...inventory, newProduct]);
+    showToast(`✅ ${newProduct.name} added to inventory!`);
+  };
 
   const handleScan = (scanData) => {
     if (scanData.type === 'barcode') {
-      const existingProduct = inventory.find(p => p.batch === scanData.value)
+      const existingProduct = inventory.find(p => p.batch === scanData.value);
       if (existingProduct) {
-        showToast(`📦 Product found: ${existingProduct.name} - Stock: ${existingProduct.stock}`)
-        setSelectedProduct(existingProduct)
-        setShowEditModal(true)
+        showToast(`📦 Product found: ${existingProduct.name} - Stock: ${existingProduct.stock}`);
+        setSelectedProduct(existingProduct);
+        setShowEditModal(true);
       } else {
-        const productName = window.prompt('Enter product name:', 'New Product')
+        if (!canAddProduct && isTrialActive) {
+          onLimitReached('products', usage.productsUsed, usage.productsLimit);
+          setShowScanner(false);
+          return;
+        }
+        
+        const productName = window.prompt('Enter product name:', 'New Product');
         if (productName) {
           handleAddProduct({
             name: productName,
             batch: scanData.value,
             supplier: 'Scanned Item'
-          })
+          });
         }
       }
     } else if (scanData.type === 'ocr') {
-      showToast(`📅 Expiry date detected: ${scanData.value}`)
-      const expiringProducts = inventory.filter(p => p.daysLeft <= 14 && p.daysLeft > 0)
+      showToast(`📅 Expiry date detected: ${scanData.value}`);
+      const expiringProducts = inventory.filter(p => p.daysLeft <= 14 && p.daysLeft > 0);
       if (expiringProducts.length > 0) {
-        const productToUpdate = expiringProducts[0]
+        const productToUpdate = expiringProducts[0];
         if (window.confirm(`Update expiry for ${productToUpdate.name} to ${scanData.value}?`)) {
-          const daysLeft = Math.ceil((new Date(scanData.value) - new Date()) / (1000 * 60 * 60 * 24))
+          const daysLeft = Math.ceil((new Date(scanData.value) - new Date()) / (1000 * 60 * 60 * 24));
           const updatedInventory = inventory.map(item => 
             item.id === productToUpdate.id ? { 
               ...item, 
@@ -106,15 +117,15 @@ function Inventory({ inventory, onUpdateInventory, showToast }) {
               daysLeft: daysLeft,
               status: daysLeft <= 0 ? 'expired' : daysLeft <= 7 ? 'warning' : 'good'
             } : item
-          )
-          onUpdateInventory(updatedInventory)
-          showToast(`✅ Expiry updated for ${productToUpdate.name}`)
+          );
+          onUpdateInventory(updatedInventory);
+          showToast(`✅ Expiry updated for ${productToUpdate.name}`);
         }
       }
     }
-    setShowScanner(false)
-    setScanType(null)
-  }
+    setShowScanner(false);
+    setScanType(null);
+  };
 
   return (
     <div className="page-container">
@@ -125,6 +136,21 @@ function Inventory({ inventory, onUpdateInventory, showToast }) {
           </h1>
           <p className="page-description">Manage your stock, track batches, and monitor expiry dates</p>
         </div>
+        
+        {isTrialActive && (
+          <div className="usage-indicator">
+            <span className="usage-text">
+              {usage.productsUsed} / {usage.productsLimit} products used
+            </span>
+            <div className="usage-bar">
+              <div 
+                className="usage-bar-fill" 
+                style={{ width: `${usage.productsPercentage}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+        
         <button className="btn-primary-lg" onClick={() => setShowScanner(true)}>
           <i className="fas fa-plus"></i> Add Product
         </button>
@@ -161,14 +187,21 @@ function Inventory({ inventory, onUpdateInventory, showToast }) {
         </div>
       </div>
 
+      {/* Scanner Section */}
       {showScanner && !scanType && (
         <div className="scanner-section">
           <div className="scanner-tabs">
             <button className="scanner-tab" onClick={() => setScanType('barcode')}>
               <i className="fas fa-barcode"></i> Barcode Scanner
             </button>
-            <button className="scanner-tab" onClick={() => setScanType('ocr')}>
-              <i className="fas fa-eye"></i> OCR Scanner
+            {/* OCR Scanner - Now enabled for testing */}
+            <button 
+              className="scanner-tab" 
+              onClick={() => setScanType('ocr')}
+              style={{ background: 'linear-gradient(135deg, var(--green-deep), var(--green-neon))', color: '#030a03' }}
+            >
+              <i className="fas fa-eye"></i> OCR Scanner 
+              <span style={{ fontSize: '0.7rem', background: '#fff', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px' }}>BETA</span>
             </button>
             <button className="scanner-close" onClick={() => setShowScanner(false)}>
               <i className="fas fa-times"></i>
@@ -176,6 +209,11 @@ function Inventory({ inventory, onUpdateInventory, showToast }) {
           </div>
           <div className="scanner-prompt">
             <p>Scan barcode or expiry date to add or update products</p>
+            {isTrialActive && (
+              <small className="scan-limit-info">
+                {usage.productsRemaining} product slots remaining in trial
+              </small>
+            )}
           </div>
         </div>
       )}
@@ -192,6 +230,7 @@ function Inventory({ inventory, onUpdateInventory, showToast }) {
         </div>
       )}
 
+      {/* Search and Filter */}
       <div className="search-filter-bar">
         <div className="search-box">
           <i className="fas fa-search"></i>
@@ -211,6 +250,7 @@ function Inventory({ inventory, onUpdateInventory, showToast }) {
         </div>
       </div>
 
+      {/* Inventory Table */}
       <div className="inventory-table-container">
         <table className="inventory-table">
           <thead>
@@ -240,12 +280,18 @@ function Inventory({ inventory, onUpdateInventory, showToast }) {
                 <td>
                   <div className="action-buttons">
                     <button className="btn-edit" onClick={() => {
-                      setSelectedProduct(item)
-                      setShowEditModal(true)
+                      setSelectedProduct(item);
+                      setShowEditModal(true);
                     }}>
                       <i className="fas fa-edit"></i>
                     </button>
-                    <button className="btn-delete" onClick={() => handleDeleteProduct(item)}>
+                    <button className="btn-delete" onClick={() => {
+                      if (window.confirm(`Delete ${item.name}?`)) {
+                        const updatedInventory = inventory.filter(i => i.id !== item.id);
+                        onUpdateInventory(updatedInventory);
+                        showToast(`🗑️ ${item.name} removed`);
+                      }
+                    }}>
                       <i className="fas fa-trash"></i>
                     </button>
                   </div>
@@ -258,11 +304,16 @@ function Inventory({ inventory, onUpdateInventory, showToast }) {
           <div className="empty-state">
             <i className="fas fa-box-open"></i>
             <p>No products found</p>
-            <button className="btn-primary" onClick={() => setShowScanner(true)}>Add your first product</button>
+            {canAddProduct ? (
+              <button className="btn-primary" onClick={() => setShowScanner(true)}>Add your first product</button>
+            ) : (
+              <button className="btn-primary" onClick={() => window.location.href = '/billing'}>Upgrade to Add Products</button>
+            )}
           </div>
         )}
       </div>
 
+      {/* Edit Modal */}
       {showEditModal && selectedProduct && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
@@ -271,13 +322,19 @@ function Inventory({ inventory, onUpdateInventory, showToast }) {
               <button className="modal-close" onClick={() => setShowEditModal(false)}>✕</button>
             </div>
             <form className="modal-form" onSubmit={(e) => {
-              e.preventDefault()
-              const daysLeft = Math.ceil((new Date(selectedProduct.expiryDate) - new Date()) / (1000 * 60 * 60 * 24))
-              handleUpdateProduct({
-                ...selectedProduct,
-                daysLeft: daysLeft,
-                status: daysLeft <= 0 ? 'expired' : daysLeft <= 7 ? 'warning' : 'good'
-              })
+              e.preventDefault();
+              const daysLeft = Math.ceil((new Date(selectedProduct.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+              const updatedInventory = inventory.map(item => 
+                item.id === selectedProduct.id ? {
+                  ...selectedProduct,
+                  daysLeft: daysLeft,
+                  status: daysLeft <= 0 ? 'expired' : daysLeft <= 7 ? 'warning' : 'good'
+                } : item
+              );
+              onUpdateInventory(updatedInventory);
+              showToast(`✏️ ${selectedProduct.name} updated`);
+              setShowEditModal(false);
+              setSelectedProduct(null);
             }}>
               <div className="form-group">
                 <label>Product Name</label>
@@ -324,7 +381,7 @@ function Inventory({ inventory, onUpdateInventory, showToast }) {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default Inventory
+export default Inventory;

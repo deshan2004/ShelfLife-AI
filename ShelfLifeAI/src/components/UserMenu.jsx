@@ -1,3 +1,6 @@
+// Update UserMenu.jsx to include Settings
+// src/components/UserMenu.jsx
+
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './UserMenu.css'
@@ -46,6 +49,13 @@ function UserMenu({ user, onLogout }) {
           </button>
           <button className="menu-item" onClick={() => handleNavigation('/analytics')}>
             <i className="fas fa-chart-pie"></i> Analytics
+          </button>
+          <button className="menu-item" onClick={() => handleNavigation('/billing')}>
+            <i className="fas fa-credit-card"></i> Billing
+          </button>
+          {/* Settings Link */}
+          <button className="menu-item" onClick={() => handleNavigation('/settings')}>
+            <i className="fas fa-cog"></i> Settings
           </button>
           <div className="menu-divider"></div>
           <button className="menu-item logout" onClick={onLogout}>

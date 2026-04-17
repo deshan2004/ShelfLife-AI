@@ -1,6 +1,30 @@
+// src/components/Hero.jsx
+import { useNavigate } from 'react-router-dom'
 import './Hero.css'
 
-export default function Hero() {
+export default function Hero({ onLoginClick }) {
+  const navigate = useNavigate()
+
+  const handleStartFreeTrial = () => {
+    // Check if user is logged in
+    const user = localStorage.getItem('shelflife_user')
+    if (user) {
+      // If logged in, go to billing page
+      navigate('/billing')
+    } else {
+      // If not logged in, show login modal
+      if (onLoginClick) onLoginClick()
+    }
+  }
+
+  const handleSeeDemo = () => {
+    // Scroll to features section or show demo
+    const featuresSection = document.getElementById('features')
+    if (featuresSection) {
+      featuresSection.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
   return (
     <section className="hero">
       <div className="hero-bg-gradient"></div>
@@ -69,12 +93,12 @@ export default function Hero() {
 
             {/* CTA Buttons */}
             <div className="hero-cta-group">
-              <button className="btn-primary">
+              <button className="btn-primary" onClick={handleStartFreeTrial}>
                 <i className="fas fa-rocket"></i>
                 <span>Start Free Trial</span>
                 <i className="fas fa-arrow-right"></i>
               </button>
-              <button className="btn-secondary">
+              <button className="btn-secondary" onClick={handleSeeDemo}>
                 <i className="fas fa-play"></i>
                 <span>See Demo</span>
               </button>

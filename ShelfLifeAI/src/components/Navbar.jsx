@@ -1,3 +1,4 @@
+// src/components/Navbar.jsx
 import { Link, useLocation } from 'react-router-dom'
 import './Navbar.css'
 import UserMenu from './UserMenu'
@@ -43,6 +44,7 @@ export default function Navbar({ onLoginClick, user, onLogout }) {
             className={`nav-link ${isActive('/analytics') ? 'active' : ''}`}
           >
             Analytics
+          
           </Link>
           {user ? (
             <UserMenu user={user} onLogout={onLogout} />

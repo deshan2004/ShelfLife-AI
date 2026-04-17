@@ -774,4 +774,130 @@
     width: 100%;
     justify-content: center;
   }
+}/* Add to src/pages/Pages.css */
+
+/* Free Trial Banner on Dashboard */
+.free-trial-banner {
+  background: linear-gradient(135deg, #0f3b0f, #0a1a0a);
+  border: 1px solid rgba(57, 231, 95, 0.3);
+  border-radius: var(--r-xl);
+  margin: 1rem 0 1.5rem;
+  overflow: hidden;
+  animation: slideIn 0.5s ease;
+}
+
+.free-trial-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.free-trial-icon {
+  width: 60px;
+  height: 60px;
+  background: rgba(57, 231, 95, 0.15);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.free-trial-icon i {
+  font-size: 1.8rem;
+  color: var(--green-neon);
+}
+
+.free-trial-text {
+  flex: 1;
+}
+
+.free-trial-text h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.free-trial-text p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.trial-days-badge {
+  display: inline-block;
+  background: rgba(57, 231, 95, 0.15);
+  border: 1px solid rgba(57, 231, 95, 0.3);
+  border-radius: var(--r-pill);
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--green-bright);
+}
+
+.btn-start-free-trial {
+  background: linear-gradient(135deg, var(--green-deep), var(--green-neon));
+  border: none;
+  padding: 0.7rem 1.5rem;
+  border-radius: var(--r-pill);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #030a03;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  white-space: nowrap;
+}
+
+.btn-start-free-trial:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(57, 231, 95, 0.3);
+}
+
+.btn-start-free-trial i {
+  transition: transform 0.3s ease;
+}
+
+.btn-start-free-trial:hover i {
+  transform: translateX(5px);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .free-trial-content {
+    flex-direction: column;
+    text-align: center;
+    padding: 1.25rem;
+  }
+  
+  .free-trial-text h3 {
+    font-size: 1rem;
+  }
+  
+  .free-trial-text p {
+    font-size: 0.8rem;
+  }
+  
+  .btn-start-free-trial {
+    width: 100%;
+    justify-content: center;
+    padding: 0.6rem 1.2rem;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

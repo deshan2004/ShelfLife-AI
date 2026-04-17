@@ -1,7 +1,10 @@
+// src/pages/LandingPage.jsx
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './LandingPage.css'
 
 function LandingPage({ onLoginClick }) {
+  const navigate = useNavigate()
   const [scrolled, setScrolled] = useState(false)
   const [activeFeature, setActiveFeature] = useState(0)
 
@@ -20,6 +23,25 @@ function LandingPage({ onLoginClick }) {
     }, 5000)
     return () => clearInterval(interval)
   }, [])
+
+  const handleStartFreeTrial = () => {
+    // Check if user is logged in
+    const user = localStorage.getItem('shelflife_user')
+    if (user) {
+      // If logged in, go to billing page
+      navigate('/billing')
+    } else {
+      // If not logged in, show login modal
+      if (onLoginClick) onLoginClick()
+    }
+  }
+
+  const handleSeeDemo = () => {
+    const featuresSection = document.getElementById('features')
+    if (featuresSection) {
+      featuresSection.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
 
   const features = [
     {
@@ -89,14 +111,45 @@ function LandingPage({ onLoginClick }) {
               and suggests flash sales or supplier returns.
             </p>
             
+            {/* Stats Cards */}
+            <div className="hero-stats-grid">
+              <div className="stat-card-mini">
+                <div className="stat-icon">
+                  <i className="fas fa-check-circle"></i>
+                </div>
+                <div className="stat-info">
+                  <span className="stat-number">90%</span>
+                  <span className="stat-label">Less manual checking</span>
+                </div>
+              </div>
+              <div className="stat-card-mini">
+                <div className="stat-icon">
+                  <i className="fas fa-chart-line"></i>
+                </div>
+                <div className="stat-info">
+                  <span className="stat-number">LKR 5k+</span>
+                  <span className="stat-label">Avg monthly saved</span>
+                </div>
+              </div>
+              <div className="stat-card-mini">
+                <div className="stat-icon">
+                  <i className="fas fa-shield-alt"></i>
+                </div>
+                <div className="stat-info">
+                  <span className="stat-number">99.9%</span>
+                  <span className="stat-label">Data accuracy</span>
+                </div>
+              </div>
+            </div>
+            
             <div className="hero-actions">
-              <button className="btn-primary-glow" onClick={onLoginClick}>
+              <button className="btn-primary-glow" onClick={handleStartFreeTrial}>
                 <span>Start Free Trial</span>
                 <i className="fas fa-arrow-right"></i>
               </button>
-              <button className="btn-outline" onClick={() => document.getElementById('features').scrollIntoView({ behavior: 'smooth' })}>
+              <button className="btn-outline" onClick={handleSeeDemo}>
                 <i className="fas fa-play"></i>
-                <span>Watch Demo</span>
+                <span>See Demo</span>
               </button>
             </div>
             
@@ -107,8 +160,8 @@ function LandingPage({ onLoginClick }) {
               </div>
               <div className="trust-divider"></div>
               <div className="trust-item">
-                <i className="fas fa-shield-alt"></i>
-                <span>Bank-grade Security</span>
+                <i className="fas fa-users"></i>
+                <span>1000+ Stores</span>
               </div>
               <div className="trust-divider"></div>
               <div className="trust-item">
@@ -325,7 +378,7 @@ function LandingPage({ onLoginClick }) {
                   <span>Smarter ordering</span>
                 </div>
               </div>
-              <button className="btn-primary" onClick={onLoginClick}>
+              <button className="btn-primary" onClick={handleStartFreeTrial}>
                 Calculate Your ROI
                 <i className="fas fa-arrow-right"></i>
               </button>
@@ -367,11 +420,11 @@ function LandingPage({ onLoginClick }) {
             <h2>Ready to stop losing money to expired stock?</h2>
             <p>Join 1000+ retailers who are already saving thousands with ShelfLife AI</p>
             <div className="cta-buttons">
-              <button className="btn-primary-large" onClick={onLoginClick}>
+              <button className="btn-primary-large" onClick={handleStartFreeTrial}>
                 Start Free Trial
                 <i className="fas fa-rocket"></i>
               </button>
-              <button className="btn-outline-light">
+              <button className="btn-outline-light" onClick={handleSeeDemo}>
                 Schedule Demo
                 <i className="fas fa-calendar"></i>
               </button>

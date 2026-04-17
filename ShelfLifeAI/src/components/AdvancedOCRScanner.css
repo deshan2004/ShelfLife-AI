@@ -1,3 +1,4 @@
+/* src/components/AdvancedOCRScanner.css */
 .advanced-ocr-scanner {
   background: var(--bg-panel);
   border: 1px solid var(--border);
@@ -92,6 +93,7 @@
   border-radius: var(--r-md);
   overflow: hidden;
   background: #000;
+  min-height: 300px;
 }
 
 .camera-preview-ocr {
@@ -99,6 +101,8 @@
   height: auto;
   min-height: 300px;
   background: #000;
+  display: block;
+  object-fit: cover;
 }
 
 .ocr-overlay {
