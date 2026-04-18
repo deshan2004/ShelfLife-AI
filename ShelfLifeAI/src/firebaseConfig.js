@@ -1,5 +1,6 @@
+// src/firebaseConfig.js
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, GithubAuthProvider, FacebookAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -11,7 +12,18 @@ const firebaseConfig = {
   appId: "1:916781512926:web:5e2500ab7c7055bfccaa4f"
 };
 
-
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Social Providers
+export const googleProvider = new GoogleAuthProvider();
+export const githubProvider = new GithubAuthProvider();
+export const facebookProvider = new FacebookAuthProvider();
+
+// Add scopes for additional user data
+googleProvider.addScope('profile');
+googleProvider.addScope('email');
+githubProvider.addScope('user:email');
+facebookProvider.addScope('email');
+facebookProvider.addScope('public_profile');

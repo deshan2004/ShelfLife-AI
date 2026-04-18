@@ -1,7 +1,11 @@
 // src/config/payhereConfig.js
 export const PAYHERE_CONFIG = {
-  // Sandbox credentials - Get from https://sandbox.payhere.lk
-  merchantId: "1235220", // Demo sandbox ID - Replace with yours after signup
+  // Your Merchant ID
+  merchantId: "1235220",
+  
+  // Your Merchant Secret (for signature verification)
+  merchantSecret: "NDg1ODU3OTczNzYwMzc1MTQxNjk4MTU3MTcxMzg3NDc0MDM4Nw==",
+  
   platform: "sandbox",
   
   // Payment URLs
@@ -16,7 +20,6 @@ export const PAYHERE_CONFIG = {
   currency: "LKR"
 };
 
-// Plan pricing
 export const PLAN_PRICES = {
   BASIC: { 
     price: 2500, 
@@ -35,9 +38,8 @@ export const PLAN_PRICES = {
   }
 };
 
-// Test card details for sandbox
 export const TEST_CARDS = {
-  visa: { number: "4123456789123456", cvv: "123", expiry: "12/25" },
-  mastercard: { number: "5111111111111118", cvv: "123", expiry: "12/25" },
-  amex: { number: "378282246310005", cvv: "1234", expiry: "12/25" }
+  visa: { number: "4123456789123456", cvv: "123", expiry: "12/28" },
+  mastercard: { number: "5111111111111118", cvv: "123", expiry: "12/28" },
+  amex: { number: "378282246310005", cvv: "1234", expiry: "12/28" }
 };

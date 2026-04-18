@@ -1,5 +1,6 @@
-// src/services/payhereService.js (Simplified - No crypto-js needed)
+// src/services/payhereService.js
 import { PAYHERE_CONFIG, PLAN_PRICES } from '../config/payhereConfig';
+import CryptoJS from 'crypto-js'; 
 
 class PayHereService {
   constructor() {
@@ -22,6 +23,14 @@ class PayHereService {
     return `ORDER_${userId.substring(0, 8)}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
   }
 
+  generateMd5Hash(merchantId, orderId, amount, currency, merchantSecret) {
+    const hashedSecret = CryptoJS.MD5(merchantSecret).toString().toUpperCase();
+    
+    const hashString = merchantId + orderId + amount + currency + hashedSecret;
+    
+    return CryptoJS.MD5(hashString).toString().toUpperCase();
+  }
+
   initiatePayment(user, planId) {
     return new Promise((resolve, reject) => {
       try {
@@ -31,19 +40,22 @@ class PayHereService {
           return;
         }
 
-        if (!user || !user.uid) {
-          reject(new Error('User not logged in'));
+        if (!user || (!user.uid && !user.id)) { 
+          reject(new Error('User not logged in or UID missing'));
           return;
         }
 
-        const orderId = this.generateOrderId(user.uid);
+        const userId = user.uid || user.id; 
+        const orderId = this.generateOrderId(userId);
+        
+        const formattedAmount = Number(plan.price).toLocaleString('en-us', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/,/g, '');
         
         const order = {
           id: orderId,
-          userId: user.uid,
+          userId: userId,
           planId: planId,
           planName: plan.name,
-          amount: plan.price,
+          amount: formattedAmount, // Save formatted amount
           status: 'pending',
           createdAt: new Date().toISOString()
         };
@@ -51,37 +63,52 @@ class PayHereService {
         this.pendingOrders.push(order);
         this.saveToStorage();
 
+        // Create form
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = PAYHERE_CONFIG.paymentUrl;
+        form.action = PAYHERE_CONFIG.paymentUrl; 
         form.target = '_blank';
         form.style.display = 'none';
+        
+        const firstName = user.name?.split(' ')[0] || 'Demo';
+        const lastName = user.name?.split(' ').slice(1).join(' ') || 'User';
+        
+        // Generate Hash
+        const hash = this.generateMd5Hash(
+          PAYHERE_CONFIG.merchantId,
+          orderId,
+          formattedAmount, 
+          PAYHERE_CONFIG.currency,
+          PAYHERE_CONFIG.merchantSecret
+        );
         
         const fields = {
           merchant_id: PAYHERE_CONFIG.merchantId,
           return_url: PAYHERE_CONFIG.returnUrl,
           cancel_url: PAYHERE_CONFIG.cancelUrl,
           notify_url: PAYHERE_CONFIG.notifyUrl,
+          
           order_id: orderId,
           items: `${plan.name} Subscription - Monthly`,
           currency: PAYHERE_CONFIG.currency,
-          amount: plan.price.toString(),
-          first_name: user.name?.split(' ')[0] || 'Demo',
-          last_name: user.name?.split(' ')[1] || 'User',
-          email: user.email,
-          phone: user.phone || '0771234567',
-          address: user.address || 'Colombo',
-          city: 'Colombo',
-          country: 'Sri Lanka',
-          delivery_address: user.address || 'Colombo',
-          delivery_city: 'Colombo',
-          delivery_country: 'Sri Lanka'
+          amount: formattedAmount,
+          
+          first_name: firstName,
+          last_name: lastName,
+          email: user.email || 'test@example.com', 
+          phone: user.phone || '0771234567', 
+          address: user.address || 'No. 1, Galle Road, Colombo', 
+          city: 'Colombo', 
+          country: 'Sri Lanka', 
+          
+          custom_1: userId,
+          custom_2: planId,
+          hash: hash,
+          // Sandbox mode parameter is usually handled by the URL, but kept for safety if needed
+          sandbox: 'true' 
         };
         
-        if (PAYHERE_CONFIG.platform === 'sandbox') {
-          fields.sandbox = 'true';
-        }
-        
+        // Create hidden inputs
         Object.keys(fields).forEach(key => {
           const input = document.createElement('input');
           input.type = 'hidden';
@@ -91,23 +118,31 @@ class PayHereService {
         });
         
         document.body.appendChild(form);
-        console.log('Submitting payment:', { orderId, plan: plan.name, amount: plan.price });
+        console.log('--- Initiating PayHere Payment ---');
+        console.log('Order Details:', fields);
+        console.log('Generated Hash:', hash);
         
+        // Submit the form
         form.submit();
-        document.body.removeChild(form);
+        
+        setTimeout(() => {
+          if (document.body.contains(form)) {
+            document.body.removeChild(form);
+          }
+        }, 1000);
         
         resolve({ success: true, orderId, order });
       } catch (error) {
-        console.error('Payment error:', error);
+        console.error('Payment Error:', error);
         reject(error);
       }
     });
   }
 
   verifyPaymentFromUrl(params) {
-    const { order_id, payment_id, status_code } = params;
+    const { order_id, payment_id, status_code, md5sig } = params;
     
-    console.log('Verifying payment:', { order_id, payment_id, status_code });
+    console.log('Verifying payment:', params);
     
     if (!order_id) {
       return { verified: false, success: false, error: 'No order ID provided' };
@@ -119,6 +154,21 @@ class PayHereService {
       return { verified: false, success: false, error: 'Order not found' };
     }
     
+    const order = this.pendingOrders[orderIndex];
+    
+    // Verify signature
+    const expectedHash = this.generateMd5Hash(
+      PAYHERE_CONFIG.merchantId,
+      order_id,
+      order.amount, 
+      PAYHERE_CONFIG.currency,
+      PAYHERE_CONFIG.merchantSecret
+    );
+    
+    const isHashValid = md5sig === expectedHash;
+    console.log('Hash validation result:', isHashValid);
+    
+    // status_code '2' means payment successful in PayHere
     const isSuccess = status_code === '2';
     
     if (isSuccess) {

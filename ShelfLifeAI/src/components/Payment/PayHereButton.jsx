@@ -7,15 +7,45 @@ function PayHereButton({ user, planId, planName, amount, variant = 'primary', on
   const [loading, setLoading] = useState(false);
 
   const handlePayment = async () => {
-    if (!user) {
-      alert('Please login to continue');
+    console.log('PayHereButton clicked:', { user, planId, planName, amount });
+    
+    // Get user from props or localStorage
+    let activeUser = user;
+    
+    if (!activeUser || !activeUser.uid) {
+      const savedUser = localStorage.getItem('shelflife_user');
+      if (savedUser) {
+        try {
+          activeUser = JSON.parse(savedUser);
+          console.log('User loaded from localStorage:', activeUser);
+        } catch (e) {
+          console.error('Error parsing user:', e);
+        }
+      }
+    }
+    
+    if (!activeUser || !activeUser.uid) {
+      alert('Please login to continue with payment');
+      window.location.href = '/';
       return;
     }
-
+    
+    // Ensure user has required fields
+    const paymentUser = {
+      uid: activeUser.uid,
+      id: activeUser.uid,
+      name: activeUser.name || activeUser.displayName || 'User',
+      email: activeUser.email,
+      phone: activeUser.phone || '0771234567',
+      address: activeUser.address || 'Colombo'
+    };
+    
+    console.log('Final payment user:', paymentUser);
+    
     setLoading(true);
 
     try {
-      const result = await payhereService.initiatePayment(user, planId);
+      const result = await payhereService.initiatePayment(paymentUser, planId);
       console.log('Payment initiated:', result);
       if (onSuccess) onSuccess(result);
     } catch (error) {
@@ -36,7 +66,7 @@ function PayHereButton({ user, planId, planName, amount, variant = 'primary', on
       {loading ? (
         <>
           <i className="fas fa-spinner fa-pulse"></i>
-          <span>Processing...</span>
+          <span>Redirecting to PayHere...</span>
         </>
       ) : (
         <>

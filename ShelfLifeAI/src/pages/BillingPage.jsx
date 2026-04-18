@@ -17,13 +17,31 @@ function BillingPage({ user }) {
   const [selectedPlan, setSelectedPlan] = useState('PROFESSIONAL');
   const [upgrading, setUpgrading] = useState(false);
 
+  // Check if user is logged in
   useEffect(() => {
+    console.log('BillingPage - User:', user);
+    
+    // If no user, try to get from localStorage
     if (!user) {
-      navigate('/');
-      return;
+      const savedUser = localStorage.getItem('shelflife_user');
+      if (savedUser) {
+        const parsedUser = JSON.parse(savedUser);
+        console.log('Found user in localStorage:', parsedUser);
+        // User will be set by parent component
+      } else {
+        console.log('No user found, redirecting to login');
+        navigate('/');
+      }
     }
-    loadSubscriptionData(user.uid);
   }, [user, navigate]);
+
+  useEffect(() => {
+    if (user && user.uid) {
+      loadSubscriptionData(user.uid);
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
 
   const loadSubscriptionData = async (userId) => {
     try {
@@ -45,29 +63,9 @@ function BillingPage({ user }) {
     return Math.ceil((end - now) / (1000 * 60 * 60 * 24));
   };
 
-  const handleUpgrade = async (planId) => {
-    if (!user) {
-      alert('Please log in to upgrade');
-      navigate('/');
-      return;
-    }
-    
-    setUpgrading(true);
-    try {
-      await paymentService.redirectToCheckout(user.uid, planId);
-      await loadSubscriptionData(user.uid);
-    } catch (error) {
-      console.error('Upgrade error:', error);
-      alert('Something went wrong. Please try again.');
-    } finally {
-      setUpgrading(false);
-      setShowUpgradeModal(false);
-    }
-  };
-
   const handleStartFreeTrial = async () => {
     if (!user) {
-      alert('Please sign up first');
+      alert('Please login first');
       navigate('/');
       return;
     }
@@ -103,6 +101,24 @@ function BillingPage({ user }) {
           <div className="loading-container">
             <div className="loading-spinner"></div>
             <p>Loading billing information...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If no user, show login required message
+  if (!user) {
+    return (
+      <div className="billing-page">
+        <div className="container">
+          <div className="login-required-card">
+            <i className="fas fa-lock"></i>
+            <h2>Login Required</h2>
+            <p>Please login to view billing information</p>
+            <button onClick={() => navigate('/')} className="btn-primary">
+              Go to Login
+            </button>
           </div>
         </div>
       </div>
@@ -179,139 +195,68 @@ function BillingPage({ user }) {
           </div>
         )}
 
-        {/* Current Plan Card */}
-        {(isTrialActive || isActive || isTrialExpired) && (
-          <div className="current-plan-card">
-            <div className="plan-header-section">
-              <span className={`plan-badge ${isTrialActive ? 'trial' : isActive ? 'active' : 'expired'}`}>
-                {isTrialActive ? 'Free Trial' : isActive ? 'Active Plan' : 'Trial Expired'}
-              </span>
-              <div className="plan-name">
-                {subscription?.planId === 'FREE_TRIAL' ? 'Free Trial' : 
-                 subscription?.planId === 'PROFESSIONAL' ? 'Professional Plan' :
-                 subscription?.planId === 'BASIC' ? 'Basic Plan' : 'Free Trial'}
-              </div>
-            </div>
-            
-            {isTrialActive && (
-              <div className="trial-section">
-                <div className="plan-price">LKR 0<span>/month for 14 days</span></div>
-                <div className="trial-progress-container">
-                  <div className="trial-days">
-                    <i className="fas fa-hourglass-half"></i>
-                    <span>{daysLeft} days remaining in your free trial</span>
-                  </div>
-                  <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: `${((14 - daysLeft) / 14) * 100}%` }}></div>
-                  </div>
-                </div>
-                <button 
-                  className="btn-upgrade-now" 
-                  onClick={() => setShowUpgradeModal(true)}
-                  disabled={upgrading}
-                >
-                  Upgrade Now <i className="fas fa-arrow-right"></i>
-                </button>
-              </div>
-            )}
-            
-            {isActive && (
-              <div className="active-section">
-                <div className="plan-price">
-                  LKR {subscription?.planId === 'PROFESSIONAL' ? '5,900' : subscription?.planId === 'BASIC' ? '2,500' : '0'}<span>/month</span>
-                </div>
-                <button 
-                  className="btn-manage" 
-                  onClick={() => paymentService.createCustomerPortal(user?.uid, window.location.href)}
-                >
-                  <i className="fas fa-cog"></i> Manage Subscription
-                </button>
-              </div>
-            )}
-            
-            {isTrialExpired && (
-              <div className="expired-section">
-                <i className="fas fa-exclamation-triangle"></i>
-                <div>
-                  <strong>Your free trial has ended</strong>
-                  <p>Upgrade now to continue using ShelfLife AI and keep saving on expiry losses.</p>
-                </div>
-                <button 
-                  className="btn-upgrade-now" 
-                  onClick={() => setShowUpgradeModal(true)}
-                  disabled={upgrading}
-                >
-                  Upgrade Now
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Plans Section */}
-        {(isTrialActive || isTrialExpired || hasNoSubscription) && (
-          <div className="plans-section">
-            <h2>Choose Your Plan</h2>
-            <div className="plans-grid">
-              {/* Basic Plan */}
-              <div className="plan-card">
-                <h3>Basic</h3>
-                <div className="price">LKR 2,500<span>/month</span></div>
-                <p className="description">Perfect for small shops starting out</p>
-                <ul className="feature-list">
-                  {PLAN_PRICES.BASIC.features.map((feature, idx) => (
-                    <li key={idx}><i className="fas fa-check-circle"></i> {feature}</li>
-                  ))}
-                </ul>
-                <PayHereButton 
-                  user={user}
-                  planId="BASIC"
-                  planName="Basic Plan"
-                  amount={2500}
-                  variant="secondary"
-                />
-              </div>
+        <div className="plans-section">
+          <h2>Choose Your Plan</h2>
+          <div className="plans-grid">
+            {/* Basic Plan */}
+            <div className="plan-card">
+              <h3>Basic</h3>
+              <div className="price">LKR 2,500<span>/month</span></div>
+              <p className="description">Perfect for small shops starting out</p>
+              <ul className="feature-list">
+                {PLAN_PRICES.BASIC.features.map((feature, idx) => (
+                  <li key={idx}><i className="fas fa-check-circle"></i> {feature}</li>
+                ))}
+              </ul>
+              <PayHereButton 
+                user={user}
+                planId="BASIC"
+                planName="Basic Plan"
+                amount={2500}
+                variant="secondary"
+              />
+            </div>
 
-              {/* Professional Plan */}
-              <div className="plan-card featured">
-                <div className="popular-tag">Most Popular</div>
-                <h3>Professional</h3>
-                <div className="price">LKR 5,900<span>/month</span></div>
-                <p className="description">Best for growing retail businesses</p>
-                <ul className="feature-list">
-                  {PLAN_PRICES.PROFESSIONAL.features.map((feature, idx) => (
-                    <li key={idx}><i className="fas fa-check-circle"></i> {feature}</li>
-                  ))}
-                </ul>
-                <PayHereButton 
-                  user={user}
-                  planId="PROFESSIONAL"
-                  planName="Professional Plan"
-                  amount={5900}
-                  variant="primary"
-                />
-              </div>
+            {/* Professional Plan */}
+            <div className="plan-card featured">
+              <div className="popular-tag">Most Popular</div>
+              <h3>Professional</h3>
+              <div className="price">LKR 5,900<span>/month</span></div>
+              <p className="description">Best for growing retail businesses</p>
+              <ul className="feature-list">
+                {PLAN_PRICES.PROFESSIONAL.features.map((feature, idx) => (
+                  <li key={idx}><i className="fas fa-check-circle"></i> {feature}</li>
+                ))}
+              </ul>
+              <PayHereButton 
+                user={user}
+                planId="PROFESSIONAL"
+                planName="Professional Plan"
+                amount={5900}
+                variant="primary"
+              />
+            </div>
 
-              {/* Enterprise Plan */}
-              <div className="plan-card">
-                <h3>Enterprise</h3>
-                <div className="price">LKR 14,900<span>/month</span></div>
-                <p className="description">For large operations with custom needs</p>
-                <ul className="feature-list">
-                  {PLAN_PRICES.ENTERPRISE.features.map((feature, idx) => (
-                    <li key={idx}><i className="fas fa-check-circle"></i> {feature}</li>
-                  ))}
-                </ul>
-                <button 
-                  className="btn-contact-sales" 
-                  onClick={() => window.location.href = 'mailto:sales@shelflife.ai'}
-                >
-                  <i className="fas fa-envelope"></i> Contact Sales
-                </button>
-              </div>
+            {/* Enterprise Plan */}
+            <div className="plan-card">
+              <h3>Enterprise</h3>
+              <div className="price">LKR 14,900<span>/month</span></div>
+              <p className="description">For large operations with custom needs</p>
+              <ul className="feature-list">
+                {PLAN_PRICES.ENTERPRISE.features.map((feature, idx) => (
+                  <li key={idx}><i className="fas fa-check-circle"></i> {feature}</li>
+                ))}
+              </ul>
+              <button 
+                className="btn-contact-sales" 
+                onClick={() => window.location.href = 'mailto:sales@shelflife.ai'}
+              >
+                <i className="fas fa-envelope"></i> Contact Sales
+              </button>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Payment History */}
         {paymentHistory.length > 0 && (
@@ -337,7 +282,7 @@ function BillingPage({ user }) {
                         <span className="status-success">
                           <i className="fas fa-check-circle"></i> Completed
                         </span>
-                       </td>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -369,62 +314,6 @@ function BillingPage({ user }) {
           </div>
         </div>
       </div>
-
-      {/* Upgrade Modal */}
-      {showUpgradeModal && (
-        <div className="modal-overlay" onClick={() => setShowUpgradeModal(false)}>
-          <div className="upgrade-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2><i className="fas fa-rocket"></i> Upgrade Your Plan</h2>
-              <button className="modal-close" onClick={() => setShowUpgradeModal(false)}>
-                <i className="fas fa-times"></i>
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="upgrade-plans-grid">
-                <div 
-                  className={`upgrade-plan-card ${selectedPlan === 'BASIC' ? 'selected' : ''}`}
-                  onClick={() => setSelectedPlan('BASIC')}
-                >
-                  <h3>Basic</h3>
-                  <div className="price">LKR 2,500<span>/month</span></div>
-                  <ul>
-                    <li><i className="fas fa-check"></i> 200 products</li>
-                    <li><i className="fas fa-check"></i> 25 suppliers</li>
-                    <li><i className="fas fa-check"></i> Barcode scanning</li>
-                  </ul>
-                </div>
-                <div 
-                  className={`upgrade-plan-card popular ${selectedPlan === 'PROFESSIONAL' ? 'selected' : ''}`}
-                  onClick={() => setSelectedPlan('PROFESSIONAL')}
-                >
-                  <div className="popular-tag">Popular</div>
-                  <h3>Professional</h3>
-                  <div className="price">LKR 5,900<span>/month</span></div>
-                  <ul>
-                    <li><i className="fas fa-check"></i> 1,000 products</li>
-                    <li><i className="fas fa-check"></i> 100 suppliers</li>
-                    <li><i className="fas fa-check"></i> AI OCR scanning</li>
-                    <li><i className="fas fa-check"></i> Flash sale automation</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-cancel" onClick={() => setShowUpgradeModal(false)}>
-                Maybe Later
-              </button>
-              <button 
-                className="btn-confirm-upgrade" 
-                onClick={() => handleUpgrade(selectedPlan)}
-                disabled={upgrading}
-              >
-                {upgrading ? 'Processing...' : `Upgrade to ${selectedPlan}`}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
