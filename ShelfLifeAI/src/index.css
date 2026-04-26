@@ -215,8 +215,3 @@ video {
   object-fit: cover !important;
 }
 
-.camera-container {
-  display: block !important;
-  min-height: 320px !important;
-  background: #000 !important;
-}
