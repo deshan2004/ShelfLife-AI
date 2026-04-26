@@ -220,9 +220,3 @@ video {
   min-height: 320px !important;
   background: #000 !important;
 }
-
-.camera-preview {
-  display: block !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-}
