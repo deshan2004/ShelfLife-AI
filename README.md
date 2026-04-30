@@ -19,8 +19,8 @@ ShelfLife AI is a digital assistant built to monitor retail inventory 24/7. It i
 * **AI Recipe Suggestions:** Suggests recipes using near-expiry ingredients to minimize waste.
 
 ## 🏗 Technical Architecture
-* **Frontend:** React.js / HTML & CSS
-* **Backend:** Node.js / PHP 
+* **Frontend:** React.js
+* **Backend:** Node.js 
 * **Database:** Firebase 
 * **AI Layer:** Tesseract.js / Google Vision API
 
