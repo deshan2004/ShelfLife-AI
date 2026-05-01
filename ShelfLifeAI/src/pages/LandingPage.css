@@ -1,12 +1,6 @@
 /* src/pages/LandingPage.css - Complete Beautiful Styles */
 
-/* ============================================
-   SHELFLIFE AI - PREMIUM LANDING PAGE
-   ============================================ */
-
-/* Import Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap');
-
+/* Reset and Base */
 * {
   margin: 0;
   padding: 0;
@@ -14,13 +8,27 @@
 }
 
 .landing-page {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   position: relative;
   overflow-x: hidden;
   background: #030a03;
 }
 
-/* Animated Background */
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap');
+
+/* Container */
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ============================================
+   ANIMATED BACKGROUND
+   ============================================ */
 .landing-bg {
   position: fixed;
   top: 0;
@@ -81,16 +89,9 @@
   }
 }
 
-/* Container */
-.container {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 24px;
-  position: relative;
-  z-index: 1;
-}
-
-/* Animations */
+/* ============================================
+   ANIMATIONS
+   ============================================ */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -133,6 +134,17 @@
   }
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes scan {
+  0% { top: 0; }
+  50% { top: 100%; }
+  100% { top: 0; }
+}
+
 .fade-in-up {
   animation: fadeInUp 0.6s ease-out forwards;
 }
@@ -142,7 +154,13 @@
   opacity: 0;
 }
 
-/* Demo Toast */
+.slide-in {
+  animation: slideIn 0.3s ease;
+}
+
+/* ============================================
+   DEMO TOAST
+   ============================================ */
 .demo-toast {
   position: fixed;
   top: 100px;
@@ -161,11 +179,9 @@
   animation: slideIn 0.3s ease;
 }
 
-.demo-toast i {
-  font-size: 1rem;
-}
-
-/* Hero Section */
+/* ============================================
+   HERO SECTION
+   ============================================ */
 .hero-section {
   position: relative;
   z-index: 1;
@@ -182,7 +198,6 @@
   align-items: center;
 }
 
-/* Hero Content */
 .hero-badge {
   display: inline-flex;
   align-items: center;
@@ -196,10 +211,6 @@
   font-size: 0.8rem;
   font-weight: 500;
   color: #6eef8b;
-}
-
-.badge-icon {
-  font-size: 1rem;
 }
 
 .badge-new {
@@ -219,12 +230,6 @@
   color: #ffffff;
   margin-bottom: 20px;
   letter-spacing: -0.02em;
-}
-
-@media (max-width: 768px) {
-  .hero-title {
-    font-size: 2rem;
-  }
 }
 
 .gradient-text {
@@ -402,7 +407,9 @@
   background: #2a402a;
 }
 
-/* Dashboard Demo Card */
+/* ============================================
+   DASHBOARD DEMO CARD
+   ============================================ */
 .hero-visual {
   position: relative;
 }
@@ -455,11 +462,6 @@
   color: #5f8b5f;
   animation: spin 2s linear infinite;
   cursor: pointer;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 .demo-card-content {
@@ -627,7 +629,9 @@
   animation-delay: 2s;
 }
 
-/* Stats Section */
+/* ============================================
+   STATS SECTION
+   ============================================ */
 .stats-section {
   position: relative;
   z-index: 1;
@@ -684,7 +688,9 @@
   letter-spacing: 0.5px;
 }
 
-/* Features Section */
+/* ============================================
+   FEATURES SECTION
+   ============================================ */
 .features-section {
   position: relative;
   z-index: 1;
@@ -788,7 +794,9 @@
   gap: 10px;
 }
 
-/* Demo Section */
+/* ============================================
+   DEMO SECTION
+   ============================================ */
 .demo-section {
   position: relative;
   z-index: 1;
@@ -842,10 +850,7 @@
   padding: 40px;
 }
 
-.demo-panel {
-  animation: slideIn 0.3s ease;
-}
-
+/* Scan Demo */
 .demo-scan-area {
   display: flex;
   gap: 30px;
@@ -875,12 +880,6 @@
   height: 2px;
   background: #39e75f;
   animation: scan 2s linear infinite;
-}
-
-@keyframes scan {
-  0% { top: 0; }
-  50% { top: 100%; }
-  100% { top: 0; }
 }
 
 .scan-placeholder {
@@ -1046,7 +1045,9 @@
   background: rgba(57, 231, 95, 0.2);
 }
 
-/* ROI Section */
+/* ============================================
+   ROI SECTION
+   ============================================ */
 .roi-section {
   position: relative;
   z-index: 1;
@@ -1171,7 +1172,9 @@
   color: #7aaa7a;
 }
 
-/* CTA Section */
+/* ============================================
+   CTA SECTION
+   ============================================ */
 .cta-section {
   position: relative;
   z-index: 1;
@@ -1261,7 +1264,9 @@
   color: #39e75f;
 }
 
-/* Footer */
+/* ============================================
+   FOOTER
+   ============================================ */
 .landing-footer {
   position: relative;
   z-index: 1;
@@ -1355,7 +1360,9 @@
   color: #ef4444;
 }
 
-/* Responsive */
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
 @media (max-width: 1024px) {
   .hero-grid {
     grid-template-columns: 1fr;
@@ -1381,15 +1388,37 @@
   .floating-elements {
     display: none;
   }
+  
+  .hero-description {
+    max-width: 100%;
+  }
 }
 
 @media (max-width: 768px) {
   .hero-title {
     font-size: 2rem;
+    text-align: center;
   }
   
   .hero-description {
-    max-width: 100%;
+    text-align: center;
+  }
+  
+  .hero-badge {
+    display: inline-flex;
+    margin: 0 auto 20px;
+  }
+  
+  .hero-stats {
+    justify-content: center;
+  }
+  
+  .hero-buttons {
+    justify-content: center;
+  }
+  
+  .trust-badges {
+    justify-content: center;
   }
   
   .features-grid {
@@ -1425,28 +1454,34 @@
     gap: 24px;
   }
   
-  .hero-stats {
+  .roi-card {
+    padding: 30px;
+  }
+  
+  .roi-card h2 {
+    font-size: 1.5rem;
+  }
+  
+  .section-title {
+    font-size: 1.8rem;
+  }
+  
+  .chart-bars {
+    gap: 10px;
+  }
+  
+  .chart-bar span {
+    font-size: 0.6rem;
+    top: -20px;
+  }
+  
+  .cta-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .btn-cta-primary, .btn-cta-secondary {
+    width: 100%;
     justify-content: center;
-  }
-  
-  .hero-buttons {
-    justify-content: center;
-  }
-  
-  .trust-badges {
-    justify-content: center;
-  }
-  
-  .hero-description {
-    text-align: center;
-  }
-  
-  .hero-title {
-    text-align: center;
-  }
-  
-  .hero-badge {
-    display: inline-flex;
-    margin: 0 auto 20px;
   }
 }

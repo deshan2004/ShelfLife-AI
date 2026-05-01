@@ -36,7 +36,6 @@ function App() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [upgradeContext, setUpgradeContext] = useState({ resourceType: 'products', currentUsage: 0, limit: 0 })
   
-  // Get feature access for the current user
   const { 
     features, 
     usage, 
@@ -121,7 +120,6 @@ function App() {
     const existingSub = await subscriptionService.getSubscriptionStatus(userData.uid)
     
     if (!existingSub) {
-      // Start free trial for new user
       await subscriptionService.startFreeTrial(
         userData.uid, 
         userData.email, 
@@ -140,7 +138,7 @@ function App() {
     }
     
     setShowLogin(false)
-    refresh() // Refresh feature access
+    refresh()
   }
 
   const handleLogout = () => {
@@ -164,7 +162,6 @@ function App() {
     showToast('Theme applied successfully!')
   }
 
-  // Check if user can add product before adding
   const canAddNewProduct = () => {
     if (!user) return false
     if (isSubscribed) return true
@@ -172,13 +169,11 @@ function App() {
     return false
   }
 
-  // Show upgrade modal when limit is reached
   const handleLimitReached = (resourceType, currentUsage, limit) => {
     setUpgradeContext({ resourceType, currentUsage, limit })
     setShowUpgradeModal(true)
   }
 
-  // Handle upgrade from trial reminder
   const handleUpgradeClick = () => {
     setShowUpgradeModal(true)
   }
@@ -206,7 +201,7 @@ function App() {
         
         <main className="main-content">
           <Routes>
-            {/* Landing Page - Public */}
+            {/* Landing Page - Public (Beautiful Demo Page) */}
             <Route path="/" element={
               user ? <Navigate to="/dashboard" replace /> : <LandingPage onLoginClick={() => setShowLogin(true)} />
             } />
