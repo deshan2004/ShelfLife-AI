@@ -147,8 +147,6 @@ body::before {
   }
 }
 
-<<<<<<< Updated upstream
-=======
 .page-description {
   font-size: 1rem;
   color: var(--text-secondary);
@@ -797,4 +795,3 @@ body::before {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent-green);
 }
->>>>>>> Stashed changes
