@@ -1,4 +1,4 @@
-// src/pages/LandingPage.jsx - Complete Beautiful Demo Page
+// src/pages/LandingPage.jsx - Complete Beautiful Landing Page with Demo
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './LandingPage.css'
@@ -21,7 +21,7 @@ function LandingPage({ onLoginClick }) {
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveDemoIndex((prev) => (prev + 1) % 3)
-    }, 4000)
+    }, 5000)
     return () => clearInterval(interval)
   }, [])
 
@@ -38,7 +38,6 @@ function LandingPage({ onLoginClick }) {
     setShowDemoToast(true)
     setTimeout(() => setShowDemoToast(false), 3000)
     
-    // Scroll to demo section
     const demoSection = document.getElementById('demo-section')
     if (demoSection) {
       demoSection.scrollIntoView({ behavior: 'smooth' })
@@ -70,9 +69,9 @@ function LandingPage({ onLoginClick }) {
       <div className="landing-bg">
         <div className="bg-gradient"></div>
         <div className="bg-particles">
-          {[...Array(15)].map((_, i) => (
+          {[...Array(20)].map((_, i) => (
             <div key={i} className="particle" style={{ 
-              '--duration': `${15 + Math.random() * 20}s`,
+              '--duration': `${12 + Math.random() * 20}s`,
               '--delay': `${Math.random() * 10}s`,
               '--left': `${Math.random() * 100}%`,
               '--top': `${Math.random() * 100}%`
@@ -277,7 +276,7 @@ function LandingPage({ onLoginClick }) {
         </div>
       </section>
 
-      {/* Demo Section */}
+      {/* Live Demo Section */}
       <section id="demo-section" className="demo-section">
         <div className="container">
           <div className="section-header">
@@ -298,7 +297,7 @@ function LandingPage({ onLoginClick }) {
                 className={`demo-tab ${activeDemoIndex === 1 ? 'active' : ''}`}
                 onClick={() => setActiveDemoIndex(1)}
               >
-                <i className="fas fa-chart-line"></i> Analytics
+                <i className="fas fa-chart-line"></i> Analytics Dashboard
               </button>
               <button 
                 className={`demo-tab ${activeDemoIndex === 2 ? 'active' : ''}`}
@@ -328,8 +327,8 @@ function LandingPage({ onLoginClick }) {
                     </div>
                   </div>
                   <div className="demo-info">
-                    <h4>📱 OCR Technology</h4>
-                    <p>Our AI reads expiry dates directly from packaging - no barcode needed. Perfect for local products!</p>
+                    <h4>📱 AI-Powered OCR Technology</h4>
+                    <p>Our advanced OCR reads expiry dates directly from packaging - no barcode needed. Perfect for local products without standard barcodes!</p>
                   </div>
                 </div>
               )}
@@ -338,7 +337,7 @@ function LandingPage({ onLoginClick }) {
                 <div className="demo-panel slide-in">
                   <div className="demo-chart">
                     <div className="chart-bars">
-                      {[65, 75, 55, 85, 70, 90, 80].map((height, i) => (
+                      {[65, 75, 55, 85, 70, 90, 80, 95].map((height, i) => (
                         <div key={i} className="chart-bar-wrapper">
                           <div className="chart-bar" style={{ height: `${height}%` }}>
                             <span>LKR {(height * 100).toLocaleString()}</span>
@@ -349,8 +348,8 @@ function LandingPage({ onLoginClick }) {
                     </div>
                   </div>
                   <div className="demo-info">
-                    <h4>📊 Real-time Analytics</h4>
-                    <p>Track your savings, waste reduction, and inventory performance with beautiful dashboards.</p>
+                    <h4>📊 Real-time Analytics Dashboard</h4>
+                    <p>Track your savings, waste reduction, and inventory performance with beautiful, real-time charts and insights.</p>
                   </div>
                 </div>
               )}
@@ -384,8 +383,8 @@ function LandingPage({ onLoginClick }) {
                     </div>
                   </div>
                   <div className="demo-info">
-                    <h4>🔔 Smart Notifications</h4>
-                    <p>Get real-time alerts before products expire, so you never miss a flash sale opportunity.</p>
+                    <h4>🔔 Smart Notification System</h4>
+                    <p>Get real-time alerts before products expire, so you never miss a flash sale opportunity. Customize your notification preferences.</p>
                   </div>
                 </div>
               )}
@@ -440,7 +439,7 @@ function LandingPage({ onLoginClick }) {
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* Call to Action Section */}
       <section className="cta-section">
         <div className="container">
           <div className="cta-content">

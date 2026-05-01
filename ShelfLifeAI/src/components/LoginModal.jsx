@@ -1,15 +1,20 @@
 // src/components/LoginModal.jsx
 import { useState, useEffect } from 'react'
 import './LoginModal.css'
-import { auth, googleProvider, githubProvider, facebookProvider } from '../firebaseConfig';
 import { 
+  auth,
   signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult
-} from "firebase/auth";
-import axios from 'axios';
+  googleProvider,
+  githubProvider,
+  facebookProvider,
+  db,
+  doc,
+  setDoc,
+  getDoc
+} from '../firebaseConfig'
 
 function LoginModal({ isOpen, onClose, onLogin }) {
   const [isLogin, setIsLogin] = useState(true)
@@ -27,7 +32,6 @@ function LoginModal({ isOpen, onClose, onLogin }) {
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [passwordStrength, setPasswordStrength] = useState(0)
-  const [focusedField, setFocusedField] = useState(null)
   const [socialLoading, setSocialLoading] = useState(null)
 
   useEffect(() => {
@@ -43,27 +47,9 @@ function LoginModal({ isOpen, onClose, onLogin }) {
       setErrors({})
       setShowForgotPassword(false)
       setResetSent(false)
+      setPasswordStrength(0)
     }
   }, [isOpen])
-
-  // Handle redirect result for social logins
-  useEffect(() => {
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          await handleSocialLoginSuccess(result.user);
-        }
-      } catch (error) {
-        console.error("Redirect result error:", error);
-        setErrors({ general: error.message });
-      }
-    };
-    
-    if (isOpen) {
-      handleRedirectResult();
-    }
-  }, [isOpen]);
 
   if (!isOpen) return null
 
@@ -78,23 +64,37 @@ function LoginModal({ isOpen, onClose, onLogin }) {
     return strength
   }
 
+  const getPasswordStrengthColor = () => {
+    if (passwordStrength === 0) return '#ef4444'
+    if (passwordStrength === 1) return '#f59e0b'
+    if (passwordStrength === 2) return '#eab308'
+    if (passwordStrength === 3) return '#22c55e'
+    return '#39e75f'
+  }
+
   const handleSocialLoginSuccess = async (firebaseUser) => {
     try {
-      const idToken = await firebaseUser.getIdToken();
-      const response = await axios.post('/api/social-login', { 
-        idToken,
-        email: firebaseUser.email,
-        name: firebaseUser.displayName,
-        provider: firebaseUser.providerData[0]?.providerId
-      });
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      
+      if (!userDoc.exists()) {
+        await setDoc(doc(db, 'users', firebaseUser.uid), {
+          uid: firebaseUser.uid,
+          name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+          email: firebaseUser.email,
+          role: 'user',
+          businessName: `${firebaseUser.displayName?.split('@')[0] || 'User'}'s Store`,
+          businessType: 'retail',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
       
       const userData = {
         uid: firebaseUser.uid,
-        id: firebaseUser.uid,
-        ...response.data.user,
         email: firebaseUser.email,
-        name: firebaseUser.displayName || response.data.user?.name,
+        name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
         photoURL: firebaseUser.photoURL,
+        role: userDoc.exists() ? userDoc.data().role : 'user',
         lastLogin: new Date().toISOString()
       };
       
@@ -113,12 +113,8 @@ function LoginModal({ isOpen, onClose, onLogin }) {
       const result = await signInWithPopup(auth, googleProvider);
       await handleSocialLoginSuccess(result.user);
     } catch (error) {
-      if (error.code === 'auth/popup-blocked') {
-        await signInWithRedirect(auth, googleProvider);
-      } else {
-        console.error("Google login error:", error);
-        setErrors({ general: error.message });
-      }
+      console.error("Google login error:", error);
+      setErrors({ general: error.message });
     } finally {
       setSocialLoading(null);
     }
@@ -130,12 +126,8 @@ function LoginModal({ isOpen, onClose, onLogin }) {
       const result = await signInWithPopup(auth, githubProvider);
       await handleSocialLoginSuccess(result.user);
     } catch (error) {
-      if (error.code === 'auth/popup-blocked') {
-        await signInWithRedirect(auth, githubProvider);
-      } else {
-        console.error("GitHub login error:", error);
-        setErrors({ general: error.message });
-      }
+      console.error("GitHub login error:", error);
+      setErrors({ general: error.message });
     } finally {
       setSocialLoading(null);
     }
@@ -147,12 +139,8 @@ function LoginModal({ isOpen, onClose, onLogin }) {
       const result = await signInWithPopup(auth, facebookProvider);
       await handleSocialLoginSuccess(result.user);
     } catch (error) {
-      if (error.code === 'auth/popup-blocked') {
-        await signInWithRedirect(auth, facebookProvider);
-      } else {
-        console.error("Facebook login error:", error);
-        setErrors({ general: error.message });
-      }
+      console.error("Facebook login error:", error);
+      setErrors({ general: error.message });
     } finally {
       setSocialLoading(null);
     }
@@ -160,18 +148,19 @@ function LoginModal({ isOpen, onClose, onLogin }) {
 
   const handleLoginSubmit = async () => {
     setLoading(true);
+    setErrors({});
     try {
       const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      const idToken = await userCredential.user.getIdToken();
       const firebaseUser = userCredential.user;
       
-      const response = await axios.post('/api/login', { idToken });
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      const role = userDoc.exists() ? userDoc.data().role : 'user';
       
       const userData = {
         uid: firebaseUser.uid,
-        id: firebaseUser.uid,
-        ...response.data.user,
         email: formData.email,
+        name: userDoc.exists() ? userDoc.data().name : formData.email.split('@')[0],
+        role: role,
         lastLogin: new Date().toISOString()
       };
       
@@ -194,17 +183,48 @@ function LoginModal({ isOpen, onClose, onLogin }) {
     }
   };
 
-  // සංශෝධිත handleSignupSubmit කොටස - මෙතැනදී කෙලින්ම backend එකට දත්ත යවයි[cite: 7]
   const handleSignupSubmit = async () => {
     setLoading(true);
     setErrors({});
     try {
-      const response = await axios.post('/api/signup', {
-        email: formData.email,
-        password: formData.password,
+      if (formData.password.length < 6) {
+        setErrors({ password: 'Password must be at least 6 characters' });
+        setLoading(false);
+        return;
+      }
+      
+      if (formData.password !== formData.confirmPassword) {
+        setErrors({ confirmPassword: 'Passwords do not match' });
+        setLoading(false);
+        return;
+      }
+      
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const firebaseUser = userCredential.user;
+      
+      await setDoc(doc(db, 'users', firebaseUser.uid), {
+        uid: firebaseUser.uid,
         name: formData.name,
+        email: formData.email,
+        role: 'user',
         businessName: formData.businessName || `${formData.name}'s Store`,
-        businessType: 'retail'
+        businessType: 'retail',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      
+      // Create subscription
+      const trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + 14);
+      
+      await setDoc(doc(db, 'subscriptions', firebaseUser.uid), {
+        userId: firebaseUser.uid,
+        planId: 'FREE_TRIAL',
+        status: 'trial_active',
+        trialStart: new Date().toISOString(),
+        trialEnd: trialEnd.toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
       
       alert('✅ Account created successfully!\n\nPlease login with your credentials.');
@@ -217,10 +237,11 @@ function LoginModal({ isOpen, onClose, onLogin }) {
         confirmPassword: '', 
         agreeTerms: false 
       });
+      setPasswordStrength(0);
     } catch (error) {
       console.error("Signup error:", error);
-      if (error.response && error.response.data) {
-        setErrors({ general: error.response.data.error || "Signup failed" });
+      if (error.code === 'auth/email-already-in-use') {
+        setErrors({ email: 'Email already registered' });
       } else {
         setErrors({ general: error.message });
       }
@@ -298,6 +319,7 @@ function LoginModal({ isOpen, onClose, onLogin }) {
     setIsLogin(!isLogin)
     setShowForgotPassword(false)
     setErrors({})
+    setPasswordStrength(0)
     setFormData({
       email: '',
       password: '',
@@ -308,56 +330,37 @@ function LoginModal({ isOpen, onClose, onLogin }) {
     })
   }
 
-  const getPasswordStrengthText = () => {
-    if (passwordStrength === 0) return 'Very Weak'
-    if (passwordStrength === 1) return 'Weak'
-    if (passwordStrength === 2) return 'Fair'
-    if (passwordStrength === 3) return 'Good'
-    return 'Strong'
-  }
-
-  const getPasswordStrengthColor = () => {
-    if (passwordStrength === 0) return '#ef4444'
-    if (passwordStrength === 1) return '#f59e0b'
-    if (passwordStrength === 2) return '#eab308'
-    if (passwordStrength === 3) return '#22c55e'
-    return '#39e75f'
-  }
-
   if (showForgotPassword) {
     return (
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-container" onClick={(e) => e.stopPropagation()}>
           <button className="modal-close" onClick={onClose}>✕</button>
-          
           <div className="modal-header">
             <div className="modal-logo">
               <div className="logo-icon"><i className="fas fa-leaf"></i></div>
-              <span>ShelfLife <span className="logo-ai">AI</span></span>
+              <span>ShelfLife AI</span>
             </div>
             <h2>Reset Password</h2>
             <p>We'll send you a link to reset your password</p>
           </div>
-
           <div className="modal-body">
             {!resetSent ? (
               <>
                 <div className="form-group">
-                  <label><i className="fas fa-envelope"></i> Email Address</label>
+                  <label>Email Address</label>
                   <input
                     type="email"
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
                     placeholder="your@email.com"
-                    className={errors.resetEmail ? 'error' : ''}
                   />
                   {errors.resetEmail && <span className="error-message">{errors.resetEmail}</span>}
                 </div>
                 <button className="btn-reset-password" onClick={handleForgotPassword} disabled={loading}>
-                  {loading ? <><i className="fas fa-spinner fa-pulse"></i> Sending...</> : 'Send Reset Link'}
+                  {loading ? 'Sending...' : 'Send Reset Link'}
                 </button>
                 <button className="btn-back-to-login" onClick={() => setShowForgotPassword(false)}>
-                  <i className="fas fa-arrow-left"></i> Back to Login
+                  Back to Login
                 </button>
               </>
             ) : (
@@ -381,22 +384,12 @@ function LoginModal({ isOpen, onClose, onLogin }) {
       <div className="modal-container" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose}>✕</button>
         
-        <div className="modal-bg-decoration">
-          <div className="decoration-circle circle-1"></div>
-          <div className="decoration-circle circle-2"></div>
-          <div className="decoration-circle circle-3"></div>
-          <div className="particle particle-1"></div>
-          <div className="particle particle-2"></div>
-          <div className="particle particle-3"></div>
-          <div className="particle particle-4"></div>
-        </div>
-
         <div className="modal-header">
           <div className="modal-logo">
             <div className="logo-icon">
               <i className="fas fa-leaf"></i>
             </div>
-            <span>ShelfLife <span className="logo-ai">AI</span></span>
+            <span>ShelfLife AI</span>
           </div>
           
           <div className="mode-switch">
@@ -415,7 +408,7 @@ function LoginModal({ isOpen, onClose, onLogin }) {
           </div>
           
           <h2>{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
-          <p>{isLogin ? 'Sign in to continue to your account' : 'Start your 14-day free trial'}</p>
+          <p>{isLogin ? 'Sign in to continue' : 'Start your 14-day free trial'}</p>
         </div>
 
         <div className="social-login-section">
@@ -423,7 +416,14 @@ function LoginModal({ isOpen, onClose, onLogin }) {
             {socialLoading === 'google' ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fab fa-google"></i>}
             <span>Continue with Google</span>
           </button>
-          {/* GitHub and Facebook buttons are same as original[cite: 7] */}
+          <button className="social-btn github" onClick={handleGithubLogin} disabled={socialLoading}>
+            {socialLoading === 'github' ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fab fa-github"></i>}
+            <span>Continue with GitHub</span>
+          </button>
+          <button className="social-btn facebook" onClick={handleFacebookLogin} disabled={socialLoading}>
+            {socialLoading === 'facebook' ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fab fa-facebook-f"></i>}
+            <span>Continue with Facebook</span>
+          </button>
         </div>
 
         <div className="divider">
@@ -434,7 +434,7 @@ function LoginModal({ isOpen, onClose, onLogin }) {
           {!isLogin && (
             <>
               <div className="form-group">
-                <label><i className="fas fa-user"></i> Full Name</label>
+                <label>Full Name</label>
                 <input 
                   type="text" 
                   name="name" 
@@ -446,7 +446,7 @@ function LoginModal({ isOpen, onClose, onLogin }) {
               </div>
 
               <div className="form-group">
-                <label><i className="fas fa-store"></i> Business Name <span className="optional">(Optional)</span></label>
+                <label>Business Name (Optional)</label>
                 <input 
                   type="text" 
                   name="businessName" 
@@ -459,34 +459,40 @@ function LoginModal({ isOpen, onClose, onLogin }) {
           )}
 
           <div className="form-group">
-            <label><i className="fas fa-envelope"></i> Email Address</label>
+            <label>Email Address</label>
             <input 
               type="email" 
               name="email" 
               value={formData.email} 
               onChange={handleChange}
               placeholder="hello@shelflife.ai"
-              className={errors.email ? 'error' : ''}
             />
             {errors.email && <span className="error-message">{errors.email}</span>}
           </div>
 
           <div className="form-group">
-            <label><i className="fas fa-lock"></i> Password</label>
+            <label>Password</label>
             <input 
               type="password" 
               name="password" 
               value={formData.password} 
               onChange={handleChange}
               placeholder="••••••••"
-              className={errors.password ? 'error' : ''}
             />
             {errors.password && <span className="error-message">{errors.password}</span>}
+            
+            {!isLogin && formData.password && (
+              <div className="password-strength">
+                <div className="strength-bar">
+                  <div className="strength-fill" style={{ width: `${(passwordStrength / 5) * 100}%`, background: getPasswordStrengthColor() }}></div>
+                </div>
+              </div>
+            )}
           </div>
 
           {!isLogin && (
             <div className="form-group">
-              <label><i className="fas fa-check-circle"></i> Confirm Password</label>
+              <label>Confirm Password</label>
               <input 
                 type="password" 
                 name="confirmPassword" 
@@ -501,7 +507,7 @@ function LoginModal({ isOpen, onClose, onLogin }) {
           {isLogin && (
             <div className="form-options">
               <label className="checkbox-label">
-                <input type="checkbox" /> <span>Remember me</span>
+                <input type="checkbox" /> Remember me
               </label>
               <button type="button" className="forgot-password" onClick={() => setShowForgotPassword(true)}>
                 Forgot Password?
@@ -512,12 +518,7 @@ function LoginModal({ isOpen, onClose, onLogin }) {
           {!isLogin && (
             <div className="terms-checkbox">
               <label className="checkbox-label">
-                <input 
-                  type="checkbox" 
-                  name="agreeTerms" 
-                  checked={formData.agreeTerms} 
-                  onChange={handleChange}
-                />
+                <input type="checkbox" name="agreeTerms" checked={formData.agreeTerms} onChange={handleChange} />
                 <span>I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></span>
               </label>
               {errors.agreeTerms && <span className="error-message">{errors.agreeTerms}</span>}
@@ -553,4 +554,4 @@ function LoginModal({ isOpen, onClose, onLogin }) {
   )
 }
 
-export default LoginModal;
+export default LoginModal
