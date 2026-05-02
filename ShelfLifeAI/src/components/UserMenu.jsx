@@ -67,9 +67,13 @@ function UserMenu({ user, onLogout, isAdmin }) {
               <button className="menu-item" onClick={() => handleNavigation('/admin/settings')}>
                 <i className="fas fa-cog"></i> Admin Settings
               </button>
+              <div className="menu-divider"></div>
+              <button className="menu-item" onClick={() => handleNavigation('/billing')}>
+                <i className="fas fa-credit-card"></i> Billing
+              </button>
             </>
           ) : (
-            // User Menu Items
+            // User Menu Items with Billing in dropdown
             <>
               <button className="menu-item" onClick={() => handleNavigation('/dashboard')}>
                 <i className="fas fa-chart-line"></i> Dashboard
@@ -83,11 +87,12 @@ function UserMenu({ user, onLogout, isAdmin }) {
               <button className="menu-item" onClick={() => handleNavigation('/analytics')}>
                 <i className="fas fa-chart-pie"></i> Analytics
               </button>
-              <button className="menu-item" onClick={() => handleNavigation('/billing')}>
-                <i className="fas fa-credit-card"></i> Billing
-              </button>
               <button className="menu-item" onClick={() => handleNavigation('/settings')}>
                 <i className="fas fa-cog"></i> Settings
+              </button>
+              <div className="menu-divider"></div>
+              <button className="menu-item" onClick={() => handleNavigation('/billing')}>
+                <i className="fas fa-credit-card"></i> Billing & Subscription
               </button>
             </>
           )}

@@ -25,7 +25,7 @@ export default function Navbar({ onLoginClick, user, onLogout, isAdmin }) {
           {user ? (
             <>
               {isAdmin ? (
-                // Admin Navigation
+                // Admin Navigation - NO BILLING ICON
                 <>
                   <Link to="/admin/dashboard" className={`nav-link ${isActive('/admin/dashboard') ? 'active' : ''}`}>
                     <i className="fas fa-chart-pie"></i> Dashboard
@@ -47,7 +47,7 @@ export default function Navbar({ onLoginClick, user, onLogout, isAdmin }) {
                   </Link>
                 </>
               ) : (
-                // User Navigation
+                // User Navigation - NO BILLING ICON
                 <>
                   <Link to="/dashboard" className={`nav-link ${isActive('/dashboard') ? 'active' : ''}`}>
                     Dashboard
@@ -61,9 +61,7 @@ export default function Navbar({ onLoginClick, user, onLogout, isAdmin }) {
                   <Link to="/analytics" className={`nav-link ${isActive('/analytics') ? 'active' : ''}`}>
                     Analytics
                   </Link>
-                  <Link to="/billing" className={`nav-link ${isActive('/billing') ? 'active' : ''}`}>
-                    Billing
-                  </Link>
+                  {/* Billing link removed from here */}
                 </>
               )}
               <UserMenu user={user} onLogout={onLogout} isAdmin={isAdmin} />

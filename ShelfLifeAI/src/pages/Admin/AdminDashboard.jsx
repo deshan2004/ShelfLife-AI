@@ -1,6 +1,6 @@
 // src/pages/Admin/AdminDashboard.jsx
 import { useState, useEffect } from 'react'
-import { db, collection, getDocs, query, orderBy, limit } from '../../firebaseConfig'
+import { db, collection, getDocs } from '../../firebaseConfig'
 import './Admin.css'
 
 function AdminDashboard({ admin }) {
@@ -23,53 +23,44 @@ function AdminDashboard({ admin }) {
 
   const loadDashboardData = async () => {
     try {
-      // Load users from Firestore
       const usersSnapshot = await getDocs(collection(db, 'users'));
       const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      // Load subscriptions
       const subsSnapshot = await getDocs(collection(db, 'subscriptions'));
       const subscriptions = subsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      // Calculate stats
       let totalProducts = 0;
-      users.forEach(user => {
-        const userInventory = localStorage.getItem(`shelflife_inventory_${user.uid}`);
-        if (userInventory) {
-          const inventory = JSON.parse(userInventory);
-          totalProducts += inventory.length;
-        }
-      });
+      for (const user of users) {
+        try {
+          const inventorySnapshot = await getDocs(collection(db, 'inventory', user.uid, 'items'));
+          totalProducts += inventorySnapshot.size;
+        } catch (e) {}
+      }
       
+      const scansSnapshot = await getDocs(collection(db, 'scans'));
       const activeSubs = subscriptions.filter(s => s.status === 'active').length;
       const trialUsers = subscriptions.filter(s => s.status === 'trial_active').length;
       const expiredTrials = subscriptions.filter(s => s.status === 'trial_expired').length;
       
-      // Calculate revenue (mock - in production get from payments)
-      const totalRevenue = activeSubs * 5900;
+      const revenueMap = { BASIC: 2500, PROFESSIONAL: 5900, ENTERPRISE: 14900 };
+      const totalRevenue = subscriptions
+        .filter(s => s.status === 'active')
+        .reduce((sum, s) => sum + (revenueMap[s.planId] || 0), 0);
       
       setStats({
         totalUsers: users.length,
         totalProducts: totalProducts,
-        totalScans: Math.floor(Math.random() * 500) + 200,
+        totalScans: scansSnapshot.size,
         totalRevenue: totalRevenue,
         activeSubscriptions: activeSubs,
         trialUsers: trialUsers,
         expiredTrials: expiredTrials
       });
       
-      // Get recent users
-      const recentUsersList = users.slice(-5).reverse();
-      setRecentUsers(recentUsersList);
-      
-      // Mock recent activities
-      setRecentActivities([
-        { id: 1, user: 'John Doe', action: 'Signed up', time: '2 minutes ago', type: 'user', icon: 'fa-user-plus' },
-        { id: 2, user: 'Sarah Smith', action: 'Upgraded to Professional', time: '1 hour ago', type: 'subscription', icon: 'fa-crown' },
-        { id: 3, user: 'Mike Johnson', action: 'Added 15 products', time: '3 hours ago', type: 'inventory', icon: 'fa-box' },
-        { id: 4, user: 'Emily Brown', action: 'Started free trial', time: '5 hours ago', type: 'user', icon: 'fa-hourglass-start' },
-        { id: 5, user: 'David Wilson', action: 'Processed payment', time: 'Yesterday', type: 'payment', icon: 'fa-credit-card' },
-      ]);
+      const sortedUsers = [...users].sort((a, b) => 
+        new Date(b.createdAt) - new Date(a.createdAt)
+      ).slice(0, 5);
+      setRecentUsers(sortedUsers);
       
     } catch (error) {
       console.error('Error loading dashboard:', error);
@@ -90,6 +81,13 @@ function AdminDashboard({ admin }) {
   const growthData = [45, 62, 58, 78, 85, 92, 110, 125, 140, 158, 175, 195]
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+  const pieData = [
+    { name: 'Trial', percentage: 60, color: '#39e75f', strokeDashoffset: 100.48 },
+    { name: 'Basic', percentage: 25, color: '#3b82f6', strokeDashoffset: 188.4 },
+    { name: 'Pro', percentage: 10, color: '#8b5cf6', strokeDashoffset: 226.08 },
+    { name: 'Enterprise', percentage: 5, color: '#f59e0b', strokeDashoffset: 238.64 }
+  ]
+
   if (loading) {
     return (
       <div className="admin-loading">
@@ -100,7 +98,7 @@ function AdminDashboard({ admin }) {
   }
 
   return (
-    <div className="admin-dashboard">
+    <div className="admin-container">
       <div className="admin-header">
         <div className="admin-header-left">
           <h1>
@@ -110,7 +108,7 @@ function AdminDashboard({ admin }) {
           <p>Welcome back, {admin?.name || 'Admin'}! Here's what's happening with your platform.</p>
         </div>
         <div className="admin-header-right">
-          <div className="admin-date">
+          <div className="admin-date float-animation">
             <i className="fas fa-calendar"></i>
             {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </div>
@@ -126,7 +124,9 @@ function AdminDashboard({ admin }) {
             <div className="admin-stat-info">
               <h3>{stat.value}</h3>
               <p>{stat.title}</p>
-              <span className="admin-stat-change positive">{stat.change}</span>
+              <span className="admin-stat-change positive">
+                <i className="fas fa-arrow-up"></i> {stat.change}
+              </span>
             </div>
           </div>
         ))}
@@ -138,20 +138,18 @@ function AdminDashboard({ admin }) {
             <i className="fas fa-chart-line"></i>
             User Growth
           </h3>
-          <div className="admin-chart-container">
-            <div className="admin-growth-chart">
-              {growthData.map((value, i) => (
-                <div key={i} className="admin-chart-bar-wrapper">
-                  <div 
-                    className="admin-chart-bar" 
-                    style={{ height: `${(value / 200) * 100}%` }}
-                  >
-                    <span>{value}</span>
-                  </div>
-                  <span className="admin-chart-label">{months[i]}</span>
+          <div className="admin-growth-chart">
+            {growthData.map((value, i) => (
+              <div key={i} className="admin-chart-bar-wrapper">
+                <div 
+                  className="admin-chart-bar" 
+                  style={{ height: `${(value / 200) * 100}%` }}
+                >
+                  <span>{value}</span>
                 </div>
-              ))}
-            </div>
+                <span className="admin-chart-label">{months[i]}</span>
+              </div>
+            ))}
           </div>
         </div>
         
@@ -161,19 +159,30 @@ function AdminDashboard({ admin }) {
             Subscription Distribution
           </h3>
           <div className="admin-pie-chart">
-            <div className="admin-pie-segments">
-              <div className="admin-pie-segment" style={{ width: '60%', background: 'linear-gradient(90deg, #39e75f, #22c55e)' }}>
-                <span>Trial (60%)</span>
-              </div>
-              <div className="admin-pie-segment" style={{ width: '25%', background: 'linear-gradient(90deg, #3b82f6, #2563eb)' }}>
-                <span>Basic (25%)</span>
-              </div>
-              <div className="admin-pie-segment" style={{ width: '10%', background: 'linear-gradient(90deg, #8b5cf6, #7c3aed)' }}>
-                <span>Pro (10%)</span>
-              </div>
-              <div className="admin-pie-segment" style={{ width: '5%', background: 'linear-gradient(90deg, #f59e0b, #d97706)' }}>
-                <span>Enterprise (5%)</span>
-              </div>
+            <div className="admin-pie-chart-visual">
+              <svg viewBox="0 0 100 100" className="admin-pie-svg">
+                {pieData.map((item, i) => (
+                  <circle 
+                    key={i}
+                    cx="50" 
+                    cy="50" 
+                    r="40" 
+                    fill="none" 
+                    stroke={item.color} 
+                    strokeWidth="20" 
+                    strokeDasharray="251.2" 
+                    strokeDashoffset={item.strokeDashoffset}
+                  />
+                ))}
+              </svg>
+            </div>
+            <div className="admin-pie-legend">
+              {pieData.map((item, i) => (
+                <div key={i} className="admin-legend-item">
+                  <span className="admin-legend-color" style={{ background: item.color }}></span>
+                  <span>{item.name} ({item.percentage}%)</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -209,18 +218,26 @@ function AdminDashboard({ admin }) {
             Recent Activities
           </h3>
           <div className="admin-activities-list">
-            {recentActivities.map(activity => (
-              <div key={activity.id} className="admin-activity-item">
-                <div className={`admin-activity-icon ${activity.type}`}>
-                  <i className={`fas ${activity.icon}`}></i>
-                </div>
-                <div className="admin-activity-content">
-                  <div className="admin-activity-user">{activity.user}</div>
-                  <div className="admin-activity-action">{activity.action}</div>
-                </div>
-                <div className="admin-activity-time">{activity.time}</div>
+            <div className="admin-activity-item">
+              <div className="admin-activity-icon user">
+                <i className="fas fa-user-plus"></i>
               </div>
-            ))}
+              <div className="admin-activity-content">
+                <div className="admin-activity-user">System</div>
+                <div className="admin-activity-action">Dashboard loaded successfully</div>
+              </div>
+              <div className="admin-activity-time">Just now</div>
+            </div>
+            <div className="admin-activity-item">
+              <div className="admin-activity-icon inventory">
+                <i className="fas fa-box"></i>
+              </div>
+              <div className="admin-activity-content">
+                <div className="admin-activity-user">Admin</div>
+                <div className="admin-activity-action">Viewed analytics dashboard</div>
+              </div>
+              <div className="admin-activity-time">1 min ago</div>
+            </div>
           </div>
         </div>
       </div>
