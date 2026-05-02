@@ -1,6 +1,6 @@
 // src/pages/Admin/AdminUsers.jsx
 import { useState, useEffect } from 'react'
-import { db, collection, getDocs, doc, updateDoc, deleteDoc } from '../../firebaseConfig'
+import { db, collection, getDocs, doc, updateDoc, deleteDoc, setDoc } from '../../firebaseConfig'
 import './Admin.css'
 
 function AdminUsers() {
@@ -10,29 +10,50 @@ function AdminUsers() {
   const [filterRole, setFilterRole] = useState('all')
   const [selectedUser, setSelectedUser] = useState(null)
   const [showUserModal, setShowUserModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editFormData, setEditFormData] = useState({})
   const [loading, setLoading] = useState(true)
+  const [toast, setToast] = useState({ show: false, message: '', type: '' })
 
   useEffect(() => {
     loadUsers()
   }, [])
 
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type })
+    setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000)
+  }
+
   const loadUsers = async () => {
     try {
       const usersSnapshot = await getDocs(collection(db, 'users'));
-      const usersData = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const usersData = usersSnapshot.docs.map(doc => ({ id: doc.id, uid: doc.id, ...doc.data() }));
       
       const subsSnapshot = await getDocs(collection(db, 'subscriptions'));
       const subsData = subsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      const usersWithSubs = usersData.map(user => ({
-        ...user,
-        subscription: subsData.find(s => s.userId === user.uid) || { status: 'none', planId: 'None' }
+      // Load inventory counts for each user
+      const usersWithData = await Promise.all(usersData.map(async (user) => {
+        let productCount = 0;
+        try {
+          const inventorySnapshot = await getDocs(collection(db, 'inventory', user.uid, 'items'));
+          productCount = inventorySnapshot.size;
+        } catch (e) {
+          productCount = 0;
+        }
+        
+        return {
+          ...user,
+          subscription: subsData.find(s => s.userId === user.uid) || { status: 'none', planId: 'None' },
+          productCount
+        };
       }));
       
-      setUsers(usersWithSubs);
+      setUsers(usersWithData);
       setSubscriptions(subsData);
     } catch (error) {
       console.error('Error loading users:', error);
+      showToast('Error loading users', 'error');
     } finally {
       setLoading(false);
     }
@@ -45,20 +66,86 @@ function AdminUsers() {
         updatedAt: new Date().toISOString()
       });
       await loadUsers();
+      showToast(`User role updated to ${newRole}`);
     } catch (error) {
       console.error('Error updating user role:', error);
+      showToast('Error updating user role', 'error');
+    }
+  }
+
+  const handleUpdateUser = async () => {
+    try {
+      await updateDoc(doc(db, 'users', selectedUser.uid), {
+        name: editFormData.name,
+        businessName: editFormData.businessName,
+        phone: editFormData.phone,
+        address: editFormData.address,
+        updatedAt: new Date().toISOString()
+      });
+      await loadUsers();
+      setShowEditModal(false);
+      setShowUserModal(false);
+      showToast('User updated successfully');
+    } catch (error) {
+      console.error('Error updating user:', error);
+      showToast('Error updating user', 'error');
     }
   }
 
   const handleDeleteUser = async (userId) => {
     if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       try {
+        // Delete user document
         await deleteDoc(doc(db, 'users', userId));
+        // Delete subscription
+        await deleteDoc(doc(db, 'subscriptions', userId));
+        // Delete inventory collection
+        const inventorySnapshot = await getDocs(collection(db, 'inventory', userId, 'items'));
+        for (const doc of inventorySnapshot.docs) {
+          await deleteDoc(doc.ref);
+        }
         await loadUsers();
+        showToast('User deleted successfully');
       } catch (error) {
         console.error('Error deleting user:', error);
+        showToast('Error deleting user', 'error');
       }
     }
+  }
+
+  const handleUpdateSubscription = async (userId, planId, status, trialEndDays) => {
+    try {
+      const updateData = {
+        planId: planId,
+        status: status,
+        updatedAt: new Date().toISOString()
+      };
+      
+      if (trialEndDays && status === 'trial_active') {
+        const newTrialEnd = new Date();
+        newTrialEnd.setDate(newTrialEnd.getDate() + trialEndDays);
+        updateData.trialEnd = newTrialEnd.toISOString();
+      }
+      
+      await updateDoc(doc(db, 'subscriptions', userId), updateData);
+      await loadUsers();
+      showToast(`Subscription updated to ${planId}`);
+    } catch (error) {
+      console.error('Error updating subscription:', error);
+      showToast('Error updating subscription', 'error');
+    }
+  }
+
+  const openEditModal = (user) => {
+    setSelectedUser(user);
+    setEditFormData({
+      name: user.name || '',
+      businessName: user.businessName || '',
+      phone: user.phone || '',
+      address: user.address || ''
+    });
+    setShowEditModal(true);
+    setShowUserModal(false);
   }
 
   const filteredUsers = users.filter(user => {
@@ -71,7 +158,7 @@ function AdminUsers() {
   const stats = {
     total: users.length,
     admins: users.filter(u => u.role === 'admin').length,
-    users: users.filter(u => u.role === 'user').length,
+    regularUsers: users.filter(u => u.role === 'user').length,
     active: users.filter(u => u.subscription?.status === 'active').length
   }
 
@@ -86,13 +173,20 @@ function AdminUsers() {
 
   return (
     <div className="admin-users">
+      {toast.show && (
+        <div className={`admin-toast ${toast.type}`}>
+          <i className={`fas ${toast.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}`}></i>
+          <span>{toast.message}</span>
+        </div>
+      )}
+      
       <div className="admin-page-header">
         <div>
           <h1>
             <i className="fas fa-users"></i>
             User Management
           </h1>
-          <p>Manage all users, view their details, and control access</p>
+          <p>Manage all users, view their details, edit profiles, and control access</p>
         </div>
         <div className="admin-stats-chips">
           <div className="admin-stat-chip">
@@ -105,11 +199,11 @@ function AdminUsers() {
           </div>
           <div className="admin-stat-chip user">
             <i className="fas fa-user"></i>
-            <span>Users: {stats.users}</span>
+            <span>Users: {stats.regularUsers}</span>
           </div>
           <div className="admin-stat-chip active">
             <i className="fas fa-check-circle"></i>
-            <span>Active: {stats.active}</span>
+            <span>Active Subs: {stats.active}</span>
           </div>
         </div>
       </div>
@@ -137,6 +231,7 @@ function AdminUsers() {
             <tr>
               <th>User</th>
               <th>Email</th>
+              <th>Products</th>
               <th>Plan</th>
               <th>Status</th>
               <th>Joined</th>
@@ -159,17 +254,29 @@ function AdminUsers() {
                   </div>
                 </td>
                 <td>{user.email}</td>
+                <td>{user.productCount || 0}</td>
                 <td>
-                  <span className={`admin-plan-badge ${user.subscription?.planId?.toLowerCase() || 'none'}`}>
-                    {user.subscription?.planId === 'FREE_TRIAL' ? 'Free Trial' : user.subscription?.planId || 'None'}
-                  </span>
+                  <select 
+                    value={user.subscription?.planId || 'FREE_TRIAL'} 
+                    onChange={(e) => handleUpdateSubscription(user.uid, e.target.value, user.subscription?.status, 0)}
+                    className="admin-plan-select"
+                  >
+                    <option value="FREE_TRIAL">Free Trial</option>
+                    <option value="BASIC">Basic</option>
+                    <option value="PROFESSIONAL">Professional</option>
+                    <option value="ENTERPRISE">Enterprise</option>
+                  </select>
                 </td>
                 <td>
-                  <span className={`admin-status-badge ${user.subscription?.status || 'inactive'}`}>
-                    {user.subscription?.status === 'trial_active' ? 'Trial Active' : 
-                     user.subscription?.status === 'active' ? 'Active' : 
-                     user.subscription?.status === 'trial_expired' ? 'Trial Expired' : 'Inactive'}
-                  </span>
+                  <select 
+                    value={user.subscription?.status || 'trial_active'} 
+                    onChange={(e) => handleUpdateSubscription(user.uid, user.subscription?.planId || 'FREE_TRIAL', e.target.value, e.target.value === 'trial_active' ? 14 : 0)}
+                    className="admin-status-select"
+                  >
+                    <option value="trial_active">Trial Active</option>
+                    <option value="active">Active</option>
+                    <option value="trial_expired">Expired</option>
+                  </select>
                 </td>
                 <td>{new Date(user.createdAt).toLocaleDateString()}</td>
                 <td>
@@ -190,12 +297,21 @@ function AdminUsers() {
                         setSelectedUser(user)
                         setShowUserModal(true)
                       }}
+                      title="View Details"
                     >
                       <i className="fas fa-eye"></i>
                     </button>
                     <button 
+                      className="admin-edit-btn"
+                      onClick={() => openEditModal(user)}
+                      title="Edit User"
+                    >
+                      <i className="fas fa-edit"></i>
+                    </button>
+                    <button 
                       className="admin-delete-btn"
                       onClick={() => handleDeleteUser(user.uid)}
+                      title="Delete User"
                     >
                       <i className="fas fa-trash"></i>
                     </button>
@@ -224,7 +340,7 @@ function AdminUsers() {
             </div>
             <div className="admin-modal-body">
               <div className="admin-user-detail">
-                <div className="admin-detail-avatar" style={{ background: selectedUser.role === 'admin' ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #39e75f, #22c55e)' }}>
+                <div className="admin-detail-avatar" style={{ background: selectedUser.role === 'admin' ? '#ef4444' : '#39e75f' }}>
                   {selectedUser.name?.charAt(0) || 'U'}
                 </div>
                 <div className="admin-detail-info">
@@ -270,6 +386,10 @@ function AdminUsers() {
                   <span>Role:</span>
                   <strong>{selectedUser.role || 'User'}</strong>
                 </div>
+                <div className="admin-detail-row">
+                  <span>Products:</span>
+                  <strong>{selectedUser.productCount || 0} items</strong>
+                </div>
                 {selectedUser.businessName && (
                   <div className="admin-detail-row">
                     <span>Business:</span>
@@ -280,11 +400,66 @@ function AdminUsers() {
             </div>
             <div className="admin-modal-footer">
               <button className="admin-modal-btn secondary" onClick={() => setShowUserModal(false)}>Close</button>
-              <button className="admin-modal-btn primary" onClick={() => {
-                handleUpdateUserRole(selectedUser.uid, selectedUser.role === 'admin' ? 'user' : 'admin');
-                setShowUserModal(false);
-              }}>
-                {selectedUser.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
+              <button className="admin-modal-btn primary" onClick={() => openEditModal(selectedUser)}>
+                <i className="fas fa-edit"></i> Edit User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Edit User Modal */}
+      {showEditModal && selectedUser && (
+        <div className="admin-modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="admin-modal admin-modal-large" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <h2>Edit User: {selectedUser.name}</h2>
+              <button className="admin-modal-close" onClick={() => setShowEditModal(false)}>✕</button>
+            </div>
+            <div className="admin-modal-body">
+              <div className="admin-edit-form">
+                <div className="admin-form-group">
+                  <label>Full Name</label>
+                  <input 
+                    type="text" 
+                    value={editFormData.name} 
+                    onChange={(e) => setEditFormData({...editFormData, name: e.target.value})}
+                    placeholder="Enter full name"
+                  />
+                </div>
+                <div className="admin-form-group">
+                  <label>Business Name</label>
+                  <input 
+                    type="text" 
+                    value={editFormData.businessName} 
+                    onChange={(e) => setEditFormData({...editFormData, businessName: e.target.value})}
+                    placeholder="Enter business name"
+                  />
+                </div>
+                <div className="admin-form-group">
+                  <label>Phone Number</label>
+                  <input 
+                    type="tel" 
+                    value={editFormData.phone} 
+                    onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}
+                    placeholder="Enter phone number"
+                  />
+                </div>
+                <div className="admin-form-group">
+                  <label>Address</label>
+                  <textarea 
+                    rows="3"
+                    value={editFormData.address} 
+                    onChange={(e) => setEditFormData({...editFormData, address: e.target.value})}
+                    placeholder="Enter address"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="admin-modal-footer">
+              <button className="admin-modal-btn secondary" onClick={() => setShowEditModal(false)}>Cancel</button>
+              <button className="admin-modal-btn primary" onClick={handleUpdateUser}>
+                <i className="fas fa-save"></i> Save Changes
               </button>
             </div>
           </div>

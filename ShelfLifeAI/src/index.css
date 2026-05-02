@@ -795,3 +795,31 @@ body::before {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent-green);
 }
+/* Customize PayHere iframe */
+iframe[src*="payhere.lk"] {
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  background: #0c190c !important;
+}
+
+/* Style the PayHere page (if you have control over the hosted page) */
+/* Add these to your main CSS to override PayHere styles */
+.payhere-container {
+  --payhere-primary: #39e75f;
+  --payhere-bg: #0c190c;
+  --payhere-text: #ffffff;
+  --payhere-border: #2a402a;
+}
+
+/* PayHere button overrides */
+.payhere-button {
+  background: linear-gradient(135deg, #16a34a, #39e75f) !important;
+  border-radius: 60px !important;
+  font-weight: 700 !important;
+  transition: all 0.3s ease !important;
+}
+
+.payhere-button:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(57, 231, 95, 0.3) !important;
+}

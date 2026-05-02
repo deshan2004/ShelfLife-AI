@@ -1,6 +1,8 @@
-// src/pages/LandingPage.jsx - Complete Beautiful Landing Page with Demo
+// src/pages/LandingPage.jsx
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import PaymentModal from '../components/Payment/PaymentModal'
+import LearnMoreModal from '../components/LearnMoreModal'
 import './LandingPage.css'
 
 function LandingPage({ onLoginClick }) {
@@ -8,6 +10,10 @@ function LandingPage({ onLoginClick }) {
   const [scrolled, setScrolled] = useState(false)
   const [activeDemoIndex, setActiveDemoIndex] = useState(0)
   const [showDemoToast, setShowDemoToast] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [showLearnMore, setShowLearnMore] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState(null)
+  const [selectedFeature, setSelectedFeature] = useState(null)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -44,6 +50,51 @@ function LandingPage({ onLoginClick }) {
     }
   }
 
+  const handleUpgradeClick = (plan) => {
+    const user = localStorage.getItem('shelflife_user')
+    if (!user) {
+      if (onLoginClick) onLoginClick()
+      return
+    }
+    setSelectedPlan(plan)
+    setShowPaymentModal(true)
+  }
+
+  const handlePaymentSuccess = () => {
+    setShowPaymentModal(false)
+    alert('✅ Demo payment successful! In production, this would upgrade your account.')
+    navigate('/billing')
+  }
+
+  const handleLearnMore = (feature) => {
+    setSelectedFeature(feature)
+    setShowLearnMore(true)
+  }
+
+  const demoPlans = [
+    {
+      id: 'BASIC',
+      name: 'Basic',
+      price: 2500,
+      description: 'Perfect for small shops just starting out',
+      features: ['200 products', '25 suppliers', 'Barcode scanning', 'Basic analytics', 'Email support']
+    },
+    {
+      id: 'PROFESSIONAL',
+      name: 'Professional',
+      price: 5900,
+      description: 'Best for growing retail businesses',
+      features: ['1000 products', '100 suppliers', 'AI OCR scanning', 'Flash sale automation', 'Advanced analytics', 'Priority support', 'Data export']
+    },
+    {
+      id: 'ENTERPRISE',
+      name: 'Enterprise',
+      price: 14900,
+      description: 'For large operations with custom needs',
+      features: ['Unlimited products', 'Unlimited suppliers', 'All Professional features', 'API access', 'Multi-user access', 'Dedicated support']
+    }
+  ]
+
   const stats = [
     { value: "90%", label: "LESS MANUAL CHECKING", icon: "fa-clock", color: "#39e75f" },
     { value: "LKR 5k+", label: "AVG MONTHLY SAVED", icon: "fa-coins", color: "#f59e0b" },
@@ -51,10 +102,30 @@ function LandingPage({ onLoginClick }) {
   ]
 
   const features = [
-    { icon: "fa-camera", title: "AI OCR Scanner", desc: "Read expiry dates directly from packaging. No barcode needed." },
-    { icon: "fa-bolt", title: "Smart Flash Sales", desc: "Auto-trigger discounts for items expiring soon." },
-    { icon: "fa-chart-line", title: "Real-time Analytics", desc: "Track savings and waste reduction instantly." },
-    { icon: "fa-truck", title: "Supplier Returns", desc: "Automated return requests for near-expiry items." }
+    { 
+      icon: "fa-camera", 
+      title: "AI OCR Scanner", 
+      desc: "Read expiry dates directly from packaging. No barcode needed.",
+      color: "#39e75f"
+    },
+    { 
+      icon: "fa-bolt", 
+      title: "Smart Flash Sales", 
+      desc: "Auto-trigger discounts for items expiring soon.",
+      color: "#f59e0b"
+    },
+    { 
+      icon: "fa-chart-line", 
+      title: "Real-time Analytics", 
+      desc: "Track savings and waste reduction instantly.",
+      color: "#3b82f6"
+    },
+    { 
+      icon: "fa-truck", 
+      title: "Supplier Returns", 
+      desc: "Automated return requests for near-expiry items.",
+      color: "#8b5cf6"
+    }
   ]
 
   const demoProducts = [
@@ -261,12 +332,12 @@ function LandingPage({ onLoginClick }) {
           <div className="features-grid">
             {features.map((feature, index) => (
               <div key={index} className="feature-card" style={{ animationDelay: `${index * 0.1}s` }}>
-                <div className="feature-icon-wrapper">
-                  <i className={`fas ${feature.icon}`}></i>
+                <div className="feature-icon-wrapper" style={{ background: `${feature.color}15` }}>
+                  <i className={`fas ${feature.icon}`} style={{ color: feature.color }}></i>
                 </div>
                 <h3>{feature.title}</h3>
                 <p>{feature.desc}</p>
-                <div className="feature-link">
+                <div className="feature-link" onClick={() => handleLearnMore(feature)}>
                   <span>Learn more</span>
                   <i className="fas fa-arrow-right"></i>
                 </div>
@@ -316,13 +387,19 @@ function LandingPage({ onLoginClick }) {
                       <div className="scan-placeholder">
                         <i className="fas fa-camera"></i>
                         <p>Position expiry date in frame</p>
+                        <button className="demo-scan-btn" onClick={() => alert('📷 Demo: Camera would open here! In production, you can scan expiry dates directly.')}>
+                          <i className="fas fa-camera"></i> Try Demo Scan
+                        </button>
                       </div>
                     </div>
                     <div className="scan-result">
                       <i className="fas fa-check-circle"></i>
                       <div>
-                        <strong>Expiry Date Detected!</strong>
+                        <strong>Demo - Expiry Date Detected!</strong>
                         <p>2025-12-31 • 213 days remaining</p>
+                        <button className="demo-add-btn" onClick={() => alert('✅ Demo: Product would be added to inventory!')}>
+                          Add to Inventory
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -350,6 +427,9 @@ function LandingPage({ onLoginClick }) {
                   <div className="demo-info">
                     <h4>📊 Real-time Analytics Dashboard</h4>
                     <p>Track your savings, waste reduction, and inventory performance with beautiful, real-time charts and insights.</p>
+                    <button className="demo-upgrade-btn" onClick={() => handleUpgradeClick(demoPlans[1])}>
+                      Upgrade to Access Full Analytics →
+                    </button>
                   </div>
                 </div>
               )}
@@ -363,7 +443,7 @@ function LandingPage({ onLoginClick }) {
                         <strong>Critical Alert!</strong>
                         <p>Greek Yogurt expires in 2 days - Flash sale recommended</p>
                       </div>
-                      <button className="alert-action">Take Action</button>
+                      <button className="alert-action" onClick={() => alert('🔥 Demo: Flash sale would be triggered!')}>Take Action</button>
                     </div>
                     <div className="alert-item warning">
                       <i className="fas fa-clock"></i>
@@ -371,7 +451,7 @@ function LandingPage({ onLoginClick }) {
                         <strong>Warning</strong>
                         <p>Fresh Milk expires in 4 days - Schedule flash sale</p>
                       </div>
-                      <button className="alert-action">Schedule</button>
+                      <button className="alert-action" onClick={() => alert('⏰ Demo: Reminder would be set!')}>Schedule</button>
                     </div>
                     <div className="alert-item info">
                       <i className="fas fa-info-circle"></i>
@@ -379,7 +459,7 @@ function LandingPage({ onLoginClick }) {
                         <strong>Low Stock Alert</strong>
                         <p>Wheat Bread only 5 units remaining</p>
                       </div>
-                      <button className="alert-action">Order Now</button>
+                      <button className="alert-action" onClick={() => alert('📦 Demo: Order would be placed!')}>Order Now</button>
                     </div>
                   </div>
                   <div className="demo-info">
@@ -389,6 +469,49 @@ function LandingPage({ onLoginClick }) {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Plans Section */}
+      <section className="pricing-section">
+        <div className="container">
+          <div className="section-header">
+            <span className="section-eyebrow">Pricing</span>
+            <h2 className="section-title">Simple, Transparent Pricing</h2>
+            <p className="section-subtitle">Choose the plan that works best for your business</p>
+          </div>
+          
+          <div className="pricing-grid">
+            {demoPlans.map((plan, index) => (
+              <div key={plan.id} className={`pricing-card ${plan.id === 'PROFESSIONAL' ? 'featured' : ''}`} style={{ animationDelay: `${index * 0.1}s` }}>
+                {plan.id === 'PROFESSIONAL' && <div className="popular-badge">🔥 Most Popular</div>}
+                <div className="pricing-header">
+                  <h3>{plan.name}</h3>
+                  <div className="pricing-price">
+                    <span className="currency">LKR</span>
+                    <span className="amount">{plan.price.toLocaleString()}</span>
+                    <span className="period">/month</span>
+                  </div>
+                  <p className="pricing-description">{plan.description}</p>
+                </div>
+                <ul className="pricing-features">
+                  {plan.features.map((feature, idx) => (
+                    <li key={idx}>
+                      <i className="fas fa-check-circle"></i>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                <button 
+                  className={`pricing-btn ${plan.id === 'PROFESSIONAL' ? 'primary' : 'secondary'}`}
+                  onClick={() => handleUpgradeClick(plan)}
+                >
+                  {plan.id === 'BASIC' ? 'Get Started' : plan.id === 'PROFESSIONAL' ? 'Start Free Trial' : 'Contact Sales'}
+                  <i className="fas fa-arrow-right"></i>
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -507,6 +630,26 @@ function LandingPage({ onLoginClick }) {
           </div>
         </div>
       </footer>
+
+      {/* Payment Modal */}
+      {showPaymentModal && selectedPlan && (
+        <PaymentModal 
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          plan={selectedPlan}
+          user={JSON.parse(localStorage.getItem('shelflife_user'))}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
+
+      {/* Learn More Modal */}
+      {showLearnMore && selectedFeature && (
+        <LearnMoreModal 
+          isOpen={showLearnMore}
+          onClose={() => setShowLearnMore(false)}
+          feature={selectedFeature}
+        />
+      )}
     </div>
   )
 }

@@ -55,4 +55,58 @@
   .payhere-btn i {
     font-size: 14px;
   }
+}/* src/components/Payment/PayHereButton.css */
+.payhere-btn {
+  width: 100%;
+  border: none;
+  border-radius: 60px;
+  padding: 14px 20px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.payhere-btn.primary {
+  background: linear-gradient(135deg, #16a34a, #39e75f);
+  color: #030a03;
+  box-shadow: 0 4px 15px rgba(57, 231, 95, 0.2);
+}
+
+.payhere-btn.primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(57, 231, 95, 0.4);
+}
+
+.payhere-btn.secondary {
+  background: rgba(57, 231, 95, 0.1);
+  border: 1px solid rgba(57, 231, 95, 0.3);
+  color: #39e75f;
+}
+
+.payhere-btn.secondary:hover:not(:disabled) {
+  background: rgba(57, 231, 95, 0.2);
+  transform: translateY(-2px);
+}
+
+.payhere-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.payhere-btn i {
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  .payhere-btn {
+    padding: 12px 16px;
+    font-size: 0.85rem;
+  }
 }

@@ -8,7 +8,7 @@ import LoginModal from './components/LoginModal'
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
 
-// Import pages
+// User Pages
 import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
 import Inventory from './pages/Inventory'
@@ -16,9 +16,25 @@ import Suppliers from './pages/Suppliers'
 import Analytics from './pages/Analytics'
 import BillingPage from './pages/BillingPage'
 import Settings from './pages/Settings'
+import PaymentSuccess from './pages/PaymentSuccess'
+import PaymentCancel from './pages/PaymentCancel'
 
-// Import subscription services
+// Admin Pages
+import AdminDashboard from './pages/Admin/AdminDashboard'
+import AdminUsers from './pages/Admin/AdminUsers'
+import AdminInventory from './pages/Admin/AdminInventory'
+import AdminSubscriptions from './pages/Admin/AdminSubscriptions'
+import AdminAnalytics from './pages/Admin/AdminAnalytics'
+import AdminSettings from './pages/Admin/AdminSettings'
+
+// Services
 import subscriptionService from './services/subscriptionService'
+import { useFeatureAccess } from './hooks/useFeatureAccess'
+
+// Styles
+import './App.css'
+import './components/subscription/subscription.css'
+import './pages/Admin/Admin.css'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -27,6 +43,8 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [inventory, setInventory] = useState([])
   const [toastMsg, setToastMsg] = useState(null)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [upgradeContext, setUpgradeContext] = useState({ resourceType: 'products', currentUsage: 0, limit: 0 })
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -34,7 +52,6 @@ function App() {
       
       if (firebaseUser) {
         try {
-          // Get user role from Firestore
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           let role = 'user';
           let userData = {};
@@ -43,7 +60,6 @@ function App() {
             userData = userDoc.data();
             role = userData.role || 'user';
           } else {
-            // Create user document if it doesn't exist
             const newUserData = {
               uid: firebaseUser.uid,
               name: firebaseUser.displayName || 'User',
@@ -70,17 +86,8 @@ function App() {
           setUserRole(role);
           localStorage.setItem('shelflife_user', JSON.stringify(fullUserData));
           
-          // Load inventory for regular users
           if (role === 'user') {
-            const savedInventory = localStorage.getItem(`shelflife_inventory_${firebaseUser.uid}`);
-            if (savedInventory) {
-              setInventory(JSON.parse(savedInventory));
-            } else {
-              // Load initial inventory
-              const { initialInventory } = await import('./data/inventoryData');
-              setInventory(initialInventory);
-              localStorage.setItem(`shelflife_inventory_${firebaseUser.uid}`, JSON.stringify(initialInventory));
-            }
+            await loadUserInventory(firebaseUser.uid);
           }
         } catch (error) {
           console.error("Error loading user data:", error);
@@ -97,17 +104,36 @@ function App() {
     return () => unsubscribe();
   }, []);
 
+  const loadUserInventory = async (userId) => {
+    const savedInventory = localStorage.getItem(`shelflife_inventory_${userId}`)
+    if (savedInventory) {
+      try {
+        setInventory(JSON.parse(savedInventory))
+      } catch (e) {
+        await loadInitialInventory(userId)
+      }
+    } else {
+      await loadInitialInventory(userId)
+    }
+  }
+
+  const loadInitialInventory = async (userId) => {
+    const { initialInventory } = await import('./data/inventoryData')
+    setInventory(initialInventory)
+    localStorage.setItem(`shelflife_inventory_${userId}`, JSON.stringify(initialInventory))
+  }
+
   const showToast = (message) => {
-    setToastMsg(message);
-    setTimeout(() => setToastMsg(null), 3000);
-  };
+    setToastMsg(message)
+    setTimeout(() => setToastMsg(null), 3000)
+  }
 
   const handleLogin = (userData) => {
-    setUser(userData);
-    setUserRole(userData.role || 'user');
-    setShowLogin(false);
-    showToast(`Welcome back, ${userData.name}!`);
-  };
+    setUser(userData)
+    setUserRole(userData.role || 'user')
+    setShowLogin(false)
+    showToast(`Welcome back, ${userData.name}!`)
+  }
 
   const handleLogout = async () => {
     try {
@@ -118,14 +144,14 @@ function App() {
     } catch (error) {
       console.error("Logout error:", error);
     }
-  };
+  }
 
   const handleUpdateInventory = (newInventory) => {
-    setInventory(newInventory);
+    setInventory(newInventory)
     if (user && user.uid) {
-      localStorage.setItem(`shelflife_inventory_${user.uid}`, JSON.stringify(newInventory));
+      localStorage.setItem(`shelflife_inventory_${user.uid}`, JSON.stringify(newInventory))
     }
-  };
+  }
 
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
@@ -135,7 +161,7 @@ function App() {
         <div className="loading-spinner"></div>
         <p>Loading ShelfLife AI...</p>
       </div>
-    );
+    )
   }
 
   return (
@@ -150,6 +176,7 @@ function App() {
         
         <main className="main-content">
           <Routes>
+            {/* Public Route */}
             <Route path="/" element={
               user ? <Navigate to={isAdmin ? "/admin/dashboard" : "/dashboard"} replace /> : 
               <LandingPage onLoginClick={() => setShowLogin(true)} />
@@ -158,37 +185,45 @@ function App() {
             {/* User Routes */}
             <Route path="/dashboard" element={
               <ProtectedRoute user={user}>
-                <Dashboard 
-                  inventory={inventory} 
-                  onUpdateInventory={handleUpdateInventory}
-                  showToast={showToast}
-                />
+                {isAdmin ? <Navigate to="/admin/dashboard" replace /> : (
+                  <Dashboard 
+                    inventory={inventory} 
+                    onUpdateInventory={handleUpdateInventory}
+                    showToast={showToast}
+                  />
+                )}
               </ProtectedRoute>
             } />
             
             <Route path="/inventory" element={
               <ProtectedRoute user={user}>
-                <Inventory 
-                  inventory={inventory}
-                  onUpdateInventory={handleUpdateInventory}
-                  showToast={showToast}
-                />
+                {isAdmin ? <Navigate to="/admin/inventory" replace /> : (
+                  <Inventory 
+                    inventory={inventory}
+                    onUpdateInventory={handleUpdateInventory}
+                    showToast={showToast}
+                  />
+                )}
               </ProtectedRoute>
             } />
             
             <Route path="/suppliers" element={
               <ProtectedRoute user={user}>
-                <Suppliers 
-                  inventory={inventory}
-                  onUpdateInventory={handleUpdateInventory}
-                  showToast={showToast}
-                />
+                {isAdmin ? <Navigate to="/admin/inventory" replace /> : (
+                  <Suppliers 
+                    inventory={inventory}
+                    onUpdateInventory={handleUpdateInventory}
+                    showToast={showToast}
+                  />
+                )}
               </ProtectedRoute>
             } />
             
             <Route path="/analytics" element={
               <ProtectedRoute user={user}>
-                <Analytics inventory={inventory} />
+                {isAdmin ? <Navigate to="/admin/analytics" replace /> : (
+                  <Analytics inventory={inventory} />
+                )}
               </ProtectedRoute>
             } />
             
@@ -204,17 +239,49 @@ function App() {
               </ProtectedRoute>
             } />
             
-            {/* Admin Routes - Simple for now */}
+            {/* Admin Routes - IMPORTANT: These must be defined */}
             <Route path="/admin/dashboard" element={
               <ProtectedRoute user={user}>
-                {isAdmin ? (
-                  <div className="admin-container">
-                    <h1>Admin Dashboard</h1>
-                    <p>Welcome, {user?.name}</p>
-                  </div>
-                ) : <Navigate to="/dashboard" replace />}
+                {isAdmin ? <AdminDashboard admin={user} /> : <Navigate to="/dashboard" replace />}
               </ProtectedRoute>
             } />
+            
+            <Route path="/admin/users" element={
+              <ProtectedRoute user={user}>
+                {isAdmin ? <AdminUsers admin={user} /> : <Navigate to="/dashboard" replace />}
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/admin/inventory" element={
+              <ProtectedRoute user={user}>
+                {isAdmin ? <AdminInventory admin={user} /> : <Navigate to="/dashboard" replace />}
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/admin/subscriptions" element={
+              <ProtectedRoute user={user}>
+                {isAdmin ? <AdminSubscriptions admin={user} /> : <Navigate to="/dashboard" replace />}
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/admin/analytics" element={
+              <ProtectedRoute user={user}>
+                {isAdmin ? <AdminAnalytics admin={user} /> : <Navigate to="/dashboard" replace />}
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/admin/settings" element={
+              <ProtectedRoute user={user}>
+                {isAdmin ? <AdminSettings admin={user} /> : <Navigate to="/dashboard" replace />}
+              </ProtectedRoute>
+            } />
+            
+            {/* Payment Routes */}
+            <Route path="/payment-success" element={<PaymentSuccess />} />
+            <Route path="/payment-cancel" element={<PaymentCancel />} />
+            
+            {/* Catch all - redirect to home */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
 
