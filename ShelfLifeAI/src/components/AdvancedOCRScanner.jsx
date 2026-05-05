@@ -1,5 +1,5 @@
 // src/components/AdvancedOCRScanner.jsx
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import './AdvancedOCRScanner.css'
 
 function AdvancedOCRScanner({ onScan, onClose }) {
@@ -15,6 +15,7 @@ function AdvancedOCRScanner({ onScan, onClose }) {
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
 
+  // 1. කැමරාව ආරම්භ කිරීම
   const startCamera = async () => {
     try {
       if (streamRef.current) {
@@ -25,19 +26,26 @@ function AdvancedOCRScanner({ onScan, onClose }) {
         video: { facingMode: 'environment' } 
       })
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        streamRef.current = stream
-        setCameraActive(true)
-        setCapturedImage(null)
-        setScanResult(null)
-        setDetectedText('')
-      }
+      streamRef.current = stream;
+      setCameraActive(true);
+      setCapturedImage(null);
+      setScanResult(null);
+      setDetectedText('');
     } catch (err) {
-      console.error('Camera access error:', err)
-      alert('Could not access camera. Please check permissions and try again.')
+      console.error('Camera access error:', err);
+      alert('කැමරාව ක්‍රියාත්මක කිරීමට නොහැකි විය. කරුණාකර Permission පරීක්ෂා කරන්න.');
     }
   }
+
+  // 2. වැදගත්ම කොටස: Stream එක Video tag එකට සම්බන්ධ කිරීම (White screen fix)
+  useEffect(() => {
+    if (cameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.onloadedmetadata = () => {
+        videoRef.current.play().catch(e => console.error("Video play error:", e));
+      };
+    }
+  }, [cameraActive]);
 
   const captureImage = () => {
     if (videoRef.current && canvasRef.current) {
@@ -81,7 +89,6 @@ function AdvancedOCRScanner({ onScan, onClose }) {
           month = parseInt(match[2])
           year = parseInt(match[3])
         } else if (match[1] && match[2] && match[3]) {
-          // Try to determine format
           if (parseInt(match[1]) > 31 && parseInt(match[1]) < 2100) {
             year = parseInt(match[1])
             month = parseInt(match[2])
@@ -113,11 +120,10 @@ function AdvancedOCRScanner({ onScan, onClose }) {
     setOcrProgress('Initializing OCR...')
     
     try {
-      setOcrProgress('Loading OCR engine...')
+      setOcrProgress('Loading Tesseract.js...')
       const TesseractModule = await import('tesseract.js')
       const Tesseract = TesseractModule.default
       
-      setOcrProgress('Reading text from image...')
       const result = await Tesseract.recognize(
         imageData,
         'eng',
@@ -132,7 +138,6 @@ function AdvancedOCRScanner({ onScan, onClose }) {
       
       const extractedText = result.data.text
       setDetectedText(extractedText)
-      setOcrProgress('Parsing expiry date...')
       
       const expiryDate = parseExpiryDate(extractedText)
       
@@ -146,20 +151,11 @@ function AdvancedOCRScanner({ onScan, onClose }) {
         let status = ''
         let statusColor = ''
         if (daysLeft <= 0) {
-          status = 'Expired'
-          statusColor = '#ef4444'
-        } else if (daysLeft <= 3) {
-          status = 'Critical'
-          statusColor = '#ef4444'
+          status = 'Expired'; statusColor = '#ef4444'
         } else if (daysLeft <= 7) {
-          status = 'Near Expiry'
-          statusColor = '#f59e0b'
-        } else if (daysLeft <= 30) {
-          status = 'Expiring Soon'
-          statusColor = '#eab308'
+          status = 'Expiring Soon'; statusColor = '#f59e0b'
         } else {
-          status = 'Healthy'
-          statusColor = '#22c55e'
+          status = 'Healthy'; statusColor = '#22c55e'
         }
         
         onScan({ 
@@ -176,24 +172,16 @@ function AdvancedOCRScanner({ onScan, onClose }) {
           status: { text: status, color: statusColor },
           detectedText: extractedText.slice(0, 300)
         })
-        
-        setTimeout(() => {
-          stopCamera()
-          onClose()
-        }, 3000)
       } else {
         setScanResult({ 
           success: false, 
-          error: 'No valid expiry date found in image',
+          error: 'No valid expiry date found. Try better lighting.',
           detectedText: extractedText.slice(0, 300)
         })
       }
     } catch (error) {
-      console.error('OCR processing error:', error)
-      setScanResult({ 
-        success: false, 
-        error: 'Failed to process image. Please try again with better lighting.'
-      })
+      console.error('OCR Error:', error)
+      setScanResult({ success: false, error: 'Failed to process image.' })
     } finally {
       setScanning(false)
       setOcrProgress('')
@@ -202,9 +190,7 @@ function AdvancedOCRScanner({ onScan, onClose }) {
 
   const handleCaptureAndScan = () => {
     const imageData = captureImage()
-    if (imageData) {
-      processImage(imageData)
-    }
+    if (imageData) processImage(imageData)
   }
 
   const handleFileUpload = (e) => {
@@ -232,56 +218,26 @@ function AdvancedOCRScanner({ onScan, onClose }) {
   const handleManualSubmit = (e) => {
     e.preventDefault()
     if (manualExpiry) {
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/
-      if (dateRegex.test(manualExpiry)) {
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        const expiry = new Date(manualExpiry)
-        expiry.setHours(0, 0, 0, 0)
-        const daysLeft = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24))
-        
-        let status = ''
-        let statusColor = ''
-        if (daysLeft <= 0) {
-          status = 'Expired'
-          statusColor = '#ef4444'
-        } else if (daysLeft <= 3) {
-          status = 'Critical'
-          statusColor = '#ef4444'
-        } else if (daysLeft <= 7) {
-          status = 'Near Expiry'
-          statusColor = '#f59e0b'
-        } else {
-          status = 'Healthy'
-          statusColor = '#22c55e'
-        }
-        
-        onScan({ 
-          type: 'ocr', 
-          value: manualExpiry,
-          daysLeft: daysLeft,
-          status: { text: status, color: statusColor }
-        })
-        setScanResult({ 
-          success: true, 
-          expiryDate: manualExpiry,
-          daysLeft: daysLeft,
-          status: { text: status, color: statusColor }
-        })
-        setManualExpiry('')
-        setTimeout(() => setScanResult(null), 3000)
-      } else {
-        setScanResult({ success: false, error: 'Invalid date format. Use YYYY-MM-DD' })
-        setTimeout(() => setScanResult(null), 3000)
-      }
+      onScan({ type: 'ocr', value: manualExpiry })
+      setScanResult({ success: true, expiryDate: manualExpiry })
+      setManualExpiry('')
     }
   }
+
+  // Cleanup on Unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      }
+    }
+  }, [])
 
   return (
     <div className="advanced-ocr-scanner">
       <div className="ocr-header">
         <i className="fas fa-eye"></i>
-        <h4>AI-Powered Expiry Date Scanner</h4>
+        <h4>AI Expiry Scanner</h4>
         <button className="ocr-close-btn" onClick={onClose}>
           <i className="fas fa-times"></i>
         </button>
@@ -295,126 +251,39 @@ function AdvancedOCRScanner({ onScan, onClose }) {
           <div className="ocr-divider">or</div>
           <label className="btn-upload">
             <i className="fas fa-upload"></i> Upload Photo
-            <input 
-              type="file" 
-              accept="image/*" 
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-            />
+            <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
           </label>
         </div>
       ) : cameraActive && !capturedImage ? (
         <div className="camera-ocr-container">
-          <video 
-            ref={videoRef} 
-            className="camera-preview-ocr" 
-            autoPlay 
-            playsInline 
-            style={{ width: '100%', height: 'auto', minHeight: '300px', background: '#000' }}
-          />
+          <video ref={videoRef} className="camera-preview-ocr" autoPlay playsInline muted />
           <canvas ref={canvasRef} style={{ display: 'none' }} />
           <div className="ocr-overlay">
             <div className="ocr-instruction">
-              <i className="fas fa-calendar-alt"></i>
-              <span>Position expiry date clearly, then tap Capture</span>
+              <span>Position date clearly and tap Capture</span>
             </div>
           </div>
           <div className="ocr-actions">
             <button onClick={handleCaptureAndScan} className="btn-capture" disabled={scanning}>
-              {scanning ? (
-                <><i className="fas fa-spinner fa-pulse"></i> {ocrProgress || 'Processing...'}</>
-              ) : (
-                <><i className="fas fa-camera"></i> Capture & Read</>
-              )}
+              {scanning ? <><i className="fas fa-spinner fa-pulse"></i> {ocrProgress || 'Reading...'}</> : "Capture & Read"}
             </button>
-            <button onClick={stopCamera} className="btn-cancel-camera">
-              <i className="fas fa-times"></i> Cancel
-            </button>
+            <button onClick={stopCamera} className="btn-cancel-camera">Cancel</button>
           </div>
         </div>
-      ) : capturedImage && (
+      ) : (
         <div className="ocr-preview">
-          <div className="preview-image">
-            <img src={capturedImage} alt="Captured" />
-            {scanning && (
-              <div className="processing-overlay">
-                <div className="processing-spinner"></div>
-                <div className="processing-text">{ocrProgress}</div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: ocrProgress.includes('%') ? (ocrProgress.match(/\d+/)?.[0] || '50') + '%' : '50%' }}></div>
-                </div>
-              </div>
-            )}
-          </div>
+          <img src={capturedImage} alt="Captured" />
+          {scanning && <div className="processing-overlay"><p>{ocrProgress}</p></div>}
           <div className="preview-actions">
-            <button onClick={() => {
-              setCapturedImage(null)
-              setScanResult(null)
-              setDetectedText('')
-              if (cameraActive) startCamera()
-            }} className="btn-retry">
-              <i className="fas fa-redo"></i> Take Another
-            </button>
-            <button onClick={stopCamera} className="btn-done">
-              <i className="fas fa-check"></i> Done
-            </button>
+            <button onClick={() => {setCapturedImage(null); startCamera();}} className="btn-retry">Retry</button>
+            <button onClick={stopCamera} className="btn-done">Done</button>
           </div>
         </div>
       )}
 
-      <div className="ocr-divider">or enter manually</div>
-
-      <form onSubmit={handleManualSubmit} className="ocr-form">
-        <input
-          type="text"
-          placeholder="YYYY-MM-DD (e.g., 2025-12-31)"
-          value={manualExpiry}
-          onChange={(e) => setManualExpiry(e.target.value)}
-          className="ocr-input"
-        />
-        <button type="submit" className="btn-manual">
-          <i className="fas fa-pen"></i> Confirm Date
-        </button>
-      </form>
-      
-      <div className="ocr-feature">
-        <i className="fas fa-magic"></i>
-        <span>AI-powered OCR reads expiry dates from any packaging! Upload a photo of a product label.</span>
-      </div>
-      
       {scanResult && (
         <div className={`ocr-success ${scanResult.success ? 'success' : 'error'}`}>
-          <i className={`fas ${scanResult.success ? 'fa-check-circle' : 'fa-exclamation-circle'}`}></i>
-          {scanResult.success ? (
-            <div>
-              <strong>✓ Expiry Date Detected!</strong>
-              <p>Date: {scanResult.expiryDate}</p>
-              <p>Status: <span style={{ color: scanResult.status?.color }}>{scanResult.status?.text}</span></p>
-              {scanResult.daysLeft > 0 ? (
-                <p>{scanResult.daysLeft} days remaining</p>
-              ) : (
-                <p>Product has expired!</p>
-              )}
-              {scanResult.detectedText && (
-                <details>
-                  <summary>Detected Text</summary>
-                  <small>{scanResult.detectedText}</small>
-                </details>
-              )}
-            </div>
-          ) : (
-            <div>
-              <strong>Detection Failed</strong>
-              <p>{scanResult.error}</p>
-              {scanResult.detectedText && (
-                <details>
-                  <summary>Raw Text</summary>
-                  <small>{scanResult.detectedText}</small>
-                </details>
-              )}
-              <p style={{ marginTop: '8px' }}>💡 Tip: Make sure the expiry date is clearly visible in good lighting.</p>
-            </div>
-          )}
+          <p>{scanResult.success ? `Detected: ${scanResult.expiryDate}` : scanResult.error}</p>
         </div>
       )}
     </div>

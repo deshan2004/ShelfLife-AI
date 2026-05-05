@@ -1,0 +1,492 @@
+/* src/components/MobileScanner.css */
+.mobile-scanner {
+  background: linear-gradient(135deg, #0c190c, #071007);
+  border: 1px solid rgba(57, 231, 95, 0.2);
+  border-radius: 28px;
+  padding: 24px;
+  animation: fadeInUp 0.3s ease;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mobile-scanner-header {
+  text-align: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(57, 231, 95, 0.1);
+  position: relative;
+}
+
+.header-icon {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #16a34a, #39e75f);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.header-icon i {
+  font-size: 28px;
+  color: #030a03;
+}
+
+.mobile-scanner-header h3 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #ffffff;
+}
+
+.mobile-scanner-header p {
+  font-size: 0.85rem;
+  color: #9bbf9b;
+}
+
+.close-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  color: #9bbf9b;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #ef4444;
+  transform: rotate(90deg);
+}
+
+/* ngrok Success Message */
+.ngrok-success {
+  background: rgba(57, 231, 95, 0.15);
+  border: 1px solid rgba(57, 231, 95, 0.3);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.ngrok-success i {
+  font-size: 1.5rem;
+  color: #4ade80;
+}
+
+.ngrok-success strong {
+  display: block;
+  font-size: 0.85rem;
+  color: #ffffff;
+}
+
+.ngrok-success p {
+  font-size: 0.75rem;
+  color: #9bbf9b;
+  margin-top: 2px;
+}
+
+/* Pairing Section */
+.pairing-section {
+  background: rgba(57, 231, 95, 0.05);
+  border: 1px solid rgba(57, 231, 95, 0.15);
+  border-radius: 20px;
+  padding: 24px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.pairing-code-container {
+  background: rgba(13, 22, 13, 0.9);
+  border-radius: 60px;
+  padding: 10px 20px;
+  margin-bottom: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.code-label {
+  font-size: 0.8rem;
+  color: #7aaa7a;
+}
+
+.code-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-family: monospace;
+  letter-spacing: 2px;
+  color: #39e75f;
+}
+
+/* QR Code */
+.qr-code-container {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.qr-code {
+  width: 200px;
+  height: 200px;
+  background: white;
+  padding: 12px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.qr-hint {
+  font-size: 0.8rem;
+  color: #7aaa7a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.qr-hint i {
+  color: #39e75f;
+}
+
+/* Mobile Links */
+.mobile-links {
+  display: flex;
+  gap: 12px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+}
+
+.btn-open-mobile, .btn-copy-link {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 60px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+}
+
+.btn-open-mobile {
+  background: linear-gradient(135deg, #16a34a, #39e75f);
+  color: #030a03;
+}
+
+.btn-open-mobile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(57, 231, 95, 0.3);
+}
+
+.btn-copy-link {
+  background: rgba(17, 22, 17, 0.8);
+  border: 1px solid rgba(57, 231, 95, 0.3);
+  color: #39e75f;
+}
+
+.btn-copy-link:hover {
+  background: rgba(57, 231, 95, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Share Buttons */
+.share-buttons {
+  display: flex;
+  gap: 10px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+}
+
+.share-whatsapp, .share-telegram, .share-email {
+  flex: 1;
+  padding: 10px;
+  border-radius: 60px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+}
+
+.share-whatsapp {
+  background: #25D366;
+  color: white;
+}
+
+.share-whatsapp:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(37, 211, 102, 0.3);
+}
+
+.share-telegram {
+  background: #0088cc;
+  color: white;
+}
+
+.share-telegram:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 136, 204, 0.3);
+}
+
+.share-email {
+  background: #ea4335;
+  color: white;
+}
+
+.share-email:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(234, 67, 53, 0.3);
+}
+
+/* Instruction Card */
+.instruction-card {
+  margin-top: 20px;
+  padding: 16px;
+  background: rgba(17, 22, 17, 0.8);
+  border-radius: 16px;
+  text-align: left;
+}
+
+.instruction-card i {
+  font-size: 1.2rem;
+  color: #39e75f;
+  margin-right: 12px;
+  float: left;
+}
+
+.instruction-card strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #ffffff;
+}
+
+.instruction-card ul {
+  margin-left: 30px;
+  color: #9bbf9b;
+  font-size: 0.8rem;
+}
+
+.instruction-card li {
+  margin-bottom: 6px;
+}
+
+.ngrok-url {
+  margin-top: 12px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.7rem;
+}
+
+.ngrok-url i {
+  color: #39e75f;
+  float: none;
+  margin: 0;
+}
+
+.ngrok-url code {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: monospace;
+  color: #39e75f;
+  word-break: break-all;
+}
+
+.paired-status {
+  margin-top: 16px;
+  padding: 10px;
+  background: rgba(57, 231, 95, 0.15);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #4ade80;
+  font-size: 0.85rem;
+}
+
+/* Scanner Type Selector */
+.scanner-type-selector {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.type-btn {
+  flex: 1;
+  background: rgba(17, 22, 17, 0.8);
+  border: 1px solid rgba(57, 231, 95, 0.2);
+  border-radius: 60px;
+  padding: 12px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #9bbf9b;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.type-btn:hover {
+  border-color: #39e75f;
+  color: #39e75f;
+}
+
+.type-btn.active {
+  background: linear-gradient(135deg, #16a34a, #39e75f);
+  border-color: #39e75f;
+  color: #030a03;
+}
+
+/* Instruction Section */
+.instruction-section {
+  background: rgba(17, 22, 17, 0.8);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.instruction-section i {
+  font-size: 2rem;
+  color: #39e75f;
+}
+
+.instruction-section h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #ffffff;
+}
+
+.instruction-section ol {
+  margin-left: 20px;
+  color: #9bbf9b;
+  font-size: 0.8rem;
+}
+
+.instruction-section li {
+  margin-bottom: 6px;
+}
+
+/* Scan Results */
+.scan-result-success {
+  padding: 16px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: slideIn 0.3s ease;
+  background: rgba(57, 231, 95, 0.1);
+  border: 1px solid rgba(57, 231, 95, 0.2);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scan-result-success i {
+  font-size: 1.5rem;
+  color: #4ade80;
+}
+
+.scan-result-success strong {
+  display: block;
+  font-size: 0.85rem;
+  color: #ffffff;
+}
+
+.scan-result-success p {
+  font-size: 0.8rem;
+  color: #9bbf9b;
+  font-family: monospace;
+  margin-top: 4px;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .mobile-scanner {
+    padding: 16px;
+  }
+  
+  .qr-code {
+    width: 160px;
+    height: 160px;
+  }
+  
+  .code-value {
+    font-size: 1rem;
+  }
+  
+  .instruction-section {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .instruction-section i {
+    margin: 0 auto;
+  }
+  
+  .instruction-section ol {
+    text-align: left;
+  }
+  
+  .mobile-links {
+    flex-direction: column;
+  }
+  
+  .share-buttons {
+    flex-direction: column;
+  }
+  
+  .ngrok-url {
+    flex-direction: column;
+    text-align: center;
+  }
+}
