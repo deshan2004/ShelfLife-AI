@@ -1116,3 +1116,9 @@ h4 {
     padding: 0;
   }
 }
+/* Add to App.css to ensure chatbot doesn't conflict with other elements */
+.chatbot-button,
+.chatbot-window,
+.support-modal-overlay {
+  z-index: 9999;
+}
