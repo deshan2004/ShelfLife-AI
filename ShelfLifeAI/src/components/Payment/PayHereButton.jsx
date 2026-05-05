@@ -1,80 +1,80 @@
 // src/components/Payment/PayHereButton.jsx
-import React, { useState } from 'react';
-import payhereService from '../../services/payhereService';
+import { useState } from 'react';
+import PaymentModal from './PaymentModal';
 import './PayHereButton.css';
 
 function PayHereButton({ user, planId, planName, amount, variant = 'primary', onSuccess, onError }) {
+  const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handlePayment = async () => {
-    console.log('PayHereButton clicked:', { user, planId, planName, amount });
+  const plan = {
+    id: planId,
+    name: planName,
+    price: amount,
+    features: planId === 'BASIC' ? ['200 products', '25 suppliers', 'Barcode scanning'] :
+              planId === 'PROFESSIONAL' ? ['1000 products', '100 suppliers', 'AI OCR scanning', 'Flash sale automation', 'Advanced analytics'] :
+              ['Unlimited products', 'Unlimited suppliers', 'All features', 'API access', 'Multi-user access']
+  };
+
+  const handlePaymentSuccess = async () => {
+    setShowModal(false);
     
-    // Get user from props or localStorage
     let activeUser = user;
-    
     if (!activeUser || !activeUser.uid) {
       const savedUser = localStorage.getItem('shelflife_user');
       if (savedUser) {
-        try {
-          activeUser = JSON.parse(savedUser);
-          console.log('User loaded from localStorage:', activeUser);
-        } catch (e) {
-          console.error('Error parsing user:', e);
-        }
+        activeUser = JSON.parse(savedUser);
       }
     }
     
-    if (!activeUser || !activeUser.uid) {
-      alert('Please login to continue with payment');
-      window.location.href = '/';
-      return;
-    }
-    
-    // Ensure user has required fields
-    const paymentUser = {
-      uid: activeUser.uid,
-      id: activeUser.uid,
-      name: activeUser.name || activeUser.displayName || 'User',
-      email: activeUser.email,
-      phone: activeUser.phone || '0771234567',
-      address: activeUser.address || 'Colombo'
-    };
-    
-    console.log('Final payment user:', paymentUser);
-    
-    setLoading(true);
-
-    try {
-      const result = await payhereService.initiatePayment(paymentUser, planId);
-      console.log('Payment initiated:', result);
-      if (onSuccess) onSuccess(result);
-    } catch (error) {
-      console.error('Payment error:', error);
-      alert('Failed to initiate payment. Please try again.');
-      if (onError) onError(error);
-    } finally {
-      setLoading(false);
+    if (activeUser && activeUser.uid) {
+      try {
+        const { default: subscriptionService } = await import('../../services/subscriptionService');
+        const { default: paymentService } = await import('../../services/paymentService');
+        
+        await subscriptionService.upgradeToPaid(activeUser.uid, planId);
+        await subscriptionService.createPaymentRecord(activeUser.uid, amount, 'subscription');
+        await paymentService.simulatePaymentSuccess(activeUser.uid, planId);
+        
+        alert(`✅ Successfully upgraded to ${planName} plan!`);
+        if (onSuccess) onSuccess();
+        window.location.reload();
+      } catch (error) {
+        console.error('Payment error:', error);
+        alert('Payment failed. Please try again.');
+        if (onError) onError(error);
+      }
     }
   };
 
   return (
-    <button 
-      className={`payhere-btn ${variant}`}
-      onClick={handlePayment}
-      disabled={loading}
-    >
-      {loading ? (
-        <>
-          <i className="fas fa-spinner fa-pulse"></i>
-          <span>Redirecting to PayHere...</span>
-        </>
-      ) : (
-        <>
-          <i className="fas fa-credit-card"></i>
-          <span>Subscribe - LKR {amount.toLocaleString()}/month</span>
-        </>
-      )}
-    </button>
+    <>
+      <button 
+        className={`payhere-btn ${variant}`}
+        onClick={() => setShowModal(true)}
+        disabled={loading}
+      >
+        {loading ? (
+          <>
+            <i className="fas fa-spinner fa-pulse"></i>
+            <span>Processing...</span>
+          </>
+        ) : (
+          <>
+            <i className="fas fa-credit-card"></i>
+            <span>Subscribe - LKR {amount.toLocaleString()}/month</span>
+          </>
+        )}
+      </button>
+      
+      <PaymentModal 
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        plan={plan}
+        user={user}
+        onSuccess={handlePaymentSuccess}
+      />
+    </>
   );
 }
 

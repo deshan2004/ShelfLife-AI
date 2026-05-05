@@ -1,11 +1,10 @@
-// src/pages/BillingPage.jsx
+// src/pages/BillingPage.jsx - Beautiful Payment Page
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import subscriptionService from '../services/subscriptionService';
 import paymentService from '../services/paymentService';
 import PayHereButton from '../components/Payment/PayHereButton';
 import { PLAN_PRICES } from '../config/payhereConfig';
-import './Pages.css';
 import './BillingPage.css';
 
 function BillingPage({ user }) {
@@ -13,40 +12,25 @@ function BillingPage({ user }) {
   const [subscription, setSubscription] = useState(null);
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('PROFESSIONAL');
-  const [upgrading, setUpgrading] = useState(false);
 
-  // Check if user is logged in
   useEffect(() => {
-    console.log('BillingPage - User:', user);
-    
-    // If no user, try to get from localStorage
     if (!user) {
-      const savedUser = localStorage.getItem('shelflife_user');
-      if (savedUser) {
-        const parsedUser = JSON.parse(savedUser);
-        console.log('Found user in localStorage:', parsedUser);
-        // User will be set by parent component
-      } else {
-        console.log('No user found, redirecting to login');
-        navigate('/');
-      }
+      navigate('/');
+      return;
     }
+    loadSubscriptionData();
   }, [user, navigate]);
 
-  useEffect(() => {
-    if (user && user.uid) {
-      loadSubscriptionData(user.uid);
-    } else {
+  const loadSubscriptionData = async () => {
+    if (!user?.uid) {
       setLoading(false);
+      return;
     }
-  }, [user]);
-
-  const loadSubscriptionData = async (userId) => {
+    
     try {
-      const sub = await subscriptionService.getSubscriptionStatus(userId);
-      const history = await subscriptionService.getPaymentHistory(userId, 10);
+      const sub = await subscriptionService.getSubscriptionStatus(user.uid);
+      const history = await subscriptionService.getPaymentHistory(user.uid, 5);
       setSubscription(sub);
       setPaymentHistory(history);
     } catch (error) {
@@ -57,229 +41,192 @@ function BillingPage({ user }) {
   };
 
   const getDaysLeft = () => {
-    if (!subscription || !subscription.trialEnd) return 0;
+    if (!subscription?.trialEnd) return 0;
     const end = new Date(subscription.trialEnd);
     const now = new Date();
     return Math.ceil((end - now) / (1000 * 60 * 60 * 24));
   };
 
-  const handleStartFreeTrial = async () => {
-    if (!user) {
-      alert('Please login first');
-      navigate('/');
-      return;
-    }
-    
-    const existingSub = await subscriptionService.getSubscriptionStatus(user.uid);
-    if (existingSub) {
-      alert('You already have an active subscription or trial');
-      return;
-    }
-    
-    setUpgrading(true);
-    try {
-      await subscriptionService.startFreeTrial(
-        user.uid,
-        user.email,
-        user.businessName || user.name + "'s Store",
-        'retail'
-      );
-      await loadSubscriptionData(user.uid);
-      alert('🎉 Your 14-day free trial has started!');
-    } catch (error) {
-      console.error('Error starting trial:', error);
-      alert('Failed to start trial. Please try again.');
-    } finally {
-      setUpgrading(false);
-    }
+  const getTrialProgress = () => {
+    const daysLeft = getDaysLeft();
+    return ((14 - daysLeft) / 14) * 100;
   };
 
-  if (loading) {
-    return (
-      <div className="billing-page">
-        <div className="container">
-          <div className="loading-container">
-            <div className="loading-spinner"></div>
-            <p>Loading billing information...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // If no user, show login required message
-  if (!user) {
-    return (
-      <div className="billing-page">
-        <div className="container">
-          <div className="login-required-card">
-            <i className="fas fa-lock"></i>
-            <h2>Login Required</h2>
-            <p>Please login to view billing information</p>
-            <button onClick={() => navigate('/')} className="btn-primary">
-              Go to Login
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const daysLeft = getDaysLeft();
   const isTrialActive = subscription?.status === 'trial_active';
   const isTrialExpired = subscription?.status === 'trial_expired';
   const isActive = subscription?.status === 'active';
-  const hasNoSubscription = !subscription;
+  const daysLeft = getDaysLeft();
+
+  const plans = [
+    {
+      id: 'BASIC',
+      name: 'Basic',
+      price: 2500,
+      description: 'Perfect for small shops just starting out',
+      features: ['200 products', '25 suppliers', 'Barcode scanning', 'Basic analytics', 'Email support'],
+      popular: false
+    },
+    {
+      id: 'PROFESSIONAL',
+      name: 'Professional',
+      price: 5900,
+      description: 'Best for growing retail businesses',
+      features: ['1000 products', '100 suppliers', 'AI OCR scanning', 'Flash sale automation', 'Advanced analytics', 'Priority support', 'Data export'],
+      popular: true
+    },
+    {
+      id: 'ENTERPRISE',
+      name: 'Enterprise',
+      price: 14900,
+      description: 'For large operations with custom needs',
+      features: ['Unlimited products', 'Unlimited suppliers', 'All Professional features', 'API access', 'Multi-user access', 'Dedicated support'],
+      popular: false
+    }
+  ];
+
+  const stats = [
+    { value: '14 days', label: 'Free Trial', icon: 'fa-gift' },
+    { value: 'LKR 0', label: 'Setup Fee', icon: 'fa-money-bill' },
+    { value: 'Cancel anytime', label: 'No contracts', icon: 'fa-calendar-times' }
+  ];
+
+  if (loading) {
+    return (
+      <div className="billing-loading">
+        <div className="loading-spinner"></div>
+        <p>Loading billing information...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="billing-page">
       <div className="container">
-        {/* Header */}
         <div className="billing-header">
           <h1>
-            <i className="fas fa-credit-card"></i>
-            Billing & Subscription
+            <i className="fas fa-crown"></i>
+            Choose Your Plan
           </h1>
-          <p>Manage your plan, payment methods, and subscription settings</p>
+          <p>Start with 14 days free trial. No credit card required.</p>
         </div>
 
-        {/* Stats Cards */}
         <div className="billing-stats">
-          <div className="stat-card">
-            <div className="stat-icon">
-              <i className="fas fa-calendar-alt"></i>
+          {stats.map((stat, index) => (
+            <div key={index} className="billing-stat-card">
+              <div className="billing-stat-icon">
+                <i className={`fas ${stat.icon}`}></i>
+              </div>
+              <div className="billing-stat-info">
+                <h3>{stat.value}</h3>
+                <p>{stat.label}</p>
+              </div>
             </div>
-            <div className="stat-info">
-              <h3>{isTrialActive ? `${daysLeft} days` : isActive ? 'Active' : hasNoSubscription ? 'Not Started' : 'Expired'}</h3>
-              <p>Trial Status</p>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">
-              <i className="fas fa-chart-line"></i>
-            </div>
-            <div className="stat-info">
-              <h3>LKR 5,000+</h3>
-              <p>Monthly Savings</p>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">
-              <i className="fas fa-percent"></i>
-            </div>
-            <div className="stat-info">
-              <h3>340%</h3>
-              <p>ROI</p>
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Start Free Trial Banner */}
-        {hasNoSubscription && (
-          <div className="start-trial-banner">
-            <div className="start-trial-content">
+        {isTrialActive && daysLeft > 0 && (
+          <div className="trial-banner">
+            <div className="trial-banner-content">
               <i className="fas fa-gift"></i>
               <div>
-                <h2>Start Your Free Trial</h2>
-                <p>Get 14 days free access to all features. No credit card required.</p>
+                <h3>Your Free Trial is Active!</h3>
+                <p>You have <span className="trial-days">{daysLeft} days</span> remaining in your trial</p>
               </div>
-              <button 
-                className="btn-start-trial" 
-                onClick={handleStartFreeTrial}
-                disabled={upgrading}
-              >
-                {upgrading ? 'Starting...' : 'Start Free Trial'} 
-                <i className="fas fa-arrow-right"></i>
-              </button>
+            </div>
+            <div className="trial-progress">
+              <div className="trial-progress-bar">
+                <div className="trial-progress-fill" style={{ width: `${getTrialProgress()}%` }}></div>
+              </div>
+            </div>
+            <button className="btn-upgrade-trial" onClick={() => document.getElementById('plans').scrollIntoView({ behavior: 'smooth' })}>
+              Upgrade Now <i className="fas fa-arrow-right"></i>
+            </button>
+          </div>
+        )}
+
+        {isTrialExpired && (
+          <div className="trial-banner" style={{ borderColor: '#ef4444' }}>
+            <div className="trial-banner-content">
+              <i className="fas fa-exclamation-triangle" style={{ color: '#ef4444' }}></i>
+              <div>
+                <h3>Your Free Trial Has Ended</h3>
+                <p>Upgrade now to continue using all premium features</p>
+              </div>
+            </div>
+            <button className="btn-upgrade-trial" onClick={() => document.getElementById('plans').scrollIntoView({ behavior: 'smooth' })}>
+              Upgrade Now <i className="fas fa-arrow-right"></i>
+            </button>
+          </div>
+        )}
+
+        {isActive && (
+          <div className="trial-banner" style={{ borderColor: '#22c55e' }}>
+            <div className="trial-banner-content">
+              <i className="fas fa-check-circle" style={{ color: '#22c55e' }}></i>
+              <div>
+                <h3>Active Subscription</h3>
+                <p>You are on the <strong>{subscription?.planId}</strong> plan</p>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Plans Section */}
-        <div className="plans-section">
-          <h2>Choose Your Plan</h2>
+        <div id="plans" className="plans-section">
+          <h2>Select Your Perfect Plan</h2>
           <div className="plans-grid">
-            {/* Basic Plan */}
-            <div className="plan-card">
-              <h3>Basic</h3>
-              <div className="price">LKR 2,500<span>/month</span></div>
-              <p className="description">Perfect for small shops starting out</p>
-              <ul className="feature-list">
-                {PLAN_PRICES.BASIC.features.map((feature, idx) => (
-                  <li key={idx}><i className="fas fa-check-circle"></i> {feature}</li>
-                ))}
-              </ul>
-              <PayHereButton 
-                user={user}
-                planId="BASIC"
-                planName="Basic Plan"
-                amount={2500}
-                variant="secondary"
-              />
-            </div>
-
-            {/* Professional Plan */}
-            <div className="plan-card featured">
-              <div className="popular-tag">Most Popular</div>
-              <h3>Professional</h3>
-              <div className="price">LKR 5,900<span>/month</span></div>
-              <p className="description">Best for growing retail businesses</p>
-              <ul className="feature-list">
-                {PLAN_PRICES.PROFESSIONAL.features.map((feature, idx) => (
-                  <li key={idx}><i className="fas fa-check-circle"></i> {feature}</li>
-                ))}
-              </ul>
-              <PayHereButton 
-                user={user}
-                planId="PROFESSIONAL"
-                planName="Professional Plan"
-                amount={5900}
-                variant="primary"
-              />
-            </div>
-
-            {/* Enterprise Plan */}
-            <div className="plan-card">
-              <h3>Enterprise</h3>
-              <div className="price">LKR 14,900<span>/month</span></div>
-              <p className="description">For large operations with custom needs</p>
-              <ul className="feature-list">
-                {PLAN_PRICES.ENTERPRISE.features.map((feature, idx) => (
-                  <li key={idx}><i className="fas fa-check-circle"></i> {feature}</li>
-                ))}
-              </ul>
-              <button 
-                className="btn-contact-sales" 
-                onClick={() => window.location.href = 'mailto:sales@shelflife.ai'}
-              >
-                <i className="fas fa-envelope"></i> Contact Sales
-              </button>
-            </div>
+            {plans.map((plan) => (
+              <div key={plan.id} className={`plan-card ${plan.popular ? 'featured' : ''}`}>
+                {plan.popular && <div className="popular-badge">🔥 Most Popular</div>}
+                <h3>{plan.name}</h3>
+                <div className="plan-price">
+                  <span className="amount">LKR {plan.price.toLocaleString()}</span>
+                  <span className="period">/month</span>
+                </div>
+                <p className="plan-description">{plan.description}</p>
+                <ul className="plan-features">
+                  {plan.features.map((feature, idx) => (
+                    <li key={idx}>
+                      <i className="fas fa-check-circle"></i>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                <PayHereButton 
+                  user={user}
+                  planId={plan.id}
+                  planName={plan.name}
+                  amount={plan.price}
+                  variant={plan.popular ? 'primary' : 'secondary'}
+                />
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Payment History */}
         {paymentHistory.length > 0 && (
           <div className="payment-history-section">
-            <h2>Payment History</h2>
-            <div className="payment-table-container">
+            <h2>
+              <i className="fas fa-history"></i>
+              Payment History
+            </h2>
+            <div style={{ overflowX: 'auto' }}>
               <table className="payment-table">
                 <thead>
                   <tr>
                     <th>Date</th>
                     <th>Amount</th>
-                    <th>Type</th>
+                    <th>Plan</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paymentHistory.map(payment => (
+                  {paymentHistory.map((payment) => (
                     <tr key={payment.id}>
                       <td>{new Date(payment.createdAt).toLocaleDateString()}</td>
-                      <td>LKR {payment.amount.toLocaleString()}</td>
-                      <td>{payment.type === 'subscription' ? 'Subscription' : payment.type}</td>
+                      <td>LKR {payment.amount?.toLocaleString()}</td>
+                      <td>{payment.planId || 'Subscription'}</td>
                       <td>
-                        <span className="status-success">
+                        <span className="payment-status completed">
                           <i className="fas fa-check-circle"></i> Completed
                         </span>
                       </td>
@@ -291,21 +238,23 @@ function BillingPage({ user }) {
           </div>
         )}
 
-        {/* FAQ Section */}
         <div className="faq-section">
-          <h2>Frequently Asked Questions</h2>
+          <h2>
+            <i className="fas fa-question-circle"></i>
+            Frequently Asked Questions
+          </h2>
           <div className="faq-grid">
             <div className="faq-item">
               <h4>Can I cancel anytime?</h4>
-              <p>Yes, you can cancel your subscription at any time from the billing portal. No long-term contracts.</p>
+              <p>Yes, you can cancel your subscription at any time. No long-term contracts or hidden fees.</p>
             </div>
             <div className="faq-item">
               <h4>What payment methods do you accept?</h4>
-              <p>We accept all major credit cards (Visa, Mastercard, Amex) through PayHere.</p>
+              <p>We accept all major credit cards (Visa, Mastercard, Amex) through our secure payment partner PayHere.</p>
             </div>
             <div className="faq-item">
               <h4>What happens when my trial ends?</h4>
-              <p>You'll lose access to premium features but can still view your data. Upgrade to continue using all features.</p>
+              <p>You'll lose access to premium features. Upgrade anytime to continue using all features.</p>
             </div>
             <div className="faq-item">
               <h4>Is there a setup fee?</h4>
