@@ -256,46 +256,41 @@ function Chatbot() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Unified Bottom Wrapper to prevent layout breaks */}
-          <div className="chat-bottom-area">
-            <div className="quick-actions">
-              {quickActions.map((action, index) => (
-                <button
-                  key={index}
-                  className="quick-action-btn"
-                  onClick={() => handleQuickAction(action.action)}
-                >
-                  {action.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="chat-input-area">
-              <input
-                ref={inputRef}
-                type="text"
-                className="chat-input"
-                placeholder="Type your message..."
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-              />
-              <button 
-                className="chat-send-btn"
-                onClick={handleSendMessage}
-                disabled={!inputMessage.trim()}
+          <div className="quick-actions">
+            {quickActions.map((action, index) => (
+              <button
+                key={index}
+                className="quick-action-btn"
+                onClick={() => handleQuickAction(action.action)}
               >
-                <i className="fas fa-paper-plane"></i>
+                {action.label}
               </button>
-            </div>
-
-            <div className="connect-human-wrapper">
-              <button className="connect-human-btn" onClick={handleConnectHuman}>
-                <i className="fas fa-headset"></i>
-                Connect with Human Support
-              </button>
-            </div>
+            ))}
           </div>
+
+          <div className="chat-input-area">
+            <input
+              ref={inputRef}
+              type="text"
+              className="chat-input"
+              placeholder="Type your message..."
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+            />
+            <button 
+              className="chat-send-btn"
+              onClick={handleSendMessage}
+              disabled={!inputMessage.trim()}
+            >
+              <i className="fas fa-paper-plane"></i>
+            </button>
+          </div>
+
+          <button className="connect-human-btn" onClick={handleConnectHuman}>
+            <i className="fas fa-headset"></i>
+            Connect with Human Support
+          </button>
         </div>
       )}
 
@@ -342,4 +337,4 @@ function Chatbot() {
   );
 }
 
-export default Chatbot;
+export default Chatbot
