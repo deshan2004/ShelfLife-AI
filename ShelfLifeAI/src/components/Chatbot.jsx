@@ -7,9 +7,9 @@ function Chatbot() {
   const [messages, setMessages] = useState([
     {
       id: 1,
-      text: "👋 Hi there! I'm ShelfLife AI Assistant. How can I help you today?",
+      text: "👋 Hi there! 👋\n\nI'm ShelfLife AI Assistant. I can help you with:\n\n📷 Scanning products (barcode/OCR)\n📦 Managing inventory\n🔥 Flash sales\n🚚 Supplier returns\n📊 Analytics\n💰 Pricing & plans\n\nHow can I assist you today?",
       sender: 'bot',
-      time: new Date().toLocaleTimeString()
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
@@ -49,61 +49,61 @@ function Chatbot() {
     
     // Product scanning related
     if (msg.includes('scan') || msg.includes('barcode') || msg.includes('qr')) {
-      return "📷 To scan a barcode or QR code:\n\n1. Click the 'Add Product' button\n2. Select 'Barcode Scanner'\n3. Position the barcode in the frame\n4. It will auto-detect!\n\nNeed help? I can guide you through the process!";
+      return "📷 **How to scan products:**\n\n1️⃣ Click the 'Add Product' button on Inventory page\n2️⃣ Select 'Barcode Scanner'\n3️⃣ Position the barcode in the frame\n4️⃣ It will auto-detect!\n\n💡 Tip: You can also use your phone camera by clicking 'Scan with Phone Camera'";
     }
     
     // OCR / Expiry date related
     if (msg.includes('expiry') || msg.includes('ocr') || msg.includes('date')) {
-      return "📅 To scan expiry dates:\n\n1. Click 'Add Product'\n2. Select 'OCR Scanner'\n3. Point your camera at the expiry date\n4. Our AI will read it automatically!\n\nYou can also upload a photo of the label.";
+      return "📅 **How to scan expiry dates:**\n\n1️⃣ Click 'Add Product'\n2️⃣ Select 'OCR Scanner'\n3️⃣ Point your camera at the expiry date\n4️⃣ Our AI will read it automatically!\n\n📱 You can also upload a photo of the label.";
     }
     
     // Flash sale related
     if (msg.includes('flash') || msg.includes('sale') || msg.includes('discount')) {
-      return "🔥 Flash Sales help you sell expiring products faster!\n\n• 50% OFF for items expiring in 24h\n• 40% OFF for items expiring in 48h\n• 30% OFF for items expiring in 7 days\n\nClick 'Flash Sale' on any near-expiry product!";
+      return "🔥 **Flash Sale Discounts:**\n\n• 50% OFF for items expiring in 24h\n• 40% OFF for items expiring in 48h\n• 30% OFF for items expiring in 7 days\n\n💡 Click 'Flash Sale' on any near-expiry product in your inventory!";
     }
     
     // Inventory related
     if (msg.includes('inventory') || msg.includes('stock') || msg.includes('product')) {
-      return "📦 Inventory Management:\n\n• Add products via barcode/OCR scan\n• Track expiry dates automatically\n• Get low stock alerts\n• View all products in one dashboard\n\nWant to add a product? I can help!";
+      return "📦 **Inventory Management Features:**\n\n✅ Add products via barcode/OCR scan\n✅ Track expiry dates automatically\n✅ Get low stock alerts\n✅ View all products in one dashboard\n✅ Edit product details\n✅ Delete products\n\nWant to add a product? Go to Inventory page and click 'Add Product'!";
     }
     
     // Suppliers related
     if (msg.includes('supplier') || msg.includes('return')) {
-      return "🚚 Supplier Management:\n\n• Track all your suppliers\n• Request returns for near-expiry items\n• View batch information\n• Contact suppliers directly\n\nNeed to return a product? Let me help!";
+      return "🚚 **Supplier Management:**\n\n✅ Track all your suppliers\n✅ Request returns for near-expiry items\n✅ View batch information\n✅ Contact suppliers directly\n✅ Return history\n\nNeed to return a product? Go to Suppliers page and click 'Return' on any item!";
     }
     
     // Analytics related
     if (msg.includes('analytics') || msg.includes('report') || msg.includes('saving')) {
-      return "📊 Analytics Dashboard:\n\n• Track monthly savings\n• Monitor waste reduction\n• View ROI calculations\n• Export reports\n\nYour business intelligence at a glance!";
+      return "📊 **Analytics Dashboard:**\n\n📈 Track monthly savings\n📉 Monitor waste reduction\n💰 View ROI calculations\n📄 Export reports\n📊 Category performance\n\nVisit the Analytics page to see your business intelligence!";
     }
     
     // Pricing / Plans
     if (msg.includes('price') || msg.includes('plan') || msg.includes('cost') || msg.includes('subscription')) {
-      return "💰 Our Plans:\n\n• Basic: LKR 2,500/month\n• Professional: LKR 5,900/month\n• Enterprise: LKR 14,900/month\n\nAll plans include a 14-day free trial! Which plan interests you?";
+      return "💰 **Our Pricing Plans:**\n\n**Basic** - LKR 2,500/month\n• 200 products • 25 suppliers • Barcode scanning\n\n**Professional** - LKR 5,900/month\n• 1000 products • 100 suppliers • AI OCR scanning • Flash sales\n\n**Enterprise** - LKR 14,900/month\n• Unlimited • All features • API access\n\n✨ All plans include 14-day free trial!";
     }
     
     // Help / Support
     if (msg.includes('help') || msg.includes('support') || msg.includes('assist')) {
-      return "🆘 How can I help you?\n\nI can assist with:\n• Scanning products (barcode/OCR)\n• Managing inventory\n• Flash sales\n• Supplier returns\n• Analytics & reports\n• Account & billing\n\nJust type your question!";
+      return "🆘 **How can I help you today?**\n\nI can assist with:\n\n📷 **Scanning** - Barcode/OCR scanning guide\n📦 **Inventory** - Managing your products\n🔥 **Flash Sales** - Discount strategies\n🚚 **Suppliers** - Returns management\n📊 **Analytics** - Reports & insights\n💰 **Pricing** - Plans & billing\n👤 **Account** - Profile settings\n\nJust type your question!";
     }
     
     // Contact human
     if (msg.includes('human') || msg.includes('agent') || msg.includes('speak') || msg.includes('talk')) {
-      return "👨‍💼 I can connect you with a human support agent! Click the 'Connect with Support' button below and fill out the form. Our team will get back to you within 24 hours.";
+      return "👨‍💼 **Connect with Human Support**\n\nClick the 'Connect with Human Support' button below and fill out the form. Our support team will get back to you within 24 hours.\n\n📧 You can also email us at: support@shelflife.ai";
     }
     
     // Greetings
     if (msg.includes('hello') || msg.includes('hi') || msg.includes('hey') || msg.includes('greeting')) {
-      return "👋 Hello! Welcome to ShelfLife AI! How can I assist you today? You can ask me about scanning products, inventory management, flash sales, or anything else!";
+      return "👋 **Hello! Welcome to ShelfLife AI!**\n\nI'm your virtual assistant. I can help you with:\n\n• 📷 Scanning products\n• 📦 Inventory management\n• 🔥 Flash sales\n• 📊 Analytics\n• 💰 Pricing plans\n\nWhat would you like to know?";
     }
     
     // Thank you
     if (msg.includes('thank')) {
-      return "🙏 You're very welcome! I'm glad I could help. Is there anything else you'd like to know?";
+      return "🙏 **You're very welcome!**\n\nI'm glad I could help. Is there anything else you'd like to know about ShelfLife AI?\n\n💡 Tip: Check out our video tutorials in the Help section!";
     }
     
     // Default response
-    return "🤔 I'm not sure I understand. Could you please rephrase your question? I can help with:\n\n• Product scanning (barcode/OCR)\n• Inventory management\n• Flash sales\n• Supplier returns\n• Analytics\n• Pricing & plans\n\nOr click 'Connect with Support' to talk to a human!";
+    return "🤔 **I'm not sure I understand.**\n\nCould you please rephrase your question? I can help with:\n\n📷 Product scanning (barcode/OCR)\n📦 Inventory management\n🔥 Flash sales\n🚚 Supplier returns\n📊 Analytics\n💰 Pricing & plans\n\nOr click **'Connect with Human Support'** below to talk to a real person!";
   };
 
   const handleSendMessage = async () => {
@@ -114,7 +114,7 @@ function Chatbot() {
       id: messages.length + 1,
       text: inputMessage,
       sender: 'user',
-      time: new Date().toLocaleTimeString()
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
@@ -129,7 +129,7 @@ function Chatbot() {
         id: messages.length + 2,
         text: botResponse,
         sender: 'bot',
-        time: new Date().toLocaleTimeString()
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, botMessage]);
       setIsTyping(false);
@@ -173,9 +173,9 @@ function Chatbot() {
     // Add confirmation message in chat
     const confirmationMessage = {
       id: messages.length + 1,
-      text: "📧 Thanks for reaching out! I've forwarded your message to our support team. They'll get back to you within 24 hours. In the meantime, feel free to ask me any questions!",
+      text: "📧 **Support request received!**\n\nI've forwarded your message to our support team. They'll get back to you within 24 hours.\n\nIn the meantime, feel free to ask me any questions!",
       sender: 'bot',
-      time: new Date().toLocaleTimeString()
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setMessages(prev => [...prev, confirmationMessage]);
   };
@@ -184,7 +184,7 @@ function Chatbot() {
     { label: '📷 How to scan?', action: 'How do I scan a product?' },
     { label: '📅 Expiry dates', action: 'How to scan expiry dates?' },
     { label: '🔥 Flash sales', action: 'How do flash sales work?' },
-    { label: '💳 Pricing', action: 'What are your pricing plans?' }
+    { label: '💰 Pricing', action: 'What are your pricing plans?' }
   ];
 
   return (
@@ -230,7 +230,13 @@ function Chatbot() {
                 <div className="message-content">
                   {message.text.split('\n').map((line, i) => (
                     <span key={i}>
-                      {line}
+                      {line.includes('**') ? (
+                        <strong>{line.replace(/\*\*/g, '')}</strong>
+                      ) : line.startsWith('•') ? (
+                        <span style={{ display: 'block', marginLeft: '8px' }}>{line}</span>
+                      ) : (
+                        line
+                      )}
                       {i < message.text.split('\n').length - 1 && <br />}
                     </span>
                   ))}
@@ -250,41 +256,46 @@ function Chatbot() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="quick-actions">
-            {quickActions.map((action, index) => (
-              <button
-                key={index}
-                className="quick-action-btn"
-                onClick={() => handleQuickAction(action.action)}
+          {/* Unified Bottom Wrapper to prevent layout breaks */}
+          <div className="chat-bottom-area">
+            <div className="quick-actions">
+              {quickActions.map((action, index) => (
+                <button
+                  key={index}
+                  className="quick-action-btn"
+                  onClick={() => handleQuickAction(action.action)}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="chat-input-area">
+              <input
+                ref={inputRef}
+                type="text"
+                className="chat-input"
+                placeholder="Type your message..."
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+              />
+              <button 
+                className="chat-send-btn"
+                onClick={handleSendMessage}
+                disabled={!inputMessage.trim()}
               >
-                {action.label}
+                <i className="fas fa-paper-plane"></i>
               </button>
-            ))}
-          </div>
+            </div>
 
-          <div className="chat-input-area">
-            <input
-              ref={inputRef}
-              type="text"
-              className="chat-input"
-              placeholder="Type your message..."
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-            />
-            <button 
-              className="chat-send-btn"
-              onClick={handleSendMessage}
-              disabled={!inputMessage.trim()}
-            >
-              <i className="fas fa-paper-plane"></i>
-            </button>
+            <div className="connect-human-wrapper">
+              <button className="connect-human-btn" onClick={handleConnectHuman}>
+                <i className="fas fa-headset"></i>
+                Connect with Human Support
+              </button>
+            </div>
           </div>
-
-          <button className="connect-human-btn" onClick={handleConnectHuman}>
-            <i className="fas fa-headset"></i>
-            Connect with Human Support
-          </button>
         </div>
       )}
 
