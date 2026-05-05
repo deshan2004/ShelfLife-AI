@@ -1,11 +1,12 @@
 // src/App.jsx
 import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { auth, db, onAuthStateChanged, doc, getDoc } from './firebaseConfig'
+import { auth, db, onAuthStateChanged, doc, getDoc, setDoc } from './firebaseConfig'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import LoginModal from './components/LoginModal'
 import ProtectedRoute from './components/ProtectedRoute'
+import Chatbot from './components/Chatbot'
 import './App.css'
 
 // User Pages
@@ -28,7 +29,6 @@ import AdminAnalytics from './pages/Admin/AdminAnalytics'
 import AdminSettings from './pages/Admin/AdminSettings'
 
 // Services
-import subscriptionService from './services/subscriptionService'
 import { useFeatureAccess } from './hooks/useFeatureAccess'
 
 // Styles
@@ -43,8 +43,6 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [inventory, setInventory] = useState([])
   const [toastMsg, setToastMsg] = useState(null)
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
-  const [upgradeContext, setUpgradeContext] = useState({ resourceType: 'products', currentUsage: 0, limit: 0 })
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -239,7 +237,7 @@ function App() {
               </ProtectedRoute>
             } />
             
-            {/* Admin Routes - IMPORTANT: These must be defined */}
+            {/* Admin Routes */}
             <Route path="/admin/dashboard" element={
               <ProtectedRoute user={user}>
                 {isAdmin ? <AdminDashboard admin={user} /> : <Navigate to="/dashboard" replace />}
@@ -298,6 +296,9 @@ function App() {
           onClose={() => setShowLogin(false)} 
           onLogin={handleLogin}
         />
+
+        {/* Chatbot - Add this here before closing divs */}
+        <Chatbot />
       </div>
     </Router>
   )
