@@ -3891,4 +3891,121 @@
     height: 32px;
     font-size: 0.8rem;
   }
+}/* ============================================================
+   ADMIN SHOP GROUPED VIEW
+   ============================================================ */
+.admin-shop-inventory-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.admin-shop-card {
+  background: var(--admin-bg-card);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-xl);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.admin-shop-card:hover {
+  border-color: var(--admin-border-light);
+  box-shadow: var(--admin-shadow-md);
+}
+
+.admin-shop-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  background: var(--admin-bg-elevated);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.admin-shop-header:hover {
+  background: var(--admin-bg-hover);
+}
+
+.admin-shop-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.admin-shop-avatar {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, var(--admin-primary), var(--admin-primary-dark));
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: #030a03;
+}
+
+.admin-shop-info h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+  color: var(--admin-text-primary);
+}
+
+.admin-shop-info p {
+  font-size: 0.75rem;
+  color: var(--admin-text-muted);
+}
+
+.admin-shop-info p i {
+  margin-right: 0.3rem;
+  color: var(--admin-primary);
+}
+
+.admin-shop-stats {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.admin-shop-stats .admin-stat-chip {
+  background: rgba(57, 231, 95, 0.1);
+  padding: 0.3rem 0.8rem;
+  border-radius: 50px;
+  font-size: 0.7rem;
+  color: var(--admin-text-secondary);
+}
+
+.admin-shop-stats i {
+  color: var(--admin-text-muted);
+  font-size: 0.9rem;
+}
+
+.admin-shop-products {
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.admin-shop-products .admin-products-table {
+  min-width: 700px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .admin-shop-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .admin-shop-stats {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .admin-shop-info {
+    width: 100%;
+  }
 }
