@@ -1,13 +1,7 @@
-// server.mjs - Firebase Admin Initialization (Direct File Import)
-import express from 'express';
-import admin from 'firebase-admin';
-import cors from 'cors';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// server.cjs - SIMPLE COMMONJS VERSION
+const express = require('express');
+const admin = require('firebase-admin');
+const cors = require('cors');
 
 const app = express();
 app.use(cors({ origin: true }));
@@ -16,18 +10,15 @@ app.use(express.json());
 let db = null;
 let firebaseReady = false;
 
-console.log('🚀 Starting server...');
+console.log('🚀 Starting server (CommonJS)...');
 
 // ============================================================
-// 🔥 FIREBASE ADMIN - DIRECT FROM JSON FILE (NO ENV VARS!)
+// 🔥 FIREBASE ADMIN - DIRECT FROM JSON FILE
 // ============================================================
 try {
-    // Read serviceAccountKey.json directly from file system
-    const serviceAccountPath = join(__dirname, 'serviceAccountKey.json');
-    const serviceAccountJSON = readFileSync(serviceAccountPath, 'utf8');
-    const serviceAccount = JSON.parse(serviceAccountJSON);
+    const serviceAccount = require('./serviceAccountKey.json');
     
-    console.log('📋 Loading serviceAccountKey.json directly...');
+    console.log('📋 Loading serviceAccountKey.json...');
     console.log(`📡 Project: ${serviceAccount.project_id}`);
 
     admin.initializeApp({
@@ -37,10 +28,8 @@ try {
     db = admin.firestore();
     firebaseReady = true;
     console.log('✅ Firebase Admin initialized successfully!');
-    
 } catch (error) {
     console.error('❌ Failed to load serviceAccountKey.json:', error.message);
-    console.error('   Please ensure serviceAccountKey.json exists in the root folder.');
 }
 
 // ============================================================
@@ -76,7 +65,7 @@ app.use((req, res, next) => {
 });
 
 // ============================================================
-// 👤 SUPPLIERS (Test karanna meka)
+// 👤 SUPPLIERS
 // ============================================================
 app.get('/api/suppliers/:userId', async (req, res) => {
     try {
@@ -98,9 +87,6 @@ app.get('/api/suppliers/:userId', async (req, res) => {
     }
 });
 
-// ============================================================
-// 👤 ADD SUPPLIER
-// ============================================================
 app.post('/api/suppliers/:userId/add', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -133,9 +119,6 @@ app.post('/api/suppliers/:userId/add', async (req, res) => {
     }
 });
 
-// ============================================================
-// 👤 UPDATE SUPPLIER
-// ============================================================
 app.put('/api/suppliers/:userId/update/:supplierId', async (req, res) => {
     try {
         const { userId, supplierId } = req.params;
@@ -160,9 +143,6 @@ app.put('/api/suppliers/:userId/update/:supplierId', async (req, res) => {
     }
 });
 
-// ============================================================
-// 👤 DELETE SUPPLIER
-// ============================================================
 app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
     try {
         const { userId, supplierId } = req.params;
@@ -187,7 +167,7 @@ app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
 });
 
 // ============================================================
-// 👤 INVENTORY (Basic - Suppliers වැඩ උනාම මේවත් වැඩ කරයි)
+// 👤 INVENTORY
 // ============================================================
 app.get('/api/inventory/:userId', async (req, res) => {
     try {
@@ -231,7 +211,7 @@ app.post('/api/inventory/:userId/add', async (req, res) => {
 });
 
 // ============================================================
-// 👤 SUBSCRIPTION & USAGE
+// 👤 SUBSCRIPTION
 // ============================================================
 app.get('/api/subscription/:userId', async (req, res) => {
     try {
@@ -267,6 +247,9 @@ app.get('/api/subscription/:userId', async (req, res) => {
     }
 });
 
+// ============================================================
+// 👤 USAGE
+// ============================================================
 app.get('/api/usage/:userId/:type', async (req, res) => {
     try {
         const { userId, type } = req.params;
@@ -375,7 +358,7 @@ app.use((err, req, res, next) => {
 // ============================================================
 // 🚀 EXPORT
 // ============================================================
-export default app;
+module.exports = app;
 
 // Local development
 if (process.env.NODE_ENV !== 'production') {

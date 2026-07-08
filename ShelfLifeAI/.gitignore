@@ -1,54 +1,181 @@
-# Environment variables
+# ============================================
+# 🔑 ENVIRONMENT VARIABLES (Sensitive)
+# ============================================
 .env
 .env.local
 .env.*.local
 .env.development
 .env.production
 .env.test
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Firebase service account
-
+# ============================================
+# 🔥 FIREBASE SECURITY (Sensitive - NEVER COMMIT!)
+# ============================================
+serviceAccountKey.json
 *.key.json
 *.pem
+firebase-debug.log
+firebase-debug.*.log
+*.firebaserc
+firebase.json
+firebase-debug.log
 
-# Node
+# ============================================
+# 📦 NODE / NPM / YARN / PNPM
+# ============================================
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
-# Build outputs
+# ============================================
+# 🛠️ BUILD OUTPUTS (Vite / React / Webpack)
+# ============================================
 dist/
 dist-ssr/
 build/
 .vite/
 *.local
+*.tsbuildinfo
 
-# IDE
+# ============================================
+# 💻 IDE / EDITOR FILES
+# ============================================
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
 .idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
 *.sw?
 *.swp
 *.swo
 *~
 .DS_Store
 Thumbs.db
+*.iml
+*.ipr
+*.iws
 
-# Logs
+# ============================================
+# ☕ JAVA / ANDROID (if any mobile components)
+# ============================================
+*.class
+*.jar
+*.war
+*.ear
+.gradle/
+build/
+target/
+
+# ============================================
+# 🧪 TESTING / COVERAGE
+# ============================================
+coverage/
+.nyc_output/
+*.lcov
+*.test-results
+__tests__/coverage/
+jest.config.js
+
+# ============================================
+# 📊 LOGS & TEMP FILES
+# ============================================
 logs/
 *.log
 *.tmp
 *.temp
 .cache/
 .temp/
+*.pid
+*.seed
+*.pid.lock
 
-# OS
+# ============================================
+# 🐍 PYTHON (if used for any scripts)
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ============================================
+# 🐳 DOCKER (if using)
+# ============================================
+docker-compose.override.yml
+Dockerfile
+*.dockerignore
+
+# ============================================
+# 🧩 MISCELLANEOUS
+# ============================================
+*.tgz
+*.gz
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+*.bak
+*.old
+*.orig
+
+# ============================================
+# 🖥️ OS / SYSTEM FILES
+# ============================================
 .DS_Store
 Thumbs.db
 desktop.ini
+ehthumbs.db
+*.swp
+*.swo
+*~
+
+# ============================================
+# 🔧 VERCEL / NETLIFY (Deployment)
+# ============================================
+.vercel
+.netlify
+*.vercel
+
+# ============================================
+# 🌐 NGINX / SERVER CONFIGS (if any)
+# ============================================
+nginx.conf
+*.conf
+
+# ============================================
+# 🔒 SECURITY / CREDENTIALS
+# ============================================
+*.pem
+*.key
+*.crt
+*.csr
+*.secret
+credentials.json
+oauth2.json
+
+# ============================================
+# 📱 MOBILE (if any)
+# ============================================
+*.apk
+*.ipa
+*.xcodeproj
+*.xcworkspace
+Pods/
