@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "dist/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/dist/$1"
+    }
+  ],
+  "env": {
+    "FIREBASE_PROJECT_ID": "shelflife-ai-141df",
+    "FIREBASE_CLIENT_EMAIL": "firebase-adminsdk-fbsvc@shelflife-ai-141df.iam.gserviceaccount.com"
+  }
+}

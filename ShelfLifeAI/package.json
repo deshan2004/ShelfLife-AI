@@ -2,14 +2,14 @@
   "name": "shelflife-ai",
   "private": true,
   "version": "1.0.0",
-  "proxy": "http://localhost:5000",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "server": "node server.mjs",
-    "start": "concurrently \"npm run server\" \"npm run dev\""
+    "start": "concurrently \"npm run server\" \"npm run dev\"",
+    "vercel-build": "npm run build"
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.8",

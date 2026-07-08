@@ -1,126 +1,137 @@
 // src/services/apiService.js
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
-// Helper function for API calls
-const fetchApi = async (endpoint, options = {}) => {
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    const errorMessage = data.error || data.details?.join(', ') || 'Something went wrong';
-    throw new Error(errorMessage);
-  }
-  return data;
-};
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const api = {
-  // Health
   async health() {
-    return fetchApi('/api/health');
+    const response = await fetch(`${API_URL}/health`);
+    return response.json();
   },
 
-  // Inventory
-  async getInventory(userId) {
-    return fetchApi(`/api/inventory/${userId}`);
-  },
-
-  async addProduct(userId, product) {
-    return fetchApi(`/api/inventory/${userId}/add`, {
-      method: 'POST',
-      body: JSON.stringify({ product }),
-    });
-  },
-
-  async updateProduct(userId, itemId, updates) {
-    return fetchApi(`/api/inventory/${userId}/update`, {
-      method: 'PUT',
-      body: JSON.stringify({ itemId, updates }),
-    });
-  },
-
-  async deleteProduct(userId, itemId) {
-    return fetchApi(`/api/inventory/${userId}/delete/${itemId}`, {
-      method: 'DELETE',
-    });
-  },
-
-  // Suppliers
+  // ============================================================
+  // SUPPLIER ENDPOINTS
+  // ============================================================
   async getSuppliers(userId) {
-    return fetchApi(`/api/suppliers/${userId}`);
+    const response = await fetch(`${API_URL}/suppliers/${userId}`);
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Server error: ${text}`);
+    }
+    return response.json();
   },
 
   async addSupplier(userId, supplier) {
-    return fetchApi(`/api/suppliers/${userId}/add`, {
+    const response = await fetch(`${API_URL}/suppliers/${userId}/add`, {
       method: 'POST',
-      body: JSON.stringify(supplier),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(supplier)
     });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Server error: ${text}`);
+    }
+    return response.json();
   },
 
   async updateSupplier(userId, supplierId, updates) {
-    return fetchApi(`/api/suppliers/${userId}/update/${supplierId}`, {
+    const response = await fetch(`${API_URL}/suppliers/${userId}/update/${supplierId}`, {
       method: 'PUT',
-      body: JSON.stringify(updates),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
     });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Server error: ${text}`);
+    }
+    return response.json();
   },
 
   async deleteSupplier(userId, supplierId) {
-    return fetchApi(`/api/suppliers/${userId}/delete/${supplierId}`, {
-      method: 'DELETE',
+    const response = await fetch(`${API_URL}/suppliers/${userId}/delete/${supplierId}`, {
+      method: 'DELETE'
     });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Server error: ${text}`);
+    }
+    return response.json();
   },
 
-  // Subscription
+  // ============================================================
+  // INVENTORY ENDPOINTS
+  // ============================================================
+  async getInventory(userId) {
+    const response = await fetch(`${API_URL}/inventory/${userId}`);
+    return response.json();
+  },
+
+  async addProduct(userId, product) {
+    const response = await fetch(`${API_URL}/inventory/${userId}/add`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to add product');
+    }
+    return data;
+  },
+
+  async updateProduct(userId, itemId, updates) {
+    const response = await fetch(`${API_URL}/inventory/${userId}/update`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemId, updates })
+    });
+    return response.json();
+  },
+
+  async deleteProduct(userId, itemId) {
+    const response = await fetch(`${API_URL}/inventory/${userId}/delete/${itemId}`, {
+      method: 'DELETE'
+    });
+    return response.json();
+  },
+
+  // ============================================================
+  // SUBSCRIPTION ENDPOINTS
+  // ============================================================
   async getSubscription(userId) {
-    return fetchApi(`/api/subscription/${userId}`);
+    const response = await fetch(`${API_URL}/subscription/${userId}`);
+    return response.json();
   },
 
   async upgradeSubscription(userId, planId) {
-    return fetchApi('/api/subscription/upgrade', {
+    const response = await fetch(`${API_URL}/subscription/upgrade`, {
       method: 'POST',
-      body: JSON.stringify({ userId, planId }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, planId })
     });
+    return response.json();
   },
 
-  // Usage
+  // ============================================================
+  // USAGE CHECK
+  // ============================================================
   async checkUsage(userId, type) {
-    return fetchApi(`/api/usage/${userId}/${type}`);
+    const response = await fetch(`${API_URL}/usage/${userId}/${type}`);
+    return response.json();
   },
 
-  // Admin
-  async adminGetUsers() {
-    return fetchApi('/api/admin/users');
-  },
-
-  async adminUpdateRole(uid, role) {
-    return fetchApi(`/api/admin/users/${uid}/role`, {
-      method: 'PUT',
-      body: JSON.stringify({ role }),
-    });
-  },
-
-  async adminDeleteUser(uid) {
-    return fetchApi(`/api/admin/users/${uid}`, {
-      method: 'DELETE',
-    });
-  },
-
-  async adminExtendTrial(uid, days) {
-    return fetchApi(`/api/admin/subscriptions/${uid}/extend`, {
+  // ============================================================
+  // PAYMENT ENDPOINTS
+  // ============================================================
+  async processPayment(userId, amount, planId) {
+    const response = await fetch(`${API_URL}/payment/process`, {
       method: 'POST',
-      body: JSON.stringify({ days }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, amount, planId })
     });
+    return response.json();
   },
 
-  async adminUpgradePlan(uid, planId) {
-    return fetchApi(`/api/admin/subscriptions/${uid}/upgrade`, {
-      method: 'POST',
-      body: JSON.stringify({ planId }),
-    });
-  },
+  async getPaymentHistory(userId) {
+    const response = await fetch(`${API_URL}/payment/history/${userId}`);
+    return response.json();
+  }
 };
