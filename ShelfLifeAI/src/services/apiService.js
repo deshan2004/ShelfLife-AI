@@ -1,22 +1,44 @@
 // src/services/apiService.js
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// ✅ Works on Localhost AND Vercel
+
+// Dynamically determine API URL based on environment
+const getApiUrl = () => {
+  // Vercel Production: Use relative path (serverless functions)
+  if (import.meta.env.PROD) {
+    return ''; // Empty = same origin (Vercel handles /api routes)
+  }
+  // Local Development: Use localhost
+  return import.meta.env.VITE_API_URL || 'http://localhost:5000';
+};
+
+const API_URL = getApiUrl();
+
+console.log('🔧 API URL:', API_URL || '(same origin)');
 
 // Helper function for API calls
 const fetchApi = async (endpoint, options = {}) => {
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
+  const url = `${API_URL}${endpoint}`;
+  console.log(`📡 Fetching: ${url}`);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
 
-  const data = await response.json();
-  if (!response.ok) {
-    const errorMessage = data.error || data.details?.join(', ') || 'Something went wrong';
-    throw new Error(errorMessage);
+    const data = await response.json();
+    if (!response.ok) {
+      const errorMessage = data.error || data.details?.join(', ') || 'Something went wrong';
+      throw new Error(errorMessage);
+    }
+    return data;
+  } catch (error) {
+    console.error(`❌ API Error (${endpoint}):`, error.message);
+    throw error;
   }
-  return data;
 };
 
 export const api = {
@@ -52,6 +74,9 @@ export const api = {
 
   // Suppliers
   async getSuppliers(userId) {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
     return fetchApi(`/api/suppliers/${userId}`);
   },
 
