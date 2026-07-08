@@ -2,8 +2,7 @@
 import { useState } from 'react'
 import BarcodeScanner from '../components/AdvancedBarcodeScanner'
 import OCRScanner from '../components/AdvancedOCRScanner'
-import SubscriptionGuard from '../components/subscription/SubscriptionGuard'
-import { api } from '../services/apiService' // ✅ API Service import කරන්න
+import { api } from '../services/apiService'
 import './Pages.css'
 
 function Inventory({ 
@@ -17,7 +16,7 @@ function Inventory({
   subscriptionStatus,
   isTrialActive,
   isTrialExpired,
-  user  // ✅ user prop එක add කරන්න (UID එක සඳහා)
+  user
 }) {
   const [showScanner, setShowScanner] = useState(false)
   const [scanType, setScanType] = useState(null)
@@ -25,6 +24,7 @@ function Inventory({
   const [filterStatus, setFilterStatus] = useState('all')
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [addingProduct, setAddingProduct] = useState(false)
 
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -46,11 +46,8 @@ function Inventory({
     lowStockCount: inventory.filter(i => i.stock <= i.lowStockThreshold).length
   }
 
-  // ============================================================
-  // 🔥 UPDATED: handleAddProduct - දැන් Firebase API එක CALL කරනවා
-  // ============================================================
+  // ✅ UPDATED: Handle Add Product with API
   const handleAddProduct = async (productData) => {
-    // Trial limits check
     if (!canAddProduct) {
       if (isTrialActive) {
         onLimitReached('products', usage.productsUsed, usage.productsLimit);
@@ -61,14 +58,16 @@ function Inventory({
       return;
     }
 
-    // Generate new ID for local state
-    const newId = Math.max(...inventory.map(i => i.id), 0) + 1;
+    if (!productData.name || productData.name.trim().length < 2) {
+      showToast('❌ Product name is required (min 2 characters)');
+      return;
+    }
+
     const daysLeft = Math.ceil((new Date(productData.expiryDate || new Date(Date.now() + 30 * 86400000)) - new Date()) / (1000 * 60 * 60 * 24));
     
     const newProduct = {
-      id: newId,
-      name: productData.name || 'New Product',
-      batch: productData.batch || `B${String(newId).padStart(3, '0')}`,
+      name: productData.name.trim(),
+      batch: productData.batch || `B${String(Date.now()).slice(-6)}`,
       batchDate: new Date().toISOString().split('T')[0],
       supplier: productData.supplier || 'Manual Entry',
       supplierContact: productData.supplierContact || 'N/A',
@@ -83,46 +82,47 @@ function Inventory({
       sellingPrice: productData.sellingPrice || 150
     };
 
-    // 🔥 1. API එක හරහා Firebase Firestore එකට Save කරන්න
     try {
+      setAddingProduct(true);
       const result = await api.addProduct(user.uid, newProduct);
       if (result.success) {
-        // 2. Local state එක update කරන්න (Server response එකෙන් product එක ගන්න)
-        const addedProduct = result.product;
-        const finalProduct = { ...newProduct, ...addedProduct };
+        const finalProduct = { ...newProduct, ...result.product, id: result.product.id };
         onUpdateInventory([...inventory, finalProduct]);
         showToast(`✅ ${finalProduct.name} added to inventory!`);
+        setScanType(null);
+        setShowScanner(false);
       } else {
-        showToast(`❌ Failed to add product: ${result.error || 'Unknown error'}`);
+        showToast(`❌ ${result.error || 'Failed to add product'}`);
       }
     } catch (error) {
       console.error('Add product error:', error);
-      showToast('❌ Failed to add product. Please try again.');
+      if (error.message.includes('limit')) {
+        showToast('⚠️ Product limit reached. Please upgrade your plan.');
+        onLimitReached('products', usage.productsUsed, usage.productsLimit);
+      } else {
+        showToast(`❌ ${error.message || 'Failed to add product. Please try again.'}`);
+      }
+    } finally {
+      setAddingProduct(false);
     }
   };
 
-  // ============================================================
-  // 🔥 UPDATED: handleScan - Barcode / OCR Scan results handle කරනවා
-  // ============================================================
+  // ✅ UPDATED: Handle Scan
   const handleScan = (scanData) => {
     if (scanData.type === 'barcode') {
-      // Barcode එකෙන් product එක හොයන්න
       const existingProduct = inventory.find(p => p.batch === scanData.value);
       if (existingProduct) {
         showToast(`📦 Product found: ${existingProduct.name} - Stock: ${existingProduct.stock}`);
         setSelectedProduct(existingProduct);
         setShowEditModal(true);
       } else {
-        // ✅ New Product - Auto Add කරන්න
         if (!canAddProduct && isTrialActive) {
           onLimitReached('products', usage.productsUsed, usage.productsLimit);
           setShowScanner(false);
           return;
         }
-        
         const productName = window.prompt('Enter product name:', scanData.productInfo?.name || 'New Product');
         if (productName) {
-          // 🔥 මෙතනින් handleAddProduct call වෙනවා -> API call යනවා
           handleAddProduct({
             name: productName,
             batch: scanData.value,
@@ -135,12 +135,9 @@ function Inventory({
         }
       }
     } else if (scanData.type === 'ocr') {
-      // OCR - Expiry date detection
       showToast(`📅 Expiry date detected: ${scanData.value}`);
       const expiringProducts = inventory.filter(p => p.daysLeft <= 14 && p.daysLeft > 0);
-      
       if (expiringProducts.length > 0) {
-        // Existing product එකක expiry date එක update කරන්න
         const productToUpdate = expiringProducts[0];
         if (window.confirm(`Update expiry for ${productToUpdate.name} to ${scanData.value}?`)) {
           const daysLeft = Math.ceil((new Date(scanData.value) - new Date()) / (1000 * 60 * 60 * 24));
@@ -156,7 +153,6 @@ function Inventory({
           showToast(`✅ Expiry updated for ${productToUpdate.name}`);
         }
       } else {
-        // ✅ New Product - Scanned Expiry Date එකත් එක්ක Auto Add කරන්න
         const productName = window.prompt('Enter product name:', 'New Product');
         if (productName) {
           handleAddProduct({
@@ -175,9 +171,6 @@ function Inventory({
     setScanType(null);
   };
 
-  // ============================================================
-  // Edit Modal & Delete Functions (Local state update + API call optional)
-  // ============================================================
   const handleEditProduct = (updatedProduct) => {
     const updatedInventory = inventory.map(item => 
       item.id === updatedProduct.id ? updatedProduct : item
@@ -197,9 +190,6 @@ function Inventory({
     }
   };
 
-  // ============================================================
-  // UI RENDER (Unchanged)
-  // ============================================================
   return (
     <div className="page-container">
       <div className="page-header">
@@ -224,8 +214,9 @@ function Inventory({
           </div>
         )}
         
-        <button className="btn-primary-lg" onClick={() => setShowScanner(true)}>
-          <i className="fas fa-plus"></i> Add Product
+        <button className="btn-primary-lg" onClick={() => setShowScanner(true)} disabled={addingProduct}>
+          {addingProduct ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fas fa-plus"></i>}
+          {addingProduct ? 'Adding...' : 'Add Product'}
         </button>
       </div>
 
@@ -440,4 +431,4 @@ function Inventory({
   );
 }
 
-export default Inventory;
+export default Inventory
