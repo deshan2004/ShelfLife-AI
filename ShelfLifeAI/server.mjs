@@ -1,24 +1,26 @@
-// server.cjs - SIMPLEST WORKING VERSION FOR VERCEL
-const express = require('express');
-const admin = require('firebase-admin');
-const cors = require('cors');
+// server.mjs - ES Module Version for Vercel
+import express from 'express';
+import admin from 'firebase-admin';
+import cors from 'cors';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-// ============================================================
-// 🔥 FIREBASE ADMIN INITIALIZATION - SIMPLE & RELIABLE
-// ============================================================
 let db = null;
 let firebaseReady = false;
 
-console.log('🚀 Starting server...');
-console.log('📡 Checking environment variables...');
+console.log('🚀 Starting server (ES Module)...');
 
-// Try to initialize Firebase
+// ============================================================
+// 🔥 FIREBASE ADMIN INITIALIZATION
+// ============================================================
 try {
-    // Check if we have the required environment variables
     const hasProjectId = !!process.env.FIREBASE_PROJECT_ID;
     const hasClientEmail = !!process.env.FIREBASE_CLIENT_EMAIL;
     const hasPrivateKey = !!process.env.FIREBASE_PRIVATE_KEY;
@@ -28,21 +30,12 @@ try {
     console.log(`📋 Private Key: ${hasPrivateKey ? '✅' : '❌'}`);
     
     if (hasProjectId && hasClientEmail && hasPrivateKey) {
-        // Clean the private key - remove quotes and handle newlines
         let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-        
-        // Remove surrounding quotes if present
         if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
             privateKey = privateKey.slice(1, -1);
-            console.log('🔑 Removed surrounding quotes from private key');
         }
-        
-        // Replace \n with actual newlines
         privateKey = privateKey.replace(/\\n/g, '\n');
         
-        console.log('🔑 Initializing Firebase Admin SDK...');
-        
-        // Initialize Firebase Admin
         admin.initializeApp({
             credential: admin.credential.cert({
                 projectId: process.env.FIREBASE_PROJECT_ID,
@@ -53,54 +46,33 @@ try {
         
         db = admin.firestore();
         firebaseReady = true;
-        console.log('✅ Firebase Admin initialized successfully!');
-        console.log(`📡 Project: ${process.env.FIREBASE_PROJECT_ID}`);
+        console.log('✅ Firebase initialized with environment variables!');
     } else {
-        // Try local serviceAccountKey.json (for local development)
-        console.log('📁 Trying serviceAccountKey.json...');
+        // Local development - try serviceAccountKey.json
         try {
-            const serviceAccount = require('./serviceAccountKey.json');
+            const serviceAccount = await import('./serviceAccountKey.json', { 
+                assert: { type: 'json' } 
+            });
             admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
+                credential: admin.credential.cert(serviceAccount.default)
             });
             db = admin.firestore();
             firebaseReady = true;
             console.log('✅ Firebase initialized with serviceAccountKey.json');
         } catch (err) {
-            console.error('❌ serviceAccountKey.json not found:', err.message);
+            console.error('❌ No valid credentials found');
         }
     }
 } catch (error) {
-    console.error('❌ Firebase initialization error:', error.message);
-    console.error('Stack:', error.stack);
+    console.error('❌ Firebase error:', error.message);
 }
 
 // ============================================================
-// 🛡️ MIDDLEWARE - Check Firebase
-// ============================================================
-app.use((req, res, next) => {
-    if (req.path === '/api/health' || req.path === '/api/test') {
-        return next();
-    }
-    
-    if (!firebaseReady) {
-        console.error('🔥 Firebase not ready!');
-        return res.status(503).json({
-            error: 'Service unavailable',
-            message: 'Firebase is not initialized. Please check environment variables.',
-            status: 'firebase_not_ready'
-        });
-    }
-    next();
-});
-
-// ============================================================
-// ✅ TEST ENDPOINT - First check this!
+// ✅ TEST ENDPOINT
 // ============================================================
 app.get('/api/test', (req, res) => {
     res.json({
         status: 'ok',
-        message: 'API is working!',
         firebaseReady: firebaseReady,
         timestamp: new Date().toISOString(),
         env: {
@@ -117,33 +89,34 @@ app.get('/api/test', (req, res) => {
 app.get('/api/health', (req, res) => {
     res.json({
         status: firebaseReady ? 'healthy' : 'unhealthy',
-        firebase: firebaseReady ? 'connected' : 'disconnected',
-        timestamp: new Date().toISOString()
+        firebase: firebaseReady ? 'connected' : 'disconnected'
     });
 });
 
 // ============================================================
-// 👤 SUPPLIERS ENDPOINT (Test with this first)
+// 🛡️ MIDDLEWARE
+// ============================================================
+app.use((req, res, next) => {
+    if (req.path === '/api/health' || req.path === '/api/test') {
+        return next();
+    }
+    if (!firebaseReady) {
+        return res.status(503).json({ error: 'Firebase not ready' });
+    }
+    next();
+});
+
+// ============================================================
+// 👤 SUPPLIERS
 // ============================================================
 app.get('/api/suppliers/:userId', async (req, res) => {
     try {
-        if (!firebaseReady) {
-            return res.status(503).json({ error: 'Firebase not ready' });
-        }
-        
         const { userId } = req.params;
-        console.log(`📋 Getting suppliers for: ${userId}`);
-        
         const doc = await db.collection('suppliers').doc(userId).get();
-        
         if (!doc.exists) {
-            await db.collection('suppliers').doc(userId).set({
-                list: [],
-                updatedAt: new Date().toISOString()
-            });
+            await db.collection('suppliers').doc(userId).set({ list: [], updatedAt: new Date().toISOString() });
             return res.json({ list: [] });
         }
-        
         res.json(doc.data());
     } catch (error) {
         console.error('❌ Error:', error.message);
@@ -151,21 +124,11 @@ app.get('/api/suppliers/:userId', async (req, res) => {
     }
 });
 
-// ============================================================
-// 👤 ADD SUPPLIER
-// ============================================================
 app.post('/api/suppliers/:userId/add', async (req, res) => {
     try {
-        if (!firebaseReady) {
-            return res.status(503).json({ error: 'Firebase not ready' });
-        }
-        
         const { userId } = req.params;
         const { name, contact, email, address, rating, notes } = req.body;
-        
-        if (!name) {
-            return res.status(400).json({ error: 'Supplier name is required' });
-        }
+        if (!name) return res.status(400).json({ error: 'Name required' });
         
         const doc = await db.collection('suppliers').doc(userId).get();
         let list = doc.exists ? doc.data().list || [] : [];
@@ -180,54 +143,26 @@ app.post('/api/suppliers/:userId/add', async (req, res) => {
             notes: notes || '',
             createdAt: new Date().toISOString()
         };
-        
         list.push(newSupplier);
-        await db.collection('suppliers').doc(userId).set({
-            list: list,
-            updatedAt: new Date().toISOString()
-        });
-        
-        res.status(201).json({
-            success: true,
-            supplier: newSupplier,
-            total: list.length
-        });
+        await db.collection('suppliers').doc(userId).set({ list, updatedAt: new Date().toISOString() });
+        res.status(201).json({ success: true, supplier: newSupplier });
     } catch (error) {
         console.error('❌ Error:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
 
-// ============================================================
-// 👤 UPDATE SUPPLIER
-// ============================================================
 app.put('/api/suppliers/:userId/update/:supplierId', async (req, res) => {
     try {
-        if (!firebaseReady) {
-            return res.status(503).json({ error: 'Firebase not ready' });
-        }
-        
         const { userId, supplierId } = req.params;
         const updates = req.body;
-        
         const doc = await db.collection('suppliers').doc(userId).get();
-        if (!doc.exists) {
-            return res.status(404).json({ error: 'Supplier list not found' });
-        }
-        
+        if (!doc.exists) return res.status(404).json({ error: 'Not found' });
         let list = doc.data().list || [];
         const index = list.findIndex(s => s.id === supplierId);
-        
-        if (index === -1) {
-            return res.status(404).json({ error: 'Supplier not found' });
-        }
-        
+        if (index === -1) return res.status(404).json({ error: 'Supplier not found' });
         list[index] = { ...list[index], ...updates, updatedAt: new Date().toISOString() };
-        await db.collection('suppliers').doc(userId).set({
-            list: list,
-            updatedAt: new Date().toISOString()
-        });
-        
+        await db.collection('suppliers').doc(userId).set({ list, updatedAt: new Date().toISOString() });
         res.json({ success: true, supplier: list[index] });
     } catch (error) {
         console.error('❌ Error:', error.message);
@@ -235,35 +170,16 @@ app.put('/api/suppliers/:userId/update/:supplierId', async (req, res) => {
     }
 });
 
-// ============================================================
-// 👤 DELETE SUPPLIER
-// ============================================================
 app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
     try {
-        if (!firebaseReady) {
-            return res.status(503).json({ error: 'Firebase not ready' });
-        }
-        
         const { userId, supplierId } = req.params;
-        
         const doc = await db.collection('suppliers').doc(userId).get();
-        if (!doc.exists) {
-            return res.status(404).json({ error: 'Supplier list not found' });
-        }
-        
+        if (!doc.exists) return res.status(404).json({ error: 'Not found' });
         let list = doc.data().list || [];
         const index = list.findIndex(s => s.id === supplierId);
-        
-        if (index === -1) {
-            return res.status(404).json({ error: 'Supplier not found' });
-        }
-        
+        if (index === -1) return res.status(404).json({ error: 'Supplier not found' });
         list.splice(index, 1);
-        await db.collection('suppliers').doc(userId).set({
-            list: list,
-            updatedAt: new Date().toISOString()
-        });
-        
+        await db.collection('suppliers').doc(userId).set({ list, updatedAt: new Date().toISOString() });
         res.json({ success: true, total: list.length });
     } catch (error) {
         console.error('❌ Error:', error.message);
@@ -276,22 +192,12 @@ app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
 // ============================================================
 app.get('/api/inventory/:userId', async (req, res) => {
     try {
-        if (!firebaseReady) {
-            return res.status(503).json({ error: 'Firebase not ready' });
-        }
-        
         const { userId } = req.params;
         const doc = await db.collection('inventory').doc(userId).get();
-        
         if (!doc.exists) {
-            await db.collection('inventory').doc(userId).set({
-                items: [],
-                lastUpdated: new Date().toISOString(),
-                itemCount: 0
-            });
+            await db.collection('inventory').doc(userId).set({ items: [], lastUpdated: new Date().toISOString(), itemCount: 0 });
             return res.json({ items: [], itemCount: 0 });
         }
-        
         res.json(doc.data());
     } catch (error) {
         console.error('❌ Error:', error.message);
@@ -299,36 +205,18 @@ app.get('/api/inventory/:userId', async (req, res) => {
     }
 });
 
-// ============================================================
-// 👤 ADD PRODUCT
-// ============================================================
 app.post('/api/inventory/:userId/add', async (req, res) => {
     try {
-        if (!firebaseReady) {
-            return res.status(503).json({ error: 'Firebase not ready' });
-        }
-        
         const { userId } = req.params;
         const { product } = req.body;
-        
-        if (!product || !product.name) {
-            return res.status(400).json({ error: 'Product name is required' });
-        }
-        
+        if (!product || !product.name) return res.status(400).json({ error: 'Name required' });
         const doc = await db.collection('inventory').doc(userId).get();
         let items = doc.exists ? doc.data().items || [] : [];
-        
         const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
         const newProduct = { id: newId, ...product, addedAt: new Date().toISOString() };
         items.push(newProduct);
-        
-        await db.collection('inventory').doc(userId).set({
-            items: items,
-            lastUpdated: new Date().toISOString(),
-            itemCount: items.length
-        });
-        
-        res.json({ success: true, product: newProduct, total: items.length });
+        await db.collection('inventory').doc(userId).set({ items, lastUpdated: new Date().toISOString(), itemCount: items.length });
+        res.json({ success: true, product: newProduct });
     } catch (error) {
         console.error('❌ Error:', error.message);
         res.status(500).json({ error: error.message });
@@ -340,13 +228,8 @@ app.post('/api/inventory/:userId/add', async (req, res) => {
 // ============================================================
 app.get('/api/subscription/:userId', async (req, res) => {
     try {
-        if (!firebaseReady) {
-            return res.status(503).json({ error: 'Firebase not ready' });
-        }
-        
         const { userId } = req.params;
         const doc = await db.collection('subscriptions').doc(userId).get();
-        
         if (!doc.exists) {
             const trialEnd = new Date();
             trialEnd.setDate(trialEnd.getDate() + 14);
@@ -377,7 +260,6 @@ app.get('/api/subscription/:userId', async (req, res) => {
             await db.collection('subscriptions').doc(userId).set(subscription);
             return res.json(subscription);
         }
-        
         res.json(doc.data());
     } catch (error) {
         console.error('❌ Error:', error.message);
@@ -390,20 +272,13 @@ app.get('/api/subscription/:userId', async (req, res) => {
 // ============================================================
 app.get('/api/usage/:userId/:type', async (req, res) => {
     try {
-        if (!firebaseReady) {
-            return res.status(503).json({ error: 'Firebase not ready' });
-        }
-        
         const { userId, type } = req.params;
         const doc = await db.collection('subscriptions').doc(userId).get();
-        
         if (!doc.exists) {
             return res.json({ current: 0, limit: 50, remaining: 50, percentageUsed: 0 });
         }
-        
         const data = doc.data();
         let current = 0, limit = 50;
-        
         switch (type) {
             case 'products':
                 current = data.usage?.productsCount || 0;
@@ -420,10 +295,8 @@ app.get('/api/usage/:userId/:type', async (req, res) => {
             default:
                 return res.json({ current: 0, limit: 0, remaining: 0, percentageUsed: 0 });
         }
-        
         const remaining = Math.max(0, limit - current);
         const percentageUsed = limit > 0 ? (current / limit) * 100 : 0;
-        
         res.json({ current, limit, remaining, percentageUsed });
     } catch (error) {
         console.error('❌ Error:', error.message);
@@ -432,13 +305,10 @@ app.get('/api/usage/:userId/:type', async (req, res) => {
 });
 
 // ============================================================
-// 🛡️ ADMIN ENDPOINTS
+// 🛡️ ADMIN
 // ============================================================
 app.get('/api/admin/users', async (req, res) => {
     try {
-        if (!firebaseReady) {
-            return res.status(503).json({ error: 'Firebase not ready' });
-        }
         const snapshot = await db.collection('users').get();
         const users = snapshot.docs.map(doc => ({ id: doc.id, uid: doc.id, ...doc.data() }));
         res.json(users);
@@ -450,9 +320,6 @@ app.get('/api/admin/users', async (req, res) => {
 
 app.get('/api/admin/subscriptions', async (req, res) => {
     try {
-        if (!firebaseReady) {
-            return res.status(503).json({ error: 'Firebase not ready' });
-        }
         const snapshot = await db.collection('subscriptions').get();
         const subscriptions = snapshot.docs.map(doc => ({ id: doc.id, userId: doc.id, ...doc.data() }));
         res.json(subscriptions);
@@ -464,34 +331,20 @@ app.get('/api/admin/subscriptions', async (req, res) => {
 
 app.get('/api/admin/stats', async (req, res) => {
     try {
-        if (!firebaseReady) {
-            return res.status(503).json({ error: 'Firebase not ready' });
-        }
-        
         const usersSnapshot = await db.collection('users').get();
         const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
         const subsSnapshot = await db.collection('subscriptions').get();
         const subscriptions = subsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
         const activeSubs = subscriptions.filter(s => s.status === 'active').length;
         const trialUsers = subscriptions.filter(s => s.status === 'trial_active').length;
-        
         const planPrices = { BASIC: 2500, PROFESSIONAL: 5900, ENTERPRISE: 14900 };
-        const totalRevenue = subscriptions
-            .filter(s => s.status === 'active')
-            .reduce((sum, s) => sum + (planPrices[s.planId] || 0), 0);
-        
+        const totalRevenue = subscriptions.filter(s => s.status === 'active').reduce((sum, s) => sum + (planPrices[s.planId] || 0), 0);
         res.json({
             totalUsers: users.length,
             activeSubscriptions: activeSubs,
             trialUsers: trialUsers,
             totalRevenue: totalRevenue,
-            recentUsers: users.slice(0, 5).map(u => ({
-                name: u.name || 'Unknown',
-                email: u.email || '',
-                createdAt: u.createdAt || new Date().toISOString()
-            }))
+            recentUsers: users.slice(0, 5).map(u => ({ name: u.name || 'Unknown', email: u.email || '', createdAt: u.createdAt || new Date().toISOString() }))
         });
     } catch (error) {
         console.error('❌ Error:', error.message);
@@ -503,12 +356,7 @@ app.get('/api/admin/stats', async (req, res) => {
 // 🌐 ROOT
 // ============================================================
 app.get('/', (req, res) => {
-    res.json({
-        message: 'ShelfLife AI Backend',
-        status: firebaseReady ? 'Online' : 'Offline',
-        firebase: firebaseReady ? 'Connected' : 'Disconnected',
-        timestamp: new Date().toISOString()
-    });
+    res.json({ message: 'ShelfLife AI Backend', status: firebaseReady ? 'Online' : 'Offline' });
 });
 
 // ============================================================
@@ -516,16 +364,13 @@ app.get('/', (req, res) => {
 // ============================================================
 app.use((err, req, res, next) => {
     console.error('❌ Server Error:', err);
-    res.status(500).json({
-        error: 'Internal server error',
-        message: err.message || 'Something went wrong'
-    });
+    res.status(500).json({ error: 'Internal server error', message: err.message });
 });
 
 // ============================================================
 // 🚀 EXPORT
 // ============================================================
-module.exports = app;
+export default app;
 
 // Local development
 if (process.env.NODE_ENV !== 'production') {
