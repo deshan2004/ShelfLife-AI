@@ -1,4 +1,8 @@
-// server.cjs - Complete backend with all endpoints (Vercel-ready)
+// server.cjs - Complete backend with all endpoints
+// ============================================================
+// 📌 SHELFLIFE AI BACKEND - VERCEL DEPLOYMENT READY
+// ============================================================
+
 const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
@@ -6,7 +10,7 @@ const cors = require('cors');
 const app = express();
 
 // ============================================================
-// GLOBAL ERROR HANDLING (Vercel serverless සඳහා)
+// 🔥 GLOBAL ERROR HANDLING
 // ============================================================
 process.on('uncaughtException', (err) => {
     console.error('❌ Uncaught Exception:', err);
@@ -16,26 +20,49 @@ process.on('unhandledRejection', (err) => {
     console.error('❌ Unhandled Rejection:', err);
 });
 
-// Middleware
+// ============================================================
+// 📦 MIDDLEWARE
+// ============================================================
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
 // ============================================================
-// 🔥 FIREBASE ADMIN INITIALIZATION (ENV vars හෝ JSON file)
+// 🔥 FIREBASE ADMIN INITIALIZATION
 // ============================================================
 let firebaseInitialized = false;
 let db = null;
 let auth = null;
 
+console.log('🚀 Starting Firebase Admin initialization...');
+console.log('📡 Environment:', process.env.NODE_ENV || 'development');
+
 try {
     if (!admin.apps.length) {
-        // 🚀 Vercel / Production - Environment Variables වලින්
-        if (process.env.FIREBASE_PRIVATE_KEY &&
-            process.env.FIREBASE_PROJECT_ID &&
-            process.env.FIREBASE_CLIENT_EMAIL) {
-            
+        // Check for Vercel environment variables
+        const hasProjectId = !!process.env.FIREBASE_PROJECT_ID;
+        const hasClientEmail = !!process.env.FIREBASE_CLIENT_EMAIL;
+        const hasPrivateKey = !!process.env.FIREBASE_PRIVATE_KEY;
+        
+        console.log('📋 Environment Variables Status:');
+        console.log(`   FIREBASE_PROJECT_ID: ${hasProjectId ? '✅' : '❌'}`);
+        console.log(`   FIREBASE_CLIENT_EMAIL: ${hasClientEmail ? '✅' : '❌'}`);
+        console.log(`   FIREBASE_PRIVATE_KEY: ${hasPrivateKey ? '✅' : '❌'}`);
+        
+        if (hasProjectId && hasClientEmail && hasPrivateKey) {
+            // 🚀 Production / Vercel - Use Environment Variables
             try {
-                const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+                let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+                
+                // Remove surrounding quotes if present
+                if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+                    privateKey = privateKey.slice(1, -1);
+                }
+                // Replace literal \n with actual newlines
+                privateKey = privateKey.replace(/\\n/g, '\n');
+                
+                console.log('🔑 Private Key length:', privateKey.length);
+                console.log('🔑 Private Key starts with: BEGIN PRIVATE KEY');
+                console.log('🔑 Private Key ends with: END PRIVATE KEY');
                 
                 admin.initializeApp({
                     credential: admin.credential.cert({
@@ -51,10 +78,12 @@ try {
                 console.log(`📧 Client Email: ${process.env.FIREBASE_CLIENT_EMAIL}`);
                 
             } catch (initError) {
-                console.error('❌ Firebase Admin init with ENV failed:', initError.message);
+                console.error('❌ Firebase Admin ENV init failed:', initError.message);
+                console.error('   Stack:', initError.stack);
             }
         } else {
             // 💻 Local Development - serviceAccountKey.json භාවිතා කරන්න
+            console.log('📁 Trying to load serviceAccountKey.json...');
             try {
                 const serviceAccount = require('./serviceAccountKey.json');
                 admin.initializeApp({
@@ -64,6 +93,7 @@ try {
                 console.log('✅ Firebase Admin initialized using serviceAccountKey.json');
             } catch (fileError) {
                 console.error('❌ serviceAccountKey.json not found:', fileError.message);
+                console.error('   Please ensure serviceAccountKey.json exists or set FIREBASE_* env vars.');
             }
         }
     } else {
@@ -72,737 +102,102 @@ try {
     }
 } catch (error) {
     console.error('❌ Firebase initialization error:', error.message);
+    console.error('   Stack:', error.stack);
 }
 
+// Set db and auth references
 if (firebaseInitialized) {
-    db = admin.firestore();
-    auth = admin.auth();
+    try {
+        db = admin.firestore();
+        auth = admin.auth();
+        console.log('✅ Firestore and Auth references created');
+    } catch (dbError) {
+        console.error('❌ Failed to create db/auth references:', dbError.message);
+        firebaseInitialized = false;
+    }
 } else {
-    console.warn('⚠️ Firebase not initialized – database operations will fail');
+    console.warn('⚠️ Firebase not initialized - Database operations will fail');
 }
 
 // ============================================================
-// 🛡️ Middleware – Firebase status check
+// 🛡️ MIDDLEWARE - Check Firebase status
 // ============================================================
 app.use((req, res, next) => {
-    if (!firebaseInitialized && !req.path.startsWith('/api/health')) {
+    // Skip health check
+    if (req.path === '/api/health') return next();
+    
+    if (!firebaseInitialized) {
+        console.error('🔥 Firebase not initialized! Request blocked:', req.path);
         return res.status(503).json({
             error: 'Service unavailable',
-            message: 'Firebase initialization failed. Please check server logs.',
-            status: 'firebase_not_initialized'
+            message: 'Firebase initialization failed. Check environment variables.',
+            status: 'firebase_not_initialized',
+            timestamp: new Date().toISOString()
         });
     }
     next();
 });
 
 // ============================================================
-// ✅ HEALTH CHECK (Firebase status ඇතුළුව)
+// ✅ HEALTH CHECK
 // ============================================================
 app.get('/api/health', (req, res) => {
     res.json({
         status: firebaseInitialized ? 'healthy' : 'unhealthy',
         firebase: firebaseInitialized ? 'connected' : 'disconnected',
         timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development'
+        environment: process.env.NODE_ENV || 'development',
+        envVars: {
+            FIREBASE_PROJECT_ID: !!process.env.FIREBASE_PROJECT_ID,
+            FIREBASE_CLIENT_EMAIL: !!process.env.FIREBASE_CLIENT_EMAIL,
+            FIREBASE_PRIVATE_KEY: !!process.env.FIREBASE_PRIVATE_KEY,
+            VITE_FIREBASE_API_KEY: !!process.env.VITE_FIREBASE_API_KEY,
+            VITE_FIREBASE_PROJECT_ID: !!process.env.VITE_FIREBASE_PROJECT_ID
+        }
     });
 });
 
 // ============================================================
-// 📌 ROOT – API overview
+// 📌 ROOT
 // ============================================================
 app.get('/', (req, res) => {
     res.json({
         message: 'ShelfLife AI Backend',
-        status: firebaseInitialized ? 'Online' : 'Offline (Firebase not ready)',
+        status: firebaseInitialized ? 'Online' : 'Offline',
         firebase: firebaseInitialized ? 'Connected' : 'Disconnected',
         timestamp: new Date().toISOString(),
         endpoints: {
             health: 'GET /api/health',
+            suppliers: 'GET /api/suppliers/:userId',
+            addSupplier: 'POST /api/suppliers/:userId/add',
+            inventory: 'GET /api/inventory/:userId',
+            addProduct: 'POST /api/inventory/:userId/add',
+            subscription: 'GET /api/subscription/:userId',
+            usage: 'GET /api/usage/:userId/:type',
             admin: {
                 users: 'GET /api/admin/users',
                 subscriptions: 'GET /api/admin/subscriptions',
-                inventory: 'GET /api/admin/inventory',
-                inventoryByShop: 'GET /api/admin/inventory/by-shop',
-                suppliers: 'GET /api/admin/suppliers',
-                suppliersByShop: 'GET /api/admin/suppliers/by-shop',
-                payments: 'GET /api/admin/payments',
-                scans: 'GET /api/admin/scans',
-                stats: 'GET /api/admin/stats',
-                seed: 'POST /api/seed/data'
-            },
-            user: {
-                suppliers: 'GET /api/suppliers/:userId',
-                addSupplier: 'POST /api/suppliers/:userId/add',
-                updateSupplier: 'PUT /api/suppliers/:userId/update/:supplierId',
-                deleteSupplier: 'DELETE /api/suppliers/:userId/delete/:supplierId',
-                inventory: 'GET /api/inventory/:userId',
-                addProduct: 'POST /api/inventory/:userId/add',
-                updateProduct: 'PUT /api/inventory/:userId/update',
-                deleteProduct: 'DELETE /api/inventory/:userId/delete/:itemId',
-                subscription: 'GET /api/subscription/:userId',
-                usage: 'GET /api/usage/:userId/:type'
+                stats: 'GET /api/admin/stats'
             }
         }
     });
-});
-
-// ============================================================
-// 🛡️ ADMIN ENDPOINTS
-// ============================================================
-
-// 1. GET ALL USERS
-app.get('/api/admin/users', async (req, res) => {
-    try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
-        const snapshot = await db.collection('users').get();
-        const users = snapshot.docs.map(doc => ({
-            id: doc.id,
-            uid: doc.id,
-            ...doc.data()
-        }));
-        res.json(users);
-    } catch (error) {
-        console.error('Get users error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 2. GET ALL SUBSCRIPTIONS
-app.get('/api/admin/subscriptions', async (req, res) => {
-    try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
-        const snapshot = await db.collection('subscriptions').get();
-        const subscriptions = snapshot.docs.map(doc => ({
-            id: doc.id,
-            userId: doc.id,
-            ...doc.data()
-        }));
-        res.json(subscriptions);
-    } catch (error) {
-        console.error('Get subscriptions error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 3. GET ALL INVENTORY (Flat List)
-app.get('/api/admin/inventory', async (req, res) => {
-    try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
-        const usersSnapshot = await db.collection('users').get();
-        const allProducts = [];
-
-        for (const userDoc of usersSnapshot.docs) {
-            const userId = userDoc.id;
-            const userData = userDoc.data();
-            
-            try {
-                const invDoc = await db.collection('inventory').doc(userId).get();
-                if (invDoc.exists) {
-                    const items = invDoc.data().items || [];
-                    items.forEach(item => {
-                        allProducts.push({
-                            ...item,
-                            ownerId: userId,
-                            ownerName: userData.name || 'Unknown',
-                            ownerEmail: userData.email || '',
-                            ownerAvatar: (userData.name || 'U').charAt(0).toUpperCase(),
-                            shopName: userData.businessName || userData.name || 'Unknown Shop'
-                        });
-                    });
-                }
-            } catch (e) {
-                console.log(`No inventory for user ${userId}`);
-            }
-        }
-
-        res.json(allProducts);
-    } catch (error) {
-        console.error('Get inventory error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 4. GET INVENTORY BY SHOP (Grouped by User/Shop)
-app.get('/api/admin/inventory/by-shop', async (req, res) => {
-    try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
-        const usersSnapshot = await db.collection('users').get();
-        const groupedInventory = {};
-
-        for (const userDoc of usersSnapshot.docs) {
-            const userId = userDoc.id;
-            const userData = userDoc.data();
-            
-            const shopKey = userId;
-            groupedInventory[shopKey] = {
-                shopId: userId,
-                shopName: userData.businessName || userData.name || 'Unknown Shop',
-                ownerName: userData.name || 'Unknown',
-                ownerEmail: userData.email || '',
-                products: []
-            };
-
-            try {
-                const invDoc = await db.collection('inventory').doc(userId).get();
-                if (invDoc.exists) {
-                    const items = invDoc.data().items || [];
-                    items.forEach(item => {
-                        groupedInventory[shopKey].products.push({
-                            ...item,
-                            ownerId: userId
-                        });
-                    });
-                }
-            } catch (e) {
-                console.log(`No inventory for user ${userId}`);
-            }
-        }
-
-        const result = Object.values(groupedInventory);
-        res.json(result);
-    } catch (error) {
-        console.error('Get grouped inventory error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 5. GET ALL SUPPLIERS (Flat List)
-app.get('/api/admin/suppliers', async (req, res) => {
-    try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
-        const usersSnapshot = await db.collection('users').get();
-        const allSuppliers = [];
-
-        for (const userDoc of usersSnapshot.docs) {
-            const userId = userDoc.id;
-            const userData = userDoc.data();
-            
-            try {
-                const supplierDoc = await db.collection('suppliers').doc(userId).get();
-                if (supplierDoc.exists) {
-                    const supplierList = supplierDoc.data().list || [];
-                    supplierList.forEach(supplier => {
-                        allSuppliers.push({
-                            ...supplier,
-                            ownerId: userId,
-                            ownerName: userData.name || 'Unknown',
-                            ownerEmail: userData.email || '',
-                            shopName: userData.businessName || userData.name || 'Unknown Shop',
-                            productCount: 0
-                        });
-                    });
-                }
-            } catch (e) {
-                console.log(`No suppliers for user ${userId}`);
-            }
-        }
-
-        // Count products for each supplier
-        for (const supplier of allSuppliers) {
-            try {
-                const invDoc = await db.collection('inventory').doc(supplier.ownerId).get();
-                if (invDoc.exists) {
-                    const items = invDoc.data().items || [];
-                    supplier.productCount = items.filter(item => item.supplier === supplier.name).length;
-                }
-            } catch (e) {}
-        }
-
-        res.json(allSuppliers);
-    } catch (error) {
-        console.error('Get all suppliers error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 6. GET SUPPLIERS BY SHOP (Grouped by User/Shop)
-app.get('/api/admin/suppliers/by-shop', async (req, res) => {
-    try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
-        const usersSnapshot = await db.collection('users').get();
-        const groupedSuppliers = {};
-
-        for (const userDoc of usersSnapshot.docs) {
-            const userId = userDoc.id;
-            const userData = userDoc.data();
-            
-            const shopKey = userId;
-            groupedSuppliers[shopKey] = {
-                shopId: userId,
-                shopName: userData.businessName || userData.name || 'Unknown Shop',
-                ownerName: userData.name || 'Unknown',
-                ownerEmail: userData.email || '',
-                suppliers: []
-            };
-
-            try {
-                const supplierDoc = await db.collection('suppliers').doc(userId).get();
-                if (supplierDoc.exists) {
-                    const supplierList = supplierDoc.data().list || [];
-                    
-                    let items = [];
-                    try {
-                        const invDoc = await db.collection('inventory').doc(userId).get();
-                        if (invDoc.exists) {
-                            items = invDoc.data().items || [];
-                        }
-                    } catch (e) {}
-
-                    supplierList.forEach(supplier => {
-                        const productCount = items.filter(item => item.supplier === supplier.name).length;
-                        groupedSuppliers[shopKey].suppliers.push({
-                            ...supplier,
-                            productCount: productCount
-                        });
-                    });
-                }
-            } catch (e) {
-                console.log(`No suppliers for user ${userId}`);
-            }
-        }
-
-        const result = Object.values(groupedSuppliers);
-        res.json(result);
-    } catch (error) {
-        console.error('Get grouped suppliers error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 7. GET ALL PAYMENTS
-app.get('/api/admin/payments', async (req, res) => {
-    try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
-        const snapshot = await db.collection('payments').get();
-        const payments = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-        res.json(payments);
-    } catch (error) {
-        console.error('Get payments error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 8. GET ALL SCANS
-app.get('/api/admin/scans', async (req, res) => {
-    try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
-        const snapshot = await db.collection('scans')
-            .orderBy('createdAt', 'desc')
-            .limit(100)
-            .get();
-        const scans = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-        res.json(scans);
-    } catch (error) {
-        console.error('Get scans error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 9. GET ADMIN STATS (Dashboard Summary)
-app.get('/api/admin/stats', async (req, res) => {
-    try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
-        const usersSnapshot = await db.collection('users').get();
-        const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const totalUsers = users.length;
-
-        const subsSnapshot = await db.collection('subscriptions').get();
-        const subscriptions = subsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        const activeSubs = subscriptions.filter(s => s.status === 'active').length;
-        const trialUsers = subscriptions.filter(s => s.status === 'trial_active').length;
-        const expiredTrials = subscriptions.filter(s => s.status === 'trial_expired').length;
-        
-        const planPrices = { BASIC: 2500, PROFESSIONAL: 5900, ENTERPRISE: 14900 };
-        const totalRevenue = subscriptions
-            .filter(s => s.status === 'active')
-            .reduce((sum, s) => sum + (planPrices[s.planId] || 0), 0);
-
-        let totalProducts = 0;
-        for (const user of users) {
-            try {
-                const invDoc = await db.collection('inventory').doc(user.id).get();
-                if (invDoc.exists) {
-                    totalProducts += (invDoc.data().items || []).length;
-                }
-            } catch (e) {}
-        }
-
-        let totalSuppliers = 0;
-        for (const user of users) {
-            try {
-                const supplierDoc = await db.collection('suppliers').doc(user.id).get();
-                if (supplierDoc.exists) {
-                    totalSuppliers += (supplierDoc.data().list || []).length;
-                }
-            } catch (e) {}
-        }
-
-        const scansSnapshot = await db.collection('scans').get();
-        const totalScans = scansSnapshot.size;
-
-        const recentUsers = users
-            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-            .slice(0, 5)
-            .map(u => ({
-                name: u.name || 'Unknown',
-                email: u.email || '',
-                createdAt: u.createdAt || new Date().toISOString()
-            }));
-
-        const shopProductCounts = [];
-        for (const user of users) {
-            try {
-                const invDoc = await db.collection('inventory').doc(user.id).get();
-                if (invDoc.exists) {
-                    const count = (invDoc.data().items || []).length;
-                    shopProductCounts.push({
-                        shopName: user.businessName || user.name || 'Unknown',
-                        productCount: count
-                    });
-                }
-            } catch (e) {}
-        }
-        shopProductCounts.sort((a, b) => b.productCount - a.productCount);
-
-        res.json({
-            totalUsers,
-            totalProducts,
-            totalSuppliers,
-            totalScans,
-            totalRevenue,
-            activeSubscriptions: activeSubs,
-            trialUsers,
-            expiredTrials,
-            recentUsers,
-            topShops: shopProductCounts.slice(0, 5),
-            subscriptions
-        });
-    } catch (error) {
-        console.error('Get stats error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 10. UPDATE USER ROLE
-app.put('/api/admin/users/:uid/role', async (req, res) => {
-    try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
-        const { uid } = req.params;
-        const { role } = req.body;
-
-        await db.collection('users').doc(uid).update({
-            role: role,
-            updatedAt: new Date().toISOString()
-        });
-
-        res.json({ success: true, message: `User role updated to ${role}` });
-    } catch (error) {
-        console.error('Update role error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 11. DELETE USER
-app.delete('/api/admin/users/:uid', async (req, res) => {
-    try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
-        const { uid } = req.params;
-
-        await db.collection('users').doc(uid).delete();
-        await db.collection('subscriptions').doc(uid).delete();
-        await db.collection('inventory').doc(uid).delete();
-        await db.collection('suppliers').doc(uid).delete();
-
-        const scansSnapshot = await db.collection('scans')
-            .where('userId', '==', uid)
-            .get();
-        for (const doc of scansSnapshot.docs) {
-            await doc.ref.delete();
-        }
-
-        const paymentsSnapshot = await db.collection('payments')
-            .where('userId', '==', uid)
-            .get();
-        for (const doc of paymentsSnapshot.docs) {
-            await doc.ref.delete();
-        }
-
-        res.json({ success: true, message: 'User deleted successfully' });
-    } catch (error) {
-        console.error('Delete user error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 12. EXTEND TRIAL
-app.post('/api/admin/subscriptions/:uid/extend', async (req, res) => {
-    try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
-        const { uid } = req.params;
-        const { days } = req.body;
-
-        const subDoc = await db.collection('subscriptions').doc(uid).get();
-        if (!subDoc.exists) {
-            return res.status(404).json({ error: 'Subscription not found' });
-        }
-
-        const currentEnd = new Date(subDoc.data().trialEnd || new Date());
-        const newEnd = new Date(currentEnd);
-        newEnd.setDate(newEnd.getDate() + (days || 7));
-
-        await db.collection('subscriptions').doc(uid).update({
-            trialEnd: newEnd.toISOString(),
-            status: 'trial_active',
-            updatedAt: new Date().toISOString()
-        });
-
-        res.json({ 
-            success: true, 
-            message: `Trial extended by ${days || 7} days`,
-            newEnd: newEnd.toISOString()
-        });
-    } catch (error) {
-        console.error('Extend trial error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 13. UPGRADE PLAN
-app.post('/api/admin/subscriptions/:uid/upgrade', async (req, res) => {
-    try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
-        const { uid } = req.params;
-        const { planId } = req.body;
-
-        const planLimits = {
-            BASIC: { maxProducts: 200, maxSuppliers: 25, maxScansPerMonth: 500 },
-            PROFESSIONAL: { maxProducts: 1000, maxSuppliers: 100, maxScansPerMonth: 2000 },
-            ENTERPRISE: { maxProducts: Infinity, maxSuppliers: Infinity, maxScansPerMonth: Infinity }
-        };
-
-        const planFeatures = {
-            BASIC: { canSupplierReturn: true, canBasicAnalytics: true },
-            PROFESSIONAL: { canOCRScan: true, canSupplierReturn: true, canAdvancedAnalytics: true, canPrioritySupport: true, canExportData: true },
-            ENTERPRISE: { canOCRScan: true, canSupplierReturn: true, canAdvancedAnalytics: true, canPrioritySupport: true, canAPIAccess: true, canMultiUser: true, canExportData: true, canCustomReports: true }
-        };
-
-        const limits = planLimits[planId] || planLimits.BASIC;
-        const features = planFeatures[planId] || planFeatures.BASIC;
-
-        await db.collection('subscriptions').doc(uid).update({
-            planId: planId,
-            status: 'active',
-            limits: limits,
-            features: {
-                canBasicScan: true,
-                canBarcodeScan: true,
-                canFlashSale: true,
-                canBasicAnalytics: true,
-                ...features
-            },
-            updatedAt: new Date().toISOString()
-        });
-
-        res.json({ success: true, message: `Upgraded to ${planId} successfully` });
-    } catch (error) {
-        console.error('Upgrade plan error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 14. SEED TEST DATA
-app.post('/api/seed/data', async (req, res) => {
-    try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
-        const { adminUid } = req.body;
-
-        const testUsers = [
-            {
-                uid: 'test_user_1',
-                name: 'Dineth Perera',
-                email: 'dineth@example.com',
-                role: 'user',
-                businessName: 'Dineth Supermarket',
-                createdAt: new Date().toISOString()
-            },
-            {
-                uid: 'test_user_2',
-                name: 'Kamal Silva',
-                email: 'kamal@example.com',
-                role: 'user',
-                businessName: 'Kamal Grocery Store',
-                createdAt: new Date().toISOString()
-            },
-            {
-                uid: 'test_user_3',
-                name: 'Nimal Fernando',
-                email: 'nimal@example.com',
-                role: 'user',
-                businessName: 'Nimal Fresh Mart',
-                createdAt: new Date().toISOString()
-            }
-        ];
-
-        const testSuppliers = {
-            'test_user_1': [
-                { name: 'Dairy Farms', contact: '+94 11 234 5678', email: 'orders@dairyfarms.lk', address: 'Colombo', rating: 5, notes: 'Best dairy products' },
-                { name: 'Bakery Hub', contact: '+94 77 345 6789', email: 'info@bakeryhub.lk', address: 'Kandy', rating: 4, notes: 'Fresh bread daily' },
-                { name: 'Global Foods', contact: '+94 11 456 7890', email: 'sales@globalfoods.lk', address: 'Negombo', rating: 3, notes: 'Good canned goods' }
-            ],
-            'test_user_2': [
-                { name: 'Local Mart', contact: '+94 55 678 9012', email: 'orders@localmart.lk', address: 'Galle', rating: 4, notes: 'Reliable supplier' },
-                { name: 'HealthVibe', contact: '+94 77 890 1234', email: 'contact@healthvibe.lk', address: 'Colombo', rating: 5, notes: 'Excellent service' }
-            ],
-            'test_user_3': [
-                { name: 'Fresh Farms', contact: '+94 66 234 5678', email: 'info@freshfarms.lk', address: 'Kurunegala', rating: 4, notes: 'Organic products' },
-                { name: 'Spice World', contact: '+94 88 345 6789', email: 'sales@spiceworld.lk', address: 'Matale', rating: 3, notes: 'Good spices' }
-            ]
-        };
-
-        for (const user of testUsers) {
-            await db.collection('users').doc(user.uid).set(user);
-
-            const trialEnd = new Date();
-            trialEnd.setDate(trialEnd.getDate() + 14);
-            
-            const isPro = user.uid === 'test_user_1';
-            await db.collection('subscriptions').doc(user.uid).set({
-                userId: user.uid,
-                planId: isPro ? 'PROFESSIONAL' : 'FREE_TRIAL',
-                status: isPro ? 'active' : 'trial_active',
-                trialStart: new Date().toISOString(),
-                trialEnd: trialEnd.toISOString(),
-                features: {
-                    canBasicScan: true,
-                    canOCRScan: isPro,
-                    canBarcodeScan: true,
-                    canFlashSale: true,
-                    canSupplierReturn: isPro,
-                    canBasicAnalytics: true,
-                    canAdvancedAnalytics: isPro,
-                    canPrioritySupport: isPro
-                },
-                limits: {
-                    maxProducts: isPro ? 1000 : 50,
-                    maxSuppliers: isPro ? 100 : 10,
-                    maxScansPerMonth: isPro ? 2000 : 100
-                },
-                usage: {
-                    productsCount: isPro ? 8 : 4,
-                    suppliersCount: testSuppliers[user.uid]?.length || 0,
-                    scansThisMonth: 10
-                },
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            });
-
-            const shopProducts = {
-                'test_user_1': [
-                    { id: 1, name: 'Fresh Milk (1L)', batch: 'B001', supplier: 'Dairy Farms', stock: 24, expiryDate: '2026-08-15', costPrice: 280, sellingPrice: 350, lowStockThreshold: 10 },
-                    { id: 2, name: 'Greek Yogurt', batch: 'B002', supplier: 'Dairy Farms', stock: 15, expiryDate: '2026-07-20', costPrice: 180, sellingPrice: 220, lowStockThreshold: 8 },
-                    { id: 3, name: 'Wheat Bread', batch: 'B003', supplier: 'Bakery Hub', stock: 5, expiryDate: '2026-07-05', costPrice: 120, sellingPrice: 150, lowStockThreshold: 10 },
-                    { id: 4, name: 'Canned Beans', batch: 'B004', supplier: 'Global Foods', stock: 40, expiryDate: '2026-09-01', costPrice: 250, sellingPrice: 320, lowStockThreshold: 15 },
-                    { id: 5, name: 'Butter (500g)', batch: 'B005', supplier: 'Dairy Farms', stock: 12, expiryDate: '2026-08-25', costPrice: 450, sellingPrice: 550, lowStockThreshold: 8 }
-                ],
-                'test_user_2': [
-                    { id: 1, name: 'Tomato Ketchup', batch: 'B101', supplier: 'Local Mart', stock: 18, expiryDate: '2026-08-10', costPrice: 380, sellingPrice: 450, lowStockThreshold: 12 },
-                    { id: 2, name: 'Probiotic Drink', batch: 'B102', supplier: 'HealthVibe', stock: 9, expiryDate: '2026-07-14', costPrice: 420, sellingPrice: 520, lowStockThreshold: 15 },
-                    { id: 3, name: 'Chili Sauce', batch: 'B103', supplier: 'Local Mart', stock: 25, expiryDate: '2026-09-20', costPrice: 320, sellingPrice: 400, lowStockThreshold: 10 }
-                ],
-                'test_user_3': [
-                    { id: 1, name: 'Organic Rice (5kg)', batch: 'B201', supplier: 'Fresh Farms', stock: 30, expiryDate: '2026-10-01', costPrice: 850, sellingPrice: 950, lowStockThreshold: 20 },
-                    { id: 2, name: 'Cinnamon Sticks', batch: 'B202', supplier: 'Spice World', stock: 8, expiryDate: '2026-11-15', costPrice: 1200, sellingPrice: 1500, lowStockThreshold: 5 },
-                    { id: 3, name: 'Coconut Oil (1L)', batch: 'B203', supplier: 'Fresh Farms', stock: 20, expiryDate: '2026-09-30', costPrice: 550, sellingPrice: 700, lowStockThreshold: 10 }
-                ]
-            };
-
-            const products = shopProducts[user.uid] || [];
-            const productsWithStatus = products.map(p => {
-                const daysLeft = Math.ceil((new Date(p.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
-                let status = 'good';
-                let suggestion = 'Normal Stock';
-                if (daysLeft <= 0) { status = 'expired'; suggestion = 'DISPOSE / Return to supplier'; }
-                else if (daysLeft <= 3) { status = 'critical'; suggestion = 'URGENT: Flash Sale NOW!'; }
-                else if (daysLeft <= 7) { status = 'warning'; suggestion = 'Flash Sale recommended'; }
-                return { ...p, daysLeft, status, suggestion, addedAt: new Date().toISOString() };
-            });
-
-            await db.collection('inventory').doc(user.uid).set({
-                items: productsWithStatus,
-                lastUpdated: new Date().toISOString(),
-                itemCount: productsWithStatus.length
-            });
-
-            const supplierList = testSuppliers[user.uid] || [];
-            const suppliersWithId = supplierList.map((s, index) => ({
-                id: `supp_${user.uid}_${index}`,
-                ...s,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            }));
-
-            await db.collection('suppliers').doc(user.uid).set({
-                list: suppliersWithId,
-                updatedAt: new Date().toISOString()
-            });
-
-            if (isPro) {
-                await db.collection('payments').add({
-                    userId: user.uid,
-                    amount: 5900,
-                    planId: 'PROFESSIONAL',
-                    status: 'completed',
-                    paymentId: `pay_${Date.now()}`,
-                    createdAt: new Date().toISOString()
-                });
-            }
-
-            await db.collection('scans').add({
-                userId: user.uid,
-                type: 'barcode',
-                value: '8901234567890',
-                result: 'Success',
-                createdAt: new Date().toISOString()
-            });
-        }
-
-        if (adminUid) {
-            await db.collection('users').doc(adminUid).update({
-                role: 'admin',
-                updatedAt: new Date().toISOString()
-            });
-        }
-
-        res.json({
-            success: true,
-            message: 'Test data added successfully!',
-            users: testUsers.length,
-            subscriptions: testUsers.length,
-            inventory: 'Products added for all users',
-            suppliers: 'Suppliers added for all users'
-        });
-    } catch (error) {
-        console.error('Seed error:', error);
-        res.status(500).json({ error: error.message });
-    }
 });
 
 // ============================================================
 // 👤 USER ENDPOINTS
 // ============================================================
 
-// SUPPLIER MANAGEMENT (User)
+// ============================================================
+// 1. GET SUPPLIERS
+// ============================================================
 app.get('/api/suppliers/:userId', async (req, res) => {
     try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
         const { userId } = req.params;
+        console.log(`📋 Getting suppliers for user: ${userId}`);
+        
         const docRef = db.collection('suppliers').doc(userId);
         const doc = await docRef.get();
         
@@ -813,20 +208,27 @@ app.get('/api/suppliers/:userId', async (req, res) => {
         
         res.json(doc.data());
     } catch (error) {
-        console.error("Get suppliers error:", error);
+        console.error('❌ Get suppliers error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
+// ============================================================
+// 2. ADD SUPPLIER
+// ============================================================
 app.post('/api/suppliers/:userId/add', async (req, res) => {
     try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
         const { userId } = req.params;
         const { name, contact, email, address, rating, notes } = req.body;
         
         if (!name) {
             return res.status(400).json({ error: 'Supplier name is required' });
         }
+        
+        console.log(`📋 Adding supplier for user: ${userId}, name: ${name}`);
         
         const docRef = db.collection('suppliers').doc(userId);
         const doc = await docRef.get();
@@ -849,12 +251,9 @@ app.post('/api/suppliers/:userId/add', async (req, res) => {
         };
         
         list.push(newSupplier);
+        await docRef.set({ list, updatedAt: new Date().toISOString() });
         
-        await docRef.set({
-            list: list,
-            updatedAt: new Date().toISOString()
-        });
-        
+        // Update subscription usage
         const subRef = db.collection('subscriptions').doc(userId);
         const subDoc = await subRef.get();
         if (subDoc.exists) {
@@ -866,16 +265,23 @@ app.post('/api/suppliers/:userId/add', async (req, res) => {
         
         res.status(201).json({ success: true, supplier: newSupplier, total: list.length });
     } catch (error) {
-        console.error("Add supplier error:", error);
+        console.error('❌ Add supplier error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
+// ============================================================
+// 3. UPDATE SUPPLIER
+// ============================================================
 app.put('/api/suppliers/:userId/update/:supplierId', async (req, res) => {
     try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
         const { userId, supplierId } = req.params;
         const updates = req.body;
+        
+        console.log(`📋 Updating supplier: ${supplierId} for user: ${userId}`);
         
         const docRef = db.collection('suppliers').doc(userId);
         const doc = await docRef.get();
@@ -891,28 +297,27 @@ app.put('/api/suppliers/:userId/update/:supplierId', async (req, res) => {
             return res.status(404).json({ error: 'Supplier not found' });
         }
         
-        list[index] = {
-            ...list[index],
-            ...updates,
-            updatedAt: new Date().toISOString()
-        };
-        
-        await docRef.set({
-            list: list,
-            updatedAt: new Date().toISOString()
-        });
+        list[index] = { ...list[index], ...updates, updatedAt: new Date().toISOString() };
+        await docRef.set({ list, updatedAt: new Date().toISOString() });
         
         res.json({ success: true, supplier: list[index] });
     } catch (error) {
-        console.error("Update supplier error:", error);
+        console.error('❌ Update supplier error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
+// ============================================================
+// 4. DELETE SUPPLIER
+// ============================================================
 app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
     try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
         const { userId, supplierId } = req.params;
+        
+        console.log(`📋 Deleting supplier: ${supplierId} for user: ${userId}`);
         
         const docRef = db.collection('suppliers').doc(userId);
         const doc = await docRef.get();
@@ -929,11 +334,7 @@ app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
         }
         
         list.splice(index, 1);
-        
-        await docRef.set({
-            list: list,
-            updatedAt: new Date().toISOString()
-        });
+        await docRef.set({ list, updatedAt: new Date().toISOString() });
         
         const subRef = db.collection('subscriptions').doc(userId);
         await subRef.update({
@@ -943,16 +344,22 @@ app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
         
         res.json({ success: true, total: list.length });
     } catch (error) {
-        console.error("Delete supplier error:", error);
+        console.error('❌ Delete supplier error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// INVENTORY MANAGEMENT (User)
+// ============================================================
+// 5. GET INVENTORY
+// ============================================================
 app.get('/api/inventory/:userId', async (req, res) => {
     try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
         const { userId } = req.params;
+        console.log(`📋 Getting inventory for user: ${userId}`);
+        
         const invDoc = await db.collection('inventory').doc(userId).get();
         
         if (!invDoc.exists) {
@@ -966,20 +373,27 @@ app.get('/api/inventory/:userId', async (req, res) => {
         
         res.json(invDoc.data());
     } catch (error) {
-        console.error("Get inventory error:", error);
+        console.error('❌ Get inventory error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
+// ============================================================
+// 6. ADD PRODUCT
+// ============================================================
 app.post('/api/inventory/:userId/add', async (req, res) => {
     try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
         const { userId } = req.params;
         const { product } = req.body;
         
         if (!product || !product.name) {
             return res.status(400).json({ error: 'Product name is required' });
         }
+        
+        console.log(`📋 Adding product for user: ${userId}, name: ${product.name}`);
         
         const invDoc = await db.collection('inventory').doc(userId).get();
         let items = invDoc.exists ? invDoc.data().items || [] : [];
@@ -988,8 +402,8 @@ app.post('/api/inventory/:userId/add', async (req, res) => {
         const maxProducts = subDoc.exists ? subDoc.data().limits?.maxProducts || 50 : 50;
         
         if (items.length >= maxProducts) {
-            return res.status(403).json({ 
-                error: 'Product limit reached', 
+            return res.status(403).json({
+                error: 'Product limit reached',
                 limit: maxProducts,
                 current: items.length
             });
@@ -1004,24 +418,31 @@ app.post('/api/inventory/:userId/add', async (req, res) => {
             lastUpdated: new Date().toISOString(),
             itemCount: items.length
         });
-
+        
         await db.collection('subscriptions').doc(userId).update({
             'usage.productsCount': items.length,
             updatedAt: new Date().toISOString()
         });
-
+        
         res.json({ success: true, product: newProduct, total: items.length });
     } catch (error) {
-        console.error("Add product error:", error);
+        console.error('❌ Add product error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
+// ============================================================
+// 7. UPDATE PRODUCT
+// ============================================================
 app.put('/api/inventory/:userId/update', async (req, res) => {
     try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
         const { userId } = req.params;
         const { itemId, updates } = req.body;
+        
+        console.log(`📋 Updating product: ${itemId} for user: ${userId}`);
         
         const invDoc = await db.collection('inventory').doc(userId).get();
         let items = invDoc.exists ? invDoc.data().items || [] : [];
@@ -1039,15 +460,22 @@ app.put('/api/inventory/:userId/update', async (req, res) => {
         
         res.json({ success: true, item: items[index] });
     } catch (error) {
-        console.error("Update product error:", error);
+        console.error('❌ Update product error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
+// ============================================================
+// 8. DELETE PRODUCT
+// ============================================================
 app.delete('/api/inventory/:userId/delete/:itemId', async (req, res) => {
     try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
         const { userId, itemId } = req.params;
+        
+        console.log(`📋 Deleting product: ${itemId} for user: ${userId}`);
         
         const invDoc = await db.collection('inventory').doc(userId).get();
         let items = invDoc.exists ? invDoc.data().items || [] : [];
@@ -1066,16 +494,22 @@ app.delete('/api/inventory/:userId/delete/:itemId', async (req, res) => {
         
         res.json({ success: true, total: items.length });
     } catch (error) {
-        console.error("Delete product error:", error);
+        console.error('❌ Delete product error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// SUBSCRIPTION MANAGEMENT (User)
+// ============================================================
+// 9. GET SUBSCRIPTION
+// ============================================================
 app.get('/api/subscription/:userId', async (req, res) => {
     try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
         const { userId } = req.params;
+        console.log(`📋 Getting subscription for user: ${userId}`);
+        
         const subDoc = await db.collection('subscriptions').doc(userId).get();
         
         if (!subDoc.exists) {
@@ -1112,16 +546,22 @@ app.get('/api/subscription/:userId', async (req, res) => {
         
         res.json(subDoc.data());
     } catch (error) {
-        console.error("Get subscription error:", error);
+        console.error('❌ Get subscription error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// USAGE CHECK
+// ============================================================
+// 10. GET USAGE
+// ============================================================
 app.get('/api/usage/:userId/:type', async (req, res) => {
     try {
-        if (!firebaseInitialized) return res.status(503).json({ error: 'Firebase not initialized' });
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
         const { userId, type } = req.params;
+        console.log(`📋 Getting usage for user: ${userId}, type: ${type}`);
+        
         const subDoc = await db.collection('subscriptions').doc(userId).get();
         
         if (!subDoc.exists) {
@@ -1153,34 +593,363 @@ app.get('/api/usage/:userId/:type', async (req, res) => {
         
         res.json({ current, limit, remaining, percentageUsed });
     } catch (error) {
-        console.error("Usage check error:", error);
+        console.error('❌ Usage check error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
 // ============================================================
-// 🧩 FALLBACK ERROR HANDLING MIDDLEWARE (අවසානයේ)
+// 🛡️ ADMIN ENDPOINTS
+// ============================================================
+
+// ============================================================
+// 11. GET ALL USERS (Admin)
+// ============================================================
+app.get('/api/admin/users', async (req, res) => {
+    try {
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
+        console.log('📋 Getting all users (Admin)');
+        
+        const snapshot = await db.collection('users').get();
+        const users = snapshot.docs.map(doc => ({
+            id: doc.id,
+            uid: doc.id,
+            ...doc.data()
+        }));
+        res.json(users);
+    } catch (error) {
+        console.error('❌ Get users error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 12. GET ALL SUBSCRIPTIONS (Admin)
+// ============================================================
+app.get('/api/admin/subscriptions', async (req, res) => {
+    try {
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
+        console.log('📋 Getting all subscriptions (Admin)');
+        
+        const snapshot = await db.collection('subscriptions').get();
+        const subscriptions = snapshot.docs.map(doc => ({
+            id: doc.id,
+            userId: doc.id,
+            ...doc.data()
+        }));
+        res.json(subscriptions);
+    } catch (error) {
+        console.error('❌ Get subscriptions error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 13. GET ADMIN STATS
+// ============================================================
+app.get('/api/admin/stats', async (req, res) => {
+    try {
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
+        console.log('📋 Getting admin stats');
+        
+        const usersSnapshot = await db.collection('users').get();
+        const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const totalUsers = users.length;
+
+        const subsSnapshot = await db.collection('subscriptions').get();
+        const subscriptions = subsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        const activeSubs = subscriptions.filter(s => s.status === 'active').length;
+        const trialUsers = subscriptions.filter(s => s.status === 'trial_active').length;
+        const expiredTrials = subscriptions.filter(s => s.status === 'trial_expired').length;
+        
+        const planPrices = { BASIC: 2500, PROFESSIONAL: 5900, ENTERPRISE: 14900 };
+        const totalRevenue = subscriptions
+            .filter(s => s.status === 'active')
+            .reduce((sum, s) => sum + (planPrices[s.planId] || 0), 0);
+
+        let totalProducts = 0;
+        for (const user of users) {
+            try {
+                const invDoc = await db.collection('inventory').doc(user.id).get();
+                if (invDoc.exists) {
+                    totalProducts += (invDoc.data().items || []).length;
+                }
+            } catch (e) {}
+        }
+
+        const scansSnapshot = await db.collection('scans').get();
+        const totalScans = scansSnapshot.size;
+
+        const recentUsers = users
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, 5)
+            .map(u => ({
+                name: u.name || 'Unknown',
+                email: u.email || '',
+                createdAt: u.createdAt || new Date().toISOString()
+            }));
+
+        res.json({
+            totalUsers,
+            totalProducts,
+            totalScans,
+            totalRevenue,
+            activeSubscriptions: activeSubs,
+            trialUsers,
+            expiredTrials,
+            recentUsers
+        });
+    } catch (error) {
+        console.error('❌ Get stats error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 14. UPDATE USER ROLE (Admin)
+// ============================================================
+app.put('/api/admin/users/:uid/role', async (req, res) => {
+    try {
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
+        const { uid } = req.params;
+        const { role } = req.body;
+        
+        console.log(`📋 Updating user role: ${uid} -> ${role}`);
+        
+        await db.collection('users').doc(uid).update({
+            role: role,
+            updatedAt: new Date().toISOString()
+        });
+        
+        res.json({ success: true, message: `User role updated to ${role}` });
+    } catch (error) {
+        console.error('❌ Update role error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 15. EXTEND TRIAL (Admin)
+// ============================================================
+app.post('/api/admin/subscriptions/:uid/extend', async (req, res) => {
+    try {
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
+        const { uid } = req.params;
+        const { days } = req.body;
+        
+        console.log(`📋 Extending trial: ${uid} by ${days || 7} days`);
+        
+        const subDoc = await db.collection('subscriptions').doc(uid).get();
+        if (!subDoc.exists) {
+            return res.status(404).json({ error: 'Subscription not found' });
+        }
+        
+        const currentEnd = new Date(subDoc.data().trialEnd || new Date());
+        const newEnd = new Date(currentEnd);
+        newEnd.setDate(newEnd.getDate() + (days || 7));
+        
+        await db.collection('subscriptions').doc(uid).update({
+            trialEnd: newEnd.toISOString(),
+            status: 'trial_active',
+            updatedAt: new Date().toISOString()
+        });
+        
+        res.json({ 
+            success: true, 
+            message: `Trial extended by ${days || 7} days`,
+            newEnd: newEnd.toISOString()
+        });
+    } catch (error) {
+        console.error('❌ Extend trial error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 16. UPGRADE PLAN (Admin)
+// ============================================================
+app.post('/api/admin/subscriptions/:uid/upgrade', async (req, res) => {
+    try {
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
+        const { uid } = req.params;
+        const { planId } = req.body;
+        
+        console.log(`📋 Upgrading plan: ${uid} -> ${planId}`);
+        
+        const planLimits = {
+            BASIC: { maxProducts: 200, maxSuppliers: 25, maxScansPerMonth: 500 },
+            PROFESSIONAL: { maxProducts: 1000, maxSuppliers: 100, maxScansPerMonth: 2000 },
+            ENTERPRISE: { maxProducts: Infinity, maxSuppliers: Infinity, maxScansPerMonth: Infinity }
+        };
+        
+        const planFeatures = {
+            BASIC: { canSupplierReturn: true, canBasicAnalytics: true },
+            PROFESSIONAL: { canOCRScan: true, canSupplierReturn: true, canAdvancedAnalytics: true, canPrioritySupport: true, canExportData: true },
+            ENTERPRISE: { canOCRScan: true, canSupplierReturn: true, canAdvancedAnalytics: true, canPrioritySupport: true, canAPIAccess: true, canMultiUser: true, canExportData: true, canCustomReports: true }
+        };
+        
+        const limits = planLimits[planId] || planLimits.BASIC;
+        const features = planFeatures[planId] || planFeatures.BASIC;
+        
+        await db.collection('subscriptions').doc(uid).update({
+            planId: planId,
+            status: 'active',
+            limits: limits,
+            features: {
+                canBasicScan: true,
+                canBarcodeScan: true,
+                canFlashSale: true,
+                canBasicAnalytics: true,
+                ...features
+            },
+            updatedAt: new Date().toISOString()
+        });
+        
+        res.json({ success: true, message: `Upgraded to ${planId} successfully` });
+    } catch (error) {
+        console.error('❌ Upgrade plan error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 17. SEED TEST DATA
+// ============================================================
+app.post('/api/seed/data', async (req, res) => {
+    try {
+        if (!firebaseInitialized) {
+            return res.status(503).json({ error: 'Firebase not initialized' });
+        }
+        console.log('📋 Seeding test data...');
+        
+        const { adminUid } = req.body;
+        
+        const testUsers = [
+            {
+                uid: 'test_user_1',
+                name: 'Dineth Perera',
+                email: 'dineth@example.com',
+                role: 'user',
+                businessName: 'Dineth Supermarket',
+                createdAt: new Date().toISOString()
+            },
+            {
+                uid: 'test_user_2',
+                name: 'Kamal Silva',
+                email: 'kamal@example.com',
+                role: 'user',
+                businessName: 'Kamal Grocery Store',
+                createdAt: new Date().toISOString()
+            },
+            {
+                uid: 'test_user_3',
+                name: 'Nimal Fernando',
+                email: 'nimal@example.com',
+                role: 'user',
+                businessName: 'Nimal Fresh Mart',
+                createdAt: new Date().toISOString()
+            }
+        ];
+        
+        for (const user of testUsers) {
+            await db.collection('users').doc(user.uid).set(user);
+            
+            const trialEnd = new Date();
+            trialEnd.setDate(trialEnd.getDate() + 14);
+            
+            await db.collection('subscriptions').doc(user.uid).set({
+                userId: user.uid,
+                planId: 'FREE_TRIAL',
+                status: 'trial_active',
+                trialStart: new Date().toISOString(),
+                trialEnd: trialEnd.toISOString(),
+                features: {
+                    canBasicScan: true,
+                    canOCRScan: true,
+                    canBarcodeScan: true,
+                    canFlashSale: true,
+                    canSupplierReturn: false,
+                    canBasicAnalytics: true,
+                    canAdvancedAnalytics: false,
+                    canPrioritySupport: false,
+                    canAPIAccess: false,
+                    canMultiUser: false,
+                    canExportData: false,
+                    canCustomReports: false
+                },
+                limits: { maxProducts: 50, maxSuppliers: 10, maxScansPerMonth: 100 },
+                usage: { productsCount: 0, suppliersCount: 0, scansThisMonth: 0 },
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            });
+            
+            await db.collection('inventory').doc(user.uid).set({
+                items: [],
+                lastUpdated: new Date().toISOString(),
+                itemCount: 0
+            });
+            
+            await db.collection('suppliers').doc(user.uid).set({
+                list: [],
+                updatedAt: new Date().toISOString()
+            });
+        }
+        
+        if (adminUid) {
+            await db.collection('users').doc(adminUid).update({
+                role: 'admin',
+                updatedAt: new Date().toISOString()
+            });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Test data added successfully!',
+            users: testUsers.length
+        });
+    } catch (error) {
+        console.error('❌ Seed error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 🚨 GLOBAL ERROR HANDLING MIDDLEWARE (අවසානයේ)
 // ============================================================
 app.use((err, req, res, next) => {
-    console.error('❌ Unhandled server error:', err);
+    console.error('❌ Server Error:', err);
     res.status(500).json({
         error: 'Internal server error',
         message: err.message || 'Something went wrong',
-        status: 'error'
+        timestamp: new Date().toISOString()
     });
 });
 
 // ============================================================
-// 🚀 START SERVER (Local Development Only)
+// 🚀 START SERVER (Local Development Only - Vercel uses serverless)
 // ============================================================
 const PORT = process.env.PORT || 5000;
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {
-        console.log("=".repeat(50));
+        console.log("=".repeat(60));
         console.log(`🚀 ShelfLife AI Backend is running!`);
         console.log(`📍 URL: http://localhost:${PORT}`);
         console.log(`🔥 Firebase: ${firebaseInitialized ? '✅ Connected' : '❌ Failed'}`);
-        console.log("=".repeat(50));
+        console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log("=".repeat(60));
     });
 }
 
