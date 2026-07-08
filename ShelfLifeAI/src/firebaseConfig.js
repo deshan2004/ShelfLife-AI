@@ -30,28 +30,34 @@ import {
 } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: "AIzaSyAsGToU-W0r3TkTK9BR1E6jFNzSJ4UE7Vw",
+  authDomain: "shelflife-ai-141df.firebaseapp.com",
+  projectId: "shelflife-ai-141df",
+  storageBucket: "shelflife-ai-141df.firebasestorage.app",
+  messagingSenderId: "916781512926",
+  appId: "1:916781512926:web:5e2500ab7c7055bfccaa4f"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Initialize services
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// Social Providers
 const googleProvider = new GoogleAuthProvider();
 const githubProvider = new GithubAuthProvider();
 const facebookProvider = new FacebookAuthProvider();
 
+// Add scopes for providers
 googleProvider.addScope('profile');
 googleProvider.addScope('email');
 githubProvider.addScope('user:email');
 facebookProvider.addScope('email');
 facebookProvider.addScope('public_profile');
 
+// Export everything
 export {
   auth,
   db,
@@ -79,16 +85,21 @@ export {
   serverTimestamp
 };
 
+// Helper function to get user role
 export const getUserRole = async (userId) => {
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
-    return userDoc.exists() ? userDoc.data().role || 'user' : 'user';
+    if (userDoc.exists()) {
+      return userDoc.data().role || 'user';
+    }
+    return 'user';
   } catch (error) {
     console.error('Error getting user role:', error);
     return 'user';
   }
 };
 
+// Helper function to set user role
 export const setUserRole = async (userId, role) => {
   try {
     await updateDoc(doc(db, 'users', userId), {
@@ -102,16 +113,21 @@ export const setUserRole = async (userId, role) => {
   }
 };
 
+// Helper function to get user subscription
 export const getUserSubscription = async (userId) => {
   try {
     const subDoc = await getDoc(doc(db, 'subscriptions', userId));
-    return subDoc.exists() ? subDoc.data() : null;
+    if (subDoc.exists()) {
+      return subDoc.data();
+    }
+    return null;
   } catch (error) {
     console.error('Error getting user subscription:', error);
     return null;
   }
 };
 
+// Helper function to update user subscription
 export const updateUserSubscription = async (userId, data) => {
   try {
     await updateDoc(doc(db, 'subscriptions', userId), {
@@ -125,6 +141,7 @@ export const updateUserSubscription = async (userId, data) => {
   }
 };
 
+// Helper function to get all users
 export const getAllUsers = async () => {
   try {
     const usersSnapshot = await getDocs(collection(db, 'users'));
@@ -135,6 +152,7 @@ export const getAllUsers = async () => {
   }
 };
 
+// Helper function to get all subscriptions
 export const getAllSubscriptions = async () => {
   try {
     const subsSnapshot = await getDocs(collection(db, 'subscriptions'));
