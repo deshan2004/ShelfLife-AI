@@ -1,5 +1,5 @@
 # ============================================
-# 📦 NODE / NPM / YARN
+# 📦 NODE / NPM / YARN / PNPM
 # ============================================
 node_modules/
 npm-debug.log*
@@ -12,13 +12,14 @@ yarn.lock
 pnpm-lock.yaml
 
 # ============================================
-# 🛠️ BUILD OUTPUTS (Vite / React)
+# 🛠️ BUILD OUTPUTS (Vite / React / Webpack)
 # ============================================
 dist/
 dist-ssr/
 build/
 .vite/
 *.local
+*.tsbuildinfo
 
 # ============================================
 # 🔑 ENVIRONMENT VARIABLES (Sensitive)
@@ -29,6 +30,9 @@ build/
 .env.development
 .env.production
 .env.test
+.env.development.local
+.env.test.local
+.env.production.local
 
 # ============================================
 # 🔥 FIREBASE SECURITY (Sensitive - NEVER COMMIT!)
@@ -38,6 +42,8 @@ serviceAccountKey.json
 *.pem
 firebase-debug.log
 firebase-debug.*.log
+*.firebaserc
+firebase.json
 
 # ============================================
 # 💻 IDE / EDITOR FILES
@@ -56,6 +62,9 @@ firebase-debug.*.log
 *~
 .DS_Store
 Thumbs.db
+*.iml
+*.ipr
+*.iws
 
 # ============================================
 # ☕ JAVA / ANDROID (if any mobile components)
@@ -64,6 +73,9 @@ Thumbs.db
 *.jar
 *.war
 *.ear
+.gradle/
+build/
+target/
 
 # ============================================
 # 🧪 TESTING / COVERAGE
@@ -72,6 +84,8 @@ coverage/
 .nyc_output/
 *.lcov
 *.test-results
+__tests__/coverage/
+jest.config.js
 
 # ============================================
 # 📊 LOGS & TEMP FILES
@@ -82,6 +96,9 @@ logs/
 *.temp
 .cache/
 .temp/
+*.pid
+*.seed
+*.pid.lock
 
 # ============================================
 # 🐍 PYTHON (if used for any scripts)
@@ -89,14 +106,20 @@ logs/
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
 # ============================================
 # 🐳 DOCKER (if using)
 # ============================================
 docker-compose.override.yml
-*.pid
-*.seed
-*.pid.lock
+Dockerfile
+*.dockerignore
 
 # ============================================
 # 🧩 MISCELLANEOUS
@@ -106,6 +129,32 @@ docker-compose.override.yml
 *.zip
 *.rar
 *.7z
-.env.production
-.env.development.local
-.env.test.local
+*.tar
+*.tar.gz
+*.bak
+*.old
+*.orig
+
+# ============================================
+# 🖥️ OS / SYSTEM FILES
+# ============================================
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+*.swp
+*.swo
+*~
+
+# ============================================
+# 🔧 VERCEL / NETLIFY (Deployment)
+# ============================================
+.vercel
+.netlify
+*.vercel
+
+# ============================================
+# 🌐 NGINX / SERVER CONFIGS (if any)
+# ============================================
+nginx.conf
+*.conf

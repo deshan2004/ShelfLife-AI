@@ -10,13 +10,40 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-// Initialize Firebase Admin
-const serviceAccount = require('./serviceAccountKey.json');
-
+// ============================================================
+// 🔥 FIREBASE ADMIN INITIALIZATION (Supports both Local & Vercel)
+// ============================================================
 if (!admin.apps.length) {
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
+    // Check if running on Vercel (environment variables) or local (JSON file)
+    if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL) {
+        // 🚀 Production / Vercel - Use Environment Variables
+        try {
+            admin.initializeApp({
+                credential: admin.credential.cert({
+                    projectId: process.env.FIREBASE_PROJECT_ID,
+                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+                })
+            });
+            console.log('✅ Firebase Admin initialized using Environment Variables');
+        } catch (error) {
+            console.error('❌ Failed to initialize Firebase Admin with ENV vars:', error.message);
+            process.exit(1);
+        }
+    } else {
+        // 💻 Local Development - Use serviceAccountKey.json
+        try {
+            const serviceAccount = require('./serviceAccountKey.json');
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+            console.log('✅ Firebase Admin initialized using serviceAccountKey.json');
+        } catch (error) {
+            console.error('❌ Failed to initialize Firebase Admin:', error.message);
+            console.error('   Please ensure serviceAccountKey.json exists or set FIREBASE_* env vars.');
+            process.exit(1);
+        }
+    }
 }
 
 const db = admin.firestore();
@@ -48,20 +75,28 @@ app.get('/', (req, res) => {
                 scans: 'GET /api/admin/scans',
                 stats: 'GET /api/admin/stats',
                 seed: 'POST /api/seed/data'
+            },
+            user: {
+                suppliers: 'GET /api/suppliers/:userId',
+                addSupplier: 'POST /api/suppliers/:userId/add',
+                updateSupplier: 'PUT /api/suppliers/:userId/update/:supplierId',
+                deleteSupplier: 'DELETE /api/suppliers/:userId/delete/:supplierId',
+                inventory: 'GET /api/inventory/:userId',
+                addProduct: 'POST /api/inventory/:userId/add',
+                updateProduct: 'PUT /api/inventory/:userId/update',
+                deleteProduct: 'DELETE /api/inventory/:userId/delete/:itemId',
+                subscription: 'GET /api/subscription/:userId',
+                usage: 'GET /api/usage/:userId/:type'
             }
         }
     });
 });
 
 // ============================================================
-// ============================================================
 // 🛡️ ADMIN ENDPOINTS
 // ============================================================
-// ============================================================
 
-// ============================================================
 // 1. GET ALL USERS
-// ============================================================
 app.get('/api/admin/users', async (req, res) => {
     try {
         const snapshot = await db.collection('users').get();
@@ -77,9 +112,7 @@ app.get('/api/admin/users', async (req, res) => {
     }
 });
 
-// ============================================================
 // 2. GET ALL SUBSCRIPTIONS
-// ============================================================
 app.get('/api/admin/subscriptions', async (req, res) => {
     try {
         const snapshot = await db.collection('subscriptions').get();
@@ -95,9 +128,7 @@ app.get('/api/admin/subscriptions', async (req, res) => {
     }
 });
 
-// ============================================================
 // 3. GET ALL INVENTORY (Flat List)
-// ============================================================
 app.get('/api/admin/inventory', async (req, res) => {
     try {
         const usersSnapshot = await db.collection('users').get();
@@ -134,9 +165,7 @@ app.get('/api/admin/inventory', async (req, res) => {
     }
 });
 
-// ============================================================
 // 4. GET INVENTORY BY SHOP (Grouped by User/Shop)
-// ============================================================
 app.get('/api/admin/inventory/by-shop', async (req, res) => {
     try {
         const usersSnapshot = await db.collection('users').get();
@@ -171,7 +200,6 @@ app.get('/api/admin/inventory/by-shop', async (req, res) => {
             }
         }
 
-        // Convert to array and filter out shops with no products (optional)
         const result = Object.values(groupedInventory);
         res.json(result);
     } catch (error) {
@@ -180,9 +208,7 @@ app.get('/api/admin/inventory/by-shop', async (req, res) => {
     }
 });
 
-// ============================================================
 // 5. GET ALL SUPPLIERS (Flat List)
-// ============================================================
 app.get('/api/admin/suppliers', async (req, res) => {
     try {
         const usersSnapshot = await db.collection('users').get();
@@ -196,34 +222,14 @@ app.get('/api/admin/suppliers', async (req, res) => {
                 const supplierDoc = await db.collection('suppliers').doc(userId).get();
                 if (supplierDoc.exists) {
                     const supplierList = supplierDoc.data().list || [];
-                    
-                    // Get product count for each supplier
-                    let productCount = 0;
-                    try {
-                        const invDoc = await db.collection('inventory').doc(userId).get();
-                        if (invDoc.exists) {
-                            const items = invDoc.data().items || [];
-                            supplierList.forEach(supplier => {
-                                productCount = items.filter(item => item.supplier === supplier.name).length;
-                            });
-                        }
-                    } catch (e) {}
-
                     supplierList.forEach(supplier => {
-                        // Count products for this supplier
-                        let count = 0;
-                        try {
-                            const invDoc = db.collection('inventory').doc(userId);
-                            // We'll count separately to avoid async issues
-                        } catch (e) {}
-
                         allSuppliers.push({
                             ...supplier,
                             ownerId: userId,
                             ownerName: userData.name || 'Unknown',
                             ownerEmail: userData.email || '',
                             shopName: userData.businessName || userData.name || 'Unknown Shop',
-                            productCount: 0 // Will be updated below
+                            productCount: 0
                         });
                     });
                 }
@@ -250,9 +256,7 @@ app.get('/api/admin/suppliers', async (req, res) => {
     }
 });
 
-// ============================================================
 // 6. GET SUPPLIERS BY SHOP (Grouped by User/Shop)
-// ============================================================
 app.get('/api/admin/suppliers/by-shop', async (req, res) => {
     try {
         const usersSnapshot = await db.collection('users').get();
@@ -276,7 +280,6 @@ app.get('/api/admin/suppliers/by-shop', async (req, res) => {
                 if (supplierDoc.exists) {
                     const supplierList = supplierDoc.data().list || [];
                     
-                    // Get product counts for each supplier
                     let items = [];
                     try {
                         const invDoc = await db.collection('inventory').doc(userId).get();
@@ -306,9 +309,7 @@ app.get('/api/admin/suppliers/by-shop', async (req, res) => {
     }
 });
 
-// ============================================================
 // 7. GET ALL PAYMENTS
-// ============================================================
 app.get('/api/admin/payments', async (req, res) => {
     try {
         const snapshot = await db.collection('payments').get();
@@ -323,9 +324,7 @@ app.get('/api/admin/payments', async (req, res) => {
     }
 });
 
-// ============================================================
 // 8. GET ALL SCANS
-// ============================================================
 app.get('/api/admin/scans', async (req, res) => {
     try {
         const snapshot = await db.collection('scans')
@@ -343,17 +342,13 @@ app.get('/api/admin/scans', async (req, res) => {
     }
 });
 
-// ============================================================
 // 9. GET ADMIN STATS (Dashboard Summary)
-// ============================================================
 app.get('/api/admin/stats', async (req, res) => {
     try {
-        // Get all users
         const usersSnapshot = await db.collection('users').get();
         const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const totalUsers = users.length;
 
-        // Get all subscriptions
         const subsSnapshot = await db.collection('subscriptions').get();
         const subscriptions = subsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
@@ -361,13 +356,11 @@ app.get('/api/admin/stats', async (req, res) => {
         const trialUsers = subscriptions.filter(s => s.status === 'trial_active').length;
         const expiredTrials = subscriptions.filter(s => s.status === 'trial_expired').length;
         
-        // Calculate revenue from active subscriptions
         const planPrices = { BASIC: 2500, PROFESSIONAL: 5900, ENTERPRISE: 14900 };
         const totalRevenue = subscriptions
             .filter(s => s.status === 'active')
             .reduce((sum, s) => sum + (planPrices[s.planId] || 0), 0);
 
-        // Get total products count
         let totalProducts = 0;
         for (const user of users) {
             try {
@@ -378,7 +371,6 @@ app.get('/api/admin/stats', async (req, res) => {
             } catch (e) {}
         }
 
-        // Get total suppliers count
         let totalSuppliers = 0;
         for (const user of users) {
             try {
@@ -389,11 +381,9 @@ app.get('/api/admin/stats', async (req, res) => {
             } catch (e) {}
         }
 
-        // Get total scans
         const scansSnapshot = await db.collection('scans').get();
         const totalScans = scansSnapshot.size;
 
-        // Get recent users (last 5)
         const recentUsers = users
             .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
             .slice(0, 5)
@@ -403,7 +393,6 @@ app.get('/api/admin/stats', async (req, res) => {
                 createdAt: u.createdAt || new Date().toISOString()
             }));
 
-        // Get shops with most products
         const shopProductCounts = [];
         for (const user of users) {
             try {
@@ -438,9 +427,7 @@ app.get('/api/admin/stats', async (req, res) => {
     }
 });
 
-// ============================================================
 // 10. UPDATE USER ROLE
-// ============================================================
 app.put('/api/admin/users/:uid/role', async (req, res) => {
     try {
         const { uid } = req.params;
@@ -458,9 +445,7 @@ app.put('/api/admin/users/:uid/role', async (req, res) => {
     }
 });
 
-// ============================================================
 // 11. DELETE USER
-// ============================================================
 app.delete('/api/admin/users/:uid', async (req, res) => {
     try {
         const { uid } = req.params;
@@ -491,9 +476,7 @@ app.delete('/api/admin/users/:uid', async (req, res) => {
     }
 });
 
-// ============================================================
 // 12. EXTEND TRIAL
-// ============================================================
 app.post('/api/admin/subscriptions/:uid/extend', async (req, res) => {
     try {
         const { uid } = req.params;
@@ -525,9 +508,7 @@ app.post('/api/admin/subscriptions/:uid/extend', async (req, res) => {
     }
 });
 
-// ============================================================
 // 13. UPGRADE PLAN
-// ============================================================
 app.post('/api/admin/subscriptions/:uid/upgrade', async (req, res) => {
     try {
         const { uid } = req.params;
@@ -569,14 +550,11 @@ app.post('/api/admin/subscriptions/:uid/upgrade', async (req, res) => {
     }
 });
 
-// ============================================================
 // 14. SEED TEST DATA
-// ============================================================
 app.post('/api/seed/data', async (req, res) => {
     try {
         const { adminUid } = req.body;
 
-        // Test users with different shop names
         const testUsers = [
             {
                 uid: 'test_user_1',
@@ -604,7 +582,6 @@ app.post('/api/seed/data', async (req, res) => {
             }
         ];
 
-        // Test suppliers per shop
         const testSuppliers = {
             'test_user_1': [
                 { name: 'Dairy Farms', contact: '+94 11 234 5678', email: 'orders@dairyfarms.lk', address: 'Colombo', rating: 5, notes: 'Best dairy products' },
@@ -658,7 +635,6 @@ app.post('/api/seed/data', async (req, res) => {
                 updatedAt: new Date().toISOString()
             });
 
-            // Products per shop
             const shopProducts = {
                 'test_user_1': [
                     { id: 1, name: 'Fresh Milk (1L)', batch: 'B001', supplier: 'Dairy Farms', stock: 24, expiryDate: '2026-08-15', costPrice: 280, sellingPrice: 350, lowStockThreshold: 10 },
@@ -696,7 +672,6 @@ app.post('/api/seed/data', async (req, res) => {
                 itemCount: productsWithStatus.length
             });
 
-            // Suppliers for this shop
             const supplierList = testSuppliers[user.uid] || [];
             const suppliersWithId = supplierList.map((s, index) => ({
                 id: `supp_${user.uid}_${index}`,
@@ -710,7 +685,6 @@ app.post('/api/seed/data', async (req, res) => {
                 updatedAt: new Date().toISOString()
             });
 
-            // Create sample payments for pro user
             if (isPro) {
                 await db.collection('payments').add({
                     userId: user.uid,
@@ -722,7 +696,6 @@ app.post('/api/seed/data', async (req, res) => {
                 });
             }
 
-            // Create sample scans
             await db.collection('scans').add({
                 userId: user.uid,
                 type: 'barcode',
@@ -754,14 +727,10 @@ app.post('/api/seed/data', async (req, res) => {
 });
 
 // ============================================================
-// ============================================================
-// 👤 USER ENDPOINTS (Existing)
-// ============================================================
+// 👤 USER ENDPOINTS
 // ============================================================
 
-// ============================================================
 // SUPPLIER MANAGEMENT (User)
-// ============================================================
 app.get('/api/suppliers/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -907,9 +876,7 @@ app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
     }
 });
 
-// ============================================================
 // INVENTORY MANAGEMENT (User)
-// ============================================================
 app.get('/api/inventory/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -1028,9 +995,7 @@ app.delete('/api/inventory/:userId/delete/:itemId', async (req, res) => {
     }
 });
 
-// ============================================================
 // SUBSCRIPTION MANAGEMENT (User)
-// ============================================================
 app.get('/api/subscription/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -1075,9 +1040,7 @@ app.get('/api/subscription/:userId', async (req, res) => {
     }
 });
 
-// ============================================================
 // USAGE CHECK
-// ============================================================
 app.get('/api/usage/:userId/:type', async (req, res) => {
     try {
         const { userId, type } = req.params;
@@ -1118,17 +1081,19 @@ app.get('/api/usage/:userId/:type', async (req, res) => {
 });
 
 // ============================================================
-// START SERVER
+// START SERVER (Local Development Only - Vercel uses serverless)
 // ============================================================
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log("=".repeat(50));
-    console.log(`🚀 ShelfLife AI Backend is running!`);
-    console.log(`📍 URL: http://localhost:${PORT}`);
-    console.log(`📡 Firestore: Connected`);
-    console.log(`🔐 Firebase Auth: Ready`);
-    console.log(`🛡️ Admin Endpoints: Enabled`);
-    console.log("=".repeat(50));
-});
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log("=".repeat(50));
+        console.log(`🚀 ShelfLife AI Backend is running!`);
+        console.log(`📍 URL: http://localhost:${PORT}`);
+        console.log(`📡 Firestore: Connected`);
+        console.log(`🔐 Firebase Auth: Ready`);
+        console.log(`🛡️ Admin Endpoints: Enabled`);
+        console.log("=".repeat(50));
+    });
+}
 
 module.exports = app;
