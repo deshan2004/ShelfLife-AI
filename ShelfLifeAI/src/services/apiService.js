@@ -1,9 +1,14 @@
 // src/services/apiService.js
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Vercel එකේ Frontend එකත් Backend එකත් එකම Domain එකේ නිසා API_URL empty විය හැක.
+// එවිට relative paths use වේ.
 
-// Helper function for API calls
+const API_URL = import.meta.env.VITE_API_URL || '';
+
+console.log('🔗 API URL:', API_URL || '(Same origin - using relative paths)');
+
 const fetchApi = async (endpoint, options = {}) => {
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  const url = `${API_URL}${endpoint}`;
+  const response = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',

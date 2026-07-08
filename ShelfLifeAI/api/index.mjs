@@ -1,115 +1,60 @@
-// server.mjs - Vercel-compatible version
+// api/index.mjs - Complete Vercel Serverless Function
 import express from 'express';
 import cors from 'cors';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
+import admin from 'firebase-admin';
 import crypto from 'crypto';
-
-const require = createRequire(import.meta.url);
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 
 // ============================================================
-// 🔥 DYNAMIC FIREBASE ADMIN IMPORT
+// ✅ MIDDLEWARE
 // ============================================================
-let admin;
-try {
-  const module = await import('firebase-admin');
-  admin = module.default || module;
-  console.log('✅ firebase-admin loaded');
-} catch (error) {
-  console.error('❌ firebase-admin load failed:', error.message);
-  process.exit(1);
-}
-
-// ============================================================
-// 🔥 SERVICE ACCOUNT LOADING (ENV හෝ File එකෙන්)
-// ============================================================
-let serviceAccount;
-
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  try {
-    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    console.log('✅ Service account loaded from environment variable');
-  } catch (error) {
-    console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT:', error.message);
-    process.exit(1);
-  }
-} else {
-  const serviceAccountPath = path.join(__dirname, 'serviceAccountKey.json');
-  if (fs.existsSync(serviceAccountPath)) {
-    try {
-      const fileContent = fs.readFileSync(serviceAccountPath, 'utf8');
-      serviceAccount = JSON.parse(fileContent);
-      console.log('✅ Service account loaded from local file');
-    } catch (error) {
-      console.error('❌ Failed to parse serviceAccountKey.json:', error.message);
-      process.exit(1);
-    }
-  } else {
-    console.error('❌ No service account found!');
-    console.error('Please set FIREBASE_SERVICE_ACCOUNT env var or place serviceAccountKey.json in project root.');
-    process.exit(1);
-  }
-}
-
-// ============================================================
-// 🔥 FIREBASE ADMIN INITIALIZE
-// ============================================================
-try {
-  if (!admin.credential) {
-    console.error('❌ admin.credential is undefined. Try: npm install firebase-admin@11.11.0');
-    process.exit(1);
-  }
-
-  if (!admin.apps || admin.apps.length === 0) {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-    console.log('✅ Firebase Admin initialized successfully');
-  } else {
-    console.log('✅ Firebase Admin already initialized');
-  }
-} catch (error) {
-  console.error('❌ Firebase Admin initialization failed:', error.message);
-  process.exit(1);
-}
-
-const db = admin.firestore();
-const auth = admin.auth();
-
-// ============================================================
-// ✅ CORS CONFIGURATION (Vercel same-origin සඳහා)
-// ============================================================
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'https://shelflife-ai.vercel.app',
-  'https://shelflife-ai-git-main.vercel.app',
-  // ඔබේ Vercel URL එක මෙතනට add කරන්න
-];
-
 app.use(cors({
   origin: function (origin, callback) {
+    // Allow all origins for simplicity (Vercel same-origin, but also supports localhost)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    const allowed = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://shelflife-ai.vercel.app',
+      'https://shelflife-ai-git-main.vercel.app'
+    ];
+    if (allowed.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
       callback(null, true);
     } else {
-      console.warn(`Blocked CORS request from: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  credentials: true
 }));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ============================================================
+// 🔥 FIREBASE ADMIN INITIALIZE
+// ============================================================
+let db, auth;
+let firebaseInitialized = false;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    if (!admin.apps || admin.apps.length === 0) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+      });
+    }
+    db = admin.firestore();
+    auth = admin.auth();
+    firebaseInitialized = true;
+    console.log('✅ Firebase Admin initialized successfully');
+  } catch (error) {
+    console.error('❌ Firebase Admin initialization failed:', error.message);
+  }
+} else {
+  console.warn('⚠️ FIREBASE_SERVICE_ACCOUNT not set. Firebase features will not work.');
+}
 
 // ============================================================
 // 🏥 HEALTH CHECK
@@ -118,8 +63,8 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development'
+    firebase: firebaseInitialized ? 'connected' : 'disconnected',
+    environment: process.env.VERCEL ? 'vercel' : 'development'
   });
 });
 
@@ -158,7 +103,7 @@ const validateSupplier = (supplier) => {
 };
 
 // ============================================================
-// 💳 PAYHERE PAYMENT INITIATE (Backend Hash Generation)
+// 💳 PAYHERE CONFIG
 // ============================================================
 const PAYHERE_MERCHANT_ID = process.env.VITE_PAYHERE_MERCHANT_ID || '1235220';
 const PAYHERE_MERCHANT_SECRET = process.env.VITE_PAYHERE_MERCHANT_SECRET || 'NDg1ODU3OTczNzYwMzc1MTQxNjk4MTU3MTcxMzg3NDc0MDM4Nw==';
@@ -169,7 +114,10 @@ function generatePayHereHash(merchantId, orderId, amount, currency, merchantSecr
   return crypto.createHash('md5').update(hashString).digest('hex').toUpperCase();
 }
 
-app.post('/api/payment/initiate', async (req, res) => {
+// ============================================================
+// 💳 PAYHERE PAYMENT INITIATE
+// ============================================================
+app.post('/api/payment/initiate', (req, res) => {
   try {
     const { userId, planId, amount, orderId, firstName, lastName, email, phone, address } = req.body;
     if (!userId || !planId || !amount || !orderId) {
@@ -183,11 +131,12 @@ app.post('/api/payment/initiate', async (req, res) => {
       currency,
       PAYHERE_MERCHANT_SECRET
     );
+    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:5173';
     const paymentData = {
       merchant_id: PAYHERE_MERCHANT_ID,
-      return_url: `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'http://localhost:5000'}/api/payment/return`,
-      cancel_url: `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'http://localhost:5000'}/api/payment/cancel`,
-      notify_url: `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'http://localhost:5000'}/api/payment/notify`,
+      return_url: `${baseUrl}/payment-success`,
+      cancel_url: `${baseUrl}/payment-cancel`,
+      notify_url: `${baseUrl}/api/payment/notify`,
       order_id: orderId,
       items: `${planId} Plan - Monthly Subscription`,
       currency: currency,
@@ -216,6 +165,9 @@ app.post('/api/payment/initiate', async (req, res) => {
 
 // GET Inventory
 app.get('/api/inventory/:userId', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { userId } = req.params;
     if (!userId) {
@@ -244,6 +196,9 @@ app.get('/api/inventory/:userId', async (req, res) => {
 
 // ADD Product
 app.post('/api/inventory/:userId/add', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { userId } = req.params;
     const { product } = req.body;
@@ -312,6 +267,9 @@ app.post('/api/inventory/:userId/add', async (req, res) => {
 
 // UPDATE Product
 app.put('/api/inventory/:userId/update', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { userId } = req.params;
     const { itemId, updates } = req.body;
@@ -359,6 +317,9 @@ app.put('/api/inventory/:userId/update', async (req, res) => {
 
 // DELETE Product
 app.delete('/api/inventory/:userId/delete/:itemId', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { userId, itemId } = req.params;
     const invDoc = await db.collection('inventory').doc(userId).get();
@@ -397,6 +358,9 @@ app.delete('/api/inventory/:userId/delete/:itemId', async (req, res) => {
 
 // GET Suppliers
 app.get('/api/suppliers/:userId', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { userId } = req.params;
     const docRef = db.collection('suppliers').doc(userId);
@@ -414,6 +378,9 @@ app.get('/api/suppliers/:userId', async (req, res) => {
 
 // ADD Supplier
 app.post('/api/suppliers/:userId/add', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { userId } = req.params;
     const supplier = req.body;
@@ -466,6 +433,9 @@ app.post('/api/suppliers/:userId/add', async (req, res) => {
 
 // UPDATE Supplier
 app.put('/api/suppliers/:userId/update/:supplierId', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { userId, supplierId } = req.params;
     const updates = req.body;
@@ -494,6 +464,9 @@ app.put('/api/suppliers/:userId/update/:supplierId', async (req, res) => {
 
 // DELETE Supplier
 app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { userId, supplierId } = req.params;
     const docRef = db.collection('suppliers').doc(userId);
@@ -525,6 +498,9 @@ app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
 
 // GET Subscription
 app.get('/api/subscription/:userId', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { userId } = req.params;
     const subDoc = await db.collection('subscriptions').doc(userId).get();
@@ -582,6 +558,9 @@ app.get('/api/subscription/:userId', async (req, res) => {
 // 📊 USAGE CHECK
 // ============================================================
 app.get('/api/usage/:userId/:type', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { userId, type } = req.params;
     const subDoc = await db.collection('subscriptions').doc(userId).get();
@@ -619,6 +598,9 @@ app.get('/api/usage/:userId/:type', async (req, res) => {
 
 // GET All Users
 app.get('/api/admin/users', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const snapshot = await db.collection('users').get();
     const users = snapshot.docs.map(doc => ({
@@ -635,6 +617,9 @@ app.get('/api/admin/users', async (req, res) => {
 
 // GET All Subscriptions
 app.get('/api/admin/subscriptions', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const snapshot = await db.collection('subscriptions').get();
     const subscriptions = snapshot.docs.map(doc => ({
@@ -651,6 +636,9 @@ app.get('/api/admin/subscriptions', async (req, res) => {
 
 // GET Admin Stats
 app.get('/api/admin/stats', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const usersSnapshot = await db.collection('users').get();
     const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -704,6 +692,9 @@ app.get('/api/admin/stats', async (req, res) => {
 
 // UPDATE User Role
 app.put('/api/admin/users/:uid/role', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { uid } = req.params;
     const { role } = req.body;
@@ -723,6 +714,9 @@ app.put('/api/admin/users/:uid/role', async (req, res) => {
 
 // DELETE User
 app.delete('/api/admin/users/:uid', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { uid } = req.params;
     await db.collection('users').doc(uid).delete();
@@ -753,6 +747,9 @@ app.delete('/api/admin/users/:uid', async (req, res) => {
 
 // EXTEND Trial
 app.post('/api/admin/subscriptions/:uid/extend', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { uid } = req.params;
     const { days } = req.body;
@@ -782,6 +779,9 @@ app.post('/api/admin/subscriptions/:uid/extend', async (req, res) => {
 
 // UPGRADE Plan
 app.post('/api/admin/subscriptions/:uid/upgrade', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { uid } = req.params;
     const { planId } = req.body;
@@ -836,6 +836,9 @@ app.post('/api/admin/subscriptions/:uid/upgrade', async (req, res) => {
 // 🌱 SEED TEST DATA
 // ============================================================
 app.post('/api/seed/data', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ error: 'Firebase not initialized' });
+  }
   try {
     const { adminUid } = req.body;
     const testUsers = [
@@ -867,8 +870,10 @@ app.post('/api/seed/data', async (req, res) => {
 
     for (const user of testUsers) {
       await db.collection('users').doc(user.uid).set(user);
+
       const trialEnd = new Date();
       trialEnd.setDate(trialEnd.getDate() + 14);
+
       await db.collection('subscriptions').doc(user.uid).set({
         userId: user.uid,
         planId: 'FREE_TRIAL',
@@ -917,6 +922,7 @@ app.post('/api/seed/data', async (req, res) => {
         ],
         updatedAt: new Date().toISOString()
       });
+
       await db.collection('scans').add({
         userId: user.uid,
         type: 'barcode',
@@ -952,8 +958,10 @@ app.get('/', (req, res) => {
     name: 'ShelfLife AI Backend',
     version: '2.0.0',
     status: 'Online',
+    firebase: firebaseInitialized ? 'connected' : 'disconnected',
     endpoints: {
       health: 'GET /api/health',
+      payment: 'POST /api/payment/initiate',
       inventory: 'GET/POST/PUT/DELETE /api/inventory/:userId',
       suppliers: 'GET/POST/PUT/DELETE /api/suppliers/:userId',
       subscription: 'GET /api/subscription/:userId',
@@ -991,24 +999,6 @@ app.use((err, req, res, next) => {
 });
 
 // ============================================================
-// 🚀 START / EXPORT (Vercel compatible)
+// 🚀 EXPORT for Vercel (මෙය අනිවාර්යයි!)
 // ============================================================
-const PORT = process.env.PORT || 5000;
-
-// Vercel Serverless environment එකේදී, app export කරන්න
-// Local development එකේදී listen කරන්න
-if (process.env.VERCEL) {
-  // Vercel environment - export the app
-  console.log('✅ Running on Vercel (Serverless)');
-} else {
-  // Local development
-  app.listen(PORT, () => {
-    console.log('='.repeat(55));
-    console.log(`🚀 ShelfLife AI Backend v2.0 (Development)`);
-    console.log(`📍 URL: http://localhost:${PORT}`);
-    console.log('='.repeat(55));
-  });
-}
-
-// Vercel Serverless Functions එකට Export කරන්න
 export default app;
