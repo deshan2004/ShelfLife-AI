@@ -3,7 +3,6 @@ const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
 
-// Initialize express
 const app = express();
 
 // Middleware
@@ -11,10 +10,9 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
 // ============================================================
-// 🔥 FIREBASE ADMIN INITIALIZATION (Supports both Local & Vercel)
+// 🔥 FIREBASE ADMIN INITIALIZATION
 // ============================================================
 if (!admin.apps.length) {
-    // Check if running on Vercel (environment variables) or local (JSON file)
     if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL) {
         // 🚀 Production / Vercel - Use Environment Variables
         try {
@@ -238,7 +236,6 @@ app.get('/api/admin/suppliers', async (req, res) => {
             }
         }
 
-        // Count products for each supplier
         for (const supplier of allSuppliers) {
             try {
                 const invDoc = await db.collection('inventory').doc(supplier.ownerId).get();
@@ -1081,7 +1078,7 @@ app.get('/api/usage/:userId/:type', async (req, res) => {
 });
 
 // ============================================================
-// START SERVER (Local Development Only - Vercel uses serverless)
+// START SERVER (Local Development Only)
 // ============================================================
 const PORT = process.env.PORT || 5000;
 if (process.env.NODE_ENV !== 'production') {
@@ -1091,7 +1088,6 @@ if (process.env.NODE_ENV !== 'production') {
         console.log(`📍 URL: http://localhost:${PORT}`);
         console.log(`📡 Firestore: Connected`);
         console.log(`🔐 Firebase Auth: Ready`);
-        console.log(`🛡️ Admin Endpoints: Enabled`);
         console.log("=".repeat(50));
     });
 }

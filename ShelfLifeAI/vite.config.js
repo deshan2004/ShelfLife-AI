@@ -2,7 +2,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'force-exit',
+      closeBundle: () => {
+        setTimeout(() => process.exit(0), 100)
+      }
+    }
+  ],
   server: {
     proxy: {
       '/api': {
