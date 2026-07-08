@@ -1,19 +1,13 @@
-// server.cjs - Complete backend with all working endpoints
+// server.cjs - Complete backend with all endpoints
 const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
-const crypto = require('crypto');
-const path = require('path');
 
 // Initialize express
 const app = express();
 
 // Middleware
-app.use(cors({
-    origin: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
-}));
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
 // Initialize Firebase Admin
@@ -28,283 +22,900 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 const auth = admin.auth();
 
-// ==================== ROOT ROUTE ====================
-
-app.get('/', (req, res) => {
-    res.json({ 
-        message: 'ShelfLife AI Backend is running!',
-        status: 'Online',
-        timestamp: new Date().toISOString(),
-        endpoints: {
-            auth: { signup: 'POST /api/signup', login: 'POST /api/login' },
-            inventory: { get: 'GET /api/inventory/:userId', add: 'POST /api/inventory/:userId/add', update: 'PUT /api/inventory/:userId/update', delete: 'DELETE /api/inventory/:userId/delete/:itemId' },
-            subscription: { get: 'GET /api/subscription/:userId', upgrade: 'POST /api/subscription/upgrade' },
-            scans: { log: 'POST /api/scans/:userId' },
-            payments: { process: 'POST /api/payments/process', history: 'GET /api/payments/:userId' },
-            dashboard: { get: 'GET /api/dashboard/:userId' },
-            analytics: { get: 'GET /api/analytics/:userId' }
-        }
-    });
-});
-
-// ==================== AUTHENTICATION ====================
-
-// Health check endpoint
+// ============================================================
+// HEALTH CHECK
+// ============================================================
 app.get('/api/health', (req, res) => {
     res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Signup - Creates Auth user, Profile, Subscription and Inventory
-app.post('/api/signup', async (req, res) => {
-    console.log("=".repeat(50));
-    console.log(`[SIGNUP REQUEST] Email: ${req.body.email}`);
-    
-    let createdUid = null;
-
-    try {
-        const { email, password, name, businessName, businessType } = req.body;
-        
-        // Validation
-        if (!email || !password || !name) {
-            return res.status(400).json({ error: 'Email, password, and name are required' });
-        }
-        
-        if (password.length < 6) {
-            return res.status(400).json({ error: 'Password must be at least 6 characters' });
-        }
-        
-        // 1. Create User in Firebase Authentication
-        console.log("1. Creating user in Firebase Auth...");
-        const userRecord = await auth.createUser({
-            email,
-            password,
-            displayName: name
-        });
-        createdUid = userRecord.uid;
-        console.log(`✅ Auth User Created! UID: ${createdUid}`);
-
-        // 2. Save to Firestore
-        console.log("2. Saving data to Firestore...");
-        
-        // Create user document
-        await db.collection('users').doc(createdUid).set({
-            name,
-            email,
-            businessName: businessName || `${name}'s Store`,
-            businessType: businessType || 'retail',
-            role: 'user',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        });
-
-        // Create default subscription (14-day Free Trial)
-        const trialEnd = new Date();
-        trialEnd.setDate(trialEnd.getDate() + 14);
-        await db.collection('subscriptions').doc(createdUid).set({
-            userId: createdUid,
-            planId: 'FREE_TRIAL',
-            status: 'trial_active',
-            trialStart: new Date().toISOString(),
-            trialEnd: trialEnd.toISOString(),
-            features: {
-                canBasicScan: true,
-                canOCRScan: true,  // Enable for trial
-                canBarcodeScan: true,
-                canFlashSale: true,
-                canSupplierReturn: false,
-                canBasicAnalytics: true,
-                canAdvancedAnalytics: false,
-                canPrioritySupport: false,
-                canAPIAccess: false,
-                canMultiUser: false,
-                canExportData: false,
-                canCustomReports: false
-            },
-            limits: {
-                maxProducts: 50,
-                maxSuppliers: 10,
-                maxScansPerMonth: 100
-            },
-            usage: {
-                productsCount: 0,
-                suppliersCount: 0,
-                scansThisMonth: 0,
-                lastResetDate: new Date().toISOString()
-            },
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        });
-
-        // Create empty inventory
-        await db.collection('inventory').doc(createdUid).set({
-            items: [],
-            lastUpdated: new Date().toISOString(),
-            itemCount: 0
-        });
-
-        console.log("✅ Firestore data saved!");
-        
-        res.status(201).json({ 
-            success: true,
-            message: 'User registered successfully!', 
-            uid: createdUid,
-            trial: { days: 14, end: trialEnd.toISOString() }
-        });
-
-    } catch (error) {
-        console.error("❌ Signup Error:", error.message);
-        
-        // Rollback: Delete Auth user if Firestore failed
-        if (createdUid) {
-            try {
-                await auth.deleteUser(createdUid);
-                console.log(`Rolled back: Deleted user ${createdUid}`);
-            } catch (e) {
-                console.error("Rollback failed:", e.message);
+// ============================================================
+// ROOT
+// ============================================================
+app.get('/', (req, res) => {
+    res.json({
+        message: 'ShelfLife AI Backend',
+        status: 'Online',
+        endpoints: {
+            admin: {
+                users: 'GET /api/admin/users',
+                subscriptions: 'GET /api/admin/subscriptions',
+                inventory: 'GET /api/admin/inventory',
+                inventoryByShop: 'GET /api/admin/inventory/by-shop',
+                suppliers: 'GET /api/admin/suppliers',
+                suppliersByShop: 'GET /api/admin/suppliers/by-shop',
+                payments: 'GET /api/admin/payments',
+                scans: 'GET /api/admin/scans',
+                stats: 'GET /api/admin/stats',
+                seed: 'POST /api/seed/data'
             }
         }
-        
-        if (error.code === 'auth/email-already-exists') {
-            return res.status(400).json({ error: 'This email is already registered. Please login instead.' });
-        }
-        
-        res.status(400).json({ error: error.message });
-    }
+    });
 });
 
-// Login Verification
-app.post('/api/login', async (req, res) => {
-    console.log("[LOGIN REQUEST]");
+// ============================================================
+// ============================================================
+// 🛡️ ADMIN ENDPOINTS
+// ============================================================
+// ============================================================
+
+// ============================================================
+// 1. GET ALL USERS
+// ============================================================
+app.get('/api/admin/users', async (req, res) => {
     try {
-        const { idToken } = req.body;
-        
-        if (!idToken) {
-            return res.status(400).json({ error: 'ID token required' });
-        }
-        
-        const decodedToken = await auth.verifyIdToken(idToken);
-        const userId = decodedToken.uid;
-        
-        const userDoc = await db.collection('users').doc(userId).get();
-        const subDoc = await db.collection('subscriptions').doc(userId).get();
-        
-        if (!userDoc.exists) {
-            return res.status(404).json({ error: 'User profile not found' });
-        }
-
-        // Check if trial expired
-        let subscription = subDoc.exists ? subDoc.data() : null;
-        if (subscription && subscription.status === 'trial_active') {
-            const trialEnd = new Date(subscription.trialEnd);
-            const now = new Date();
-            if (now > trialEnd) {
-                subscription.status = 'trial_expired';
-                await db.collection('subscriptions').doc(userId).update({
-                    status: 'trial_expired',
-                    updatedAt: now.toISOString()
-                });
-            }
-        }
-
-        res.status(200).json({ 
-            success: true,
-            message: 'Login successful!', 
-            user: userDoc.data(),
-            subscription: subscription
-        });
+        const snapshot = await db.collection('users').get();
+        const users = snapshot.docs.map(doc => ({
+            id: doc.id,
+            uid: doc.id,
+            ...doc.data()
+        }));
+        res.json(users);
     } catch (error) {
-        console.error("Login Error:", error.message);
-        res.status(401).json({ error: 'Unauthorized access' });
-    }
-});
-
-// Social login handler
-app.post('/api/social-login', async (req, res) => {
-    console.log("[SOCIAL LOGIN REQUEST]");
-    try {
-        const { idToken, email, name, provider } = req.body;
-        
-        let userRecord;
-        try {
-            userRecord = await auth.getUserByEmail(email);
-        } catch {
-            // Create new user
-            userRecord = await auth.createUser({
-                email,
-                displayName: name,
-                emailVerified: true
-            });
-            
-            // Create Firestore profile
-            await db.collection('users').doc(userRecord.uid).set({
-                name: name,
-                email: email,
-                businessName: `${name}'s Store`,
-                businessType: 'retail',
-                role: 'user',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            });
-            
-            // Create subscription
-            const trialEnd = new Date();
-            trialEnd.setDate(trialEnd.getDate() + 14);
-            await db.collection('subscriptions').doc(userRecord.uid).set({
-                userId: userRecord.uid,
-                planId: 'FREE_TRIAL',
-                status: 'trial_active',
-                trialStart: new Date().toISOString(),
-                trialEnd: trialEnd.toISOString(),
-                features: {
-                    canBasicScan: true,
-                    canOCRScan: true,
-                    canBarcodeScan: true,
-                    canFlashSale: true,
-                    canSupplierReturn: false,
-                    canBasicAnalytics: true,
-                    canAdvancedAnalytics: false,
-                    canPrioritySupport: false,
-                    canAPIAccess: false,
-                    canMultiUser: false,
-                    canExportData: false,
-                    canCustomReports: false
-                },
-                limits: { maxProducts: 50, maxSuppliers: 10, maxScansPerMonth: 100 },
-                usage: { productsCount: 0, suppliersCount: 0, scansThisMonth: 0 },
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            });
-            
-            await db.collection('inventory').doc(userRecord.uid).set({
-                items: [],
-                lastUpdated: new Date().toISOString(),
-                itemCount: 0
-            });
-        }
-        
-        const userDoc = await db.collection('users').doc(userRecord.uid).get();
-        
-        res.json({
-            success: true,
-            user: userDoc.data(),
-            uid: userRecord.uid
-        });
-    } catch (error) {
-        console.error("Social login error:", error);
+        console.error('Get users error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// ==================== INVENTORY MANAGEMENT ====================
+// ============================================================
+// 2. GET ALL SUBSCRIPTIONS
+// ============================================================
+app.get('/api/admin/subscriptions', async (req, res) => {
+    try {
+        const snapshot = await db.collection('subscriptions').get();
+        const subscriptions = snapshot.docs.map(doc => ({
+            id: doc.id,
+            userId: doc.id,
+            ...doc.data()
+        }));
+        res.json(subscriptions);
+    } catch (error) {
+        console.error('Get subscriptions error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
-// Get all inventory items
+// ============================================================
+// 3. GET ALL INVENTORY (Flat List)
+// ============================================================
+app.get('/api/admin/inventory', async (req, res) => {
+    try {
+        const usersSnapshot = await db.collection('users').get();
+        const allProducts = [];
+
+        for (const userDoc of usersSnapshot.docs) {
+            const userId = userDoc.id;
+            const userData = userDoc.data();
+            
+            try {
+                const invDoc = await db.collection('inventory').doc(userId).get();
+                if (invDoc.exists) {
+                    const items = invDoc.data().items || [];
+                    items.forEach(item => {
+                        allProducts.push({
+                            ...item,
+                            ownerId: userId,
+                            ownerName: userData.name || 'Unknown',
+                            ownerEmail: userData.email || '',
+                            ownerAvatar: (userData.name || 'U').charAt(0).toUpperCase(),
+                            shopName: userData.businessName || userData.name || 'Unknown Shop'
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log(`No inventory for user ${userId}`);
+            }
+        }
+
+        res.json(allProducts);
+    } catch (error) {
+        console.error('Get inventory error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 4. GET INVENTORY BY SHOP (Grouped by User/Shop)
+// ============================================================
+app.get('/api/admin/inventory/by-shop', async (req, res) => {
+    try {
+        const usersSnapshot = await db.collection('users').get();
+        const groupedInventory = {};
+
+        for (const userDoc of usersSnapshot.docs) {
+            const userId = userDoc.id;
+            const userData = userDoc.data();
+            
+            const shopKey = userId;
+            groupedInventory[shopKey] = {
+                shopId: userId,
+                shopName: userData.businessName || userData.name || 'Unknown Shop',
+                ownerName: userData.name || 'Unknown',
+                ownerEmail: userData.email || '',
+                products: []
+            };
+
+            try {
+                const invDoc = await db.collection('inventory').doc(userId).get();
+                if (invDoc.exists) {
+                    const items = invDoc.data().items || [];
+                    items.forEach(item => {
+                        groupedInventory[shopKey].products.push({
+                            ...item,
+                            ownerId: userId
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log(`No inventory for user ${userId}`);
+            }
+        }
+
+        // Convert to array and filter out shops with no products (optional)
+        const result = Object.values(groupedInventory);
+        res.json(result);
+    } catch (error) {
+        console.error('Get grouped inventory error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 5. GET ALL SUPPLIERS (Flat List)
+// ============================================================
+app.get('/api/admin/suppliers', async (req, res) => {
+    try {
+        const usersSnapshot = await db.collection('users').get();
+        const allSuppliers = [];
+
+        for (const userDoc of usersSnapshot.docs) {
+            const userId = userDoc.id;
+            const userData = userDoc.data();
+            
+            try {
+                const supplierDoc = await db.collection('suppliers').doc(userId).get();
+                if (supplierDoc.exists) {
+                    const supplierList = supplierDoc.data().list || [];
+                    
+                    // Get product count for each supplier
+                    let productCount = 0;
+                    try {
+                        const invDoc = await db.collection('inventory').doc(userId).get();
+                        if (invDoc.exists) {
+                            const items = invDoc.data().items || [];
+                            supplierList.forEach(supplier => {
+                                productCount = items.filter(item => item.supplier === supplier.name).length;
+                            });
+                        }
+                    } catch (e) {}
+
+                    supplierList.forEach(supplier => {
+                        // Count products for this supplier
+                        let count = 0;
+                        try {
+                            const invDoc = db.collection('inventory').doc(userId);
+                            // We'll count separately to avoid async issues
+                        } catch (e) {}
+
+                        allSuppliers.push({
+                            ...supplier,
+                            ownerId: userId,
+                            ownerName: userData.name || 'Unknown',
+                            ownerEmail: userData.email || '',
+                            shopName: userData.businessName || userData.name || 'Unknown Shop',
+                            productCount: 0 // Will be updated below
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log(`No suppliers for user ${userId}`);
+            }
+        }
+
+        // Count products for each supplier
+        for (const supplier of allSuppliers) {
+            try {
+                const invDoc = await db.collection('inventory').doc(supplier.ownerId).get();
+                if (invDoc.exists) {
+                    const items = invDoc.data().items || [];
+                    supplier.productCount = items.filter(item => item.supplier === supplier.name).length;
+                }
+            } catch (e) {}
+        }
+
+        res.json(allSuppliers);
+    } catch (error) {
+        console.error('Get all suppliers error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 6. GET SUPPLIERS BY SHOP (Grouped by User/Shop)
+// ============================================================
+app.get('/api/admin/suppliers/by-shop', async (req, res) => {
+    try {
+        const usersSnapshot = await db.collection('users').get();
+        const groupedSuppliers = {};
+
+        for (const userDoc of usersSnapshot.docs) {
+            const userId = userDoc.id;
+            const userData = userDoc.data();
+            
+            const shopKey = userId;
+            groupedSuppliers[shopKey] = {
+                shopId: userId,
+                shopName: userData.businessName || userData.name || 'Unknown Shop',
+                ownerName: userData.name || 'Unknown',
+                ownerEmail: userData.email || '',
+                suppliers: []
+            };
+
+            try {
+                const supplierDoc = await db.collection('suppliers').doc(userId).get();
+                if (supplierDoc.exists) {
+                    const supplierList = supplierDoc.data().list || [];
+                    
+                    // Get product counts for each supplier
+                    let items = [];
+                    try {
+                        const invDoc = await db.collection('inventory').doc(userId).get();
+                        if (invDoc.exists) {
+                            items = invDoc.data().items || [];
+                        }
+                    } catch (e) {}
+
+                    supplierList.forEach(supplier => {
+                        const productCount = items.filter(item => item.supplier === supplier.name).length;
+                        groupedSuppliers[shopKey].suppliers.push({
+                            ...supplier,
+                            productCount: productCount
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log(`No suppliers for user ${userId}`);
+            }
+        }
+
+        const result = Object.values(groupedSuppliers);
+        res.json(result);
+    } catch (error) {
+        console.error('Get grouped suppliers error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 7. GET ALL PAYMENTS
+// ============================================================
+app.get('/api/admin/payments', async (req, res) => {
+    try {
+        const snapshot = await db.collection('payments').get();
+        const payments = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        res.json(payments);
+    } catch (error) {
+        console.error('Get payments error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 8. GET ALL SCANS
+// ============================================================
+app.get('/api/admin/scans', async (req, res) => {
+    try {
+        const snapshot = await db.collection('scans')
+            .orderBy('createdAt', 'desc')
+            .limit(100)
+            .get();
+        const scans = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        res.json(scans);
+    } catch (error) {
+        console.error('Get scans error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 9. GET ADMIN STATS (Dashboard Summary)
+// ============================================================
+app.get('/api/admin/stats', async (req, res) => {
+    try {
+        // Get all users
+        const usersSnapshot = await db.collection('users').get();
+        const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const totalUsers = users.length;
+
+        // Get all subscriptions
+        const subsSnapshot = await db.collection('subscriptions').get();
+        const subscriptions = subsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        const activeSubs = subscriptions.filter(s => s.status === 'active').length;
+        const trialUsers = subscriptions.filter(s => s.status === 'trial_active').length;
+        const expiredTrials = subscriptions.filter(s => s.status === 'trial_expired').length;
+        
+        // Calculate revenue from active subscriptions
+        const planPrices = { BASIC: 2500, PROFESSIONAL: 5900, ENTERPRISE: 14900 };
+        const totalRevenue = subscriptions
+            .filter(s => s.status === 'active')
+            .reduce((sum, s) => sum + (planPrices[s.planId] || 0), 0);
+
+        // Get total products count
+        let totalProducts = 0;
+        for (const user of users) {
+            try {
+                const invDoc = await db.collection('inventory').doc(user.id).get();
+                if (invDoc.exists) {
+                    totalProducts += (invDoc.data().items || []).length;
+                }
+            } catch (e) {}
+        }
+
+        // Get total suppliers count
+        let totalSuppliers = 0;
+        for (const user of users) {
+            try {
+                const supplierDoc = await db.collection('suppliers').doc(user.id).get();
+                if (supplierDoc.exists) {
+                    totalSuppliers += (supplierDoc.data().list || []).length;
+                }
+            } catch (e) {}
+        }
+
+        // Get total scans
+        const scansSnapshot = await db.collection('scans').get();
+        const totalScans = scansSnapshot.size;
+
+        // Get recent users (last 5)
+        const recentUsers = users
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, 5)
+            .map(u => ({
+                name: u.name || 'Unknown',
+                email: u.email || '',
+                createdAt: u.createdAt || new Date().toISOString()
+            }));
+
+        // Get shops with most products
+        const shopProductCounts = [];
+        for (const user of users) {
+            try {
+                const invDoc = await db.collection('inventory').doc(user.id).get();
+                if (invDoc.exists) {
+                    const count = (invDoc.data().items || []).length;
+                    shopProductCounts.push({
+                        shopName: user.businessName || user.name || 'Unknown',
+                        productCount: count
+                    });
+                }
+            } catch (e) {}
+        }
+        shopProductCounts.sort((a, b) => b.productCount - a.productCount);
+
+        res.json({
+            totalUsers,
+            totalProducts,
+            totalSuppliers,
+            totalScans,
+            totalRevenue,
+            activeSubscriptions: activeSubs,
+            trialUsers,
+            expiredTrials,
+            recentUsers,
+            topShops: shopProductCounts.slice(0, 5),
+            subscriptions
+        });
+    } catch (error) {
+        console.error('Get stats error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 10. UPDATE USER ROLE
+// ============================================================
+app.put('/api/admin/users/:uid/role', async (req, res) => {
+    try {
+        const { uid } = req.params;
+        const { role } = req.body;
+
+        await db.collection('users').doc(uid).update({
+            role: role,
+            updatedAt: new Date().toISOString()
+        });
+
+        res.json({ success: true, message: `User role updated to ${role}` });
+    } catch (error) {
+        console.error('Update role error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 11. DELETE USER
+// ============================================================
+app.delete('/api/admin/users/:uid', async (req, res) => {
+    try {
+        const { uid } = req.params;
+
+        await db.collection('users').doc(uid).delete();
+        await db.collection('subscriptions').doc(uid).delete();
+        await db.collection('inventory').doc(uid).delete();
+        await db.collection('suppliers').doc(uid).delete();
+
+        const scansSnapshot = await db.collection('scans')
+            .where('userId', '==', uid)
+            .get();
+        for (const doc of scansSnapshot.docs) {
+            await doc.ref.delete();
+        }
+
+        const paymentsSnapshot = await db.collection('payments')
+            .where('userId', '==', uid)
+            .get();
+        for (const doc of paymentsSnapshot.docs) {
+            await doc.ref.delete();
+        }
+
+        res.json({ success: true, message: 'User deleted successfully' });
+    } catch (error) {
+        console.error('Delete user error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 12. EXTEND TRIAL
+// ============================================================
+app.post('/api/admin/subscriptions/:uid/extend', async (req, res) => {
+    try {
+        const { uid } = req.params;
+        const { days } = req.body;
+
+        const subDoc = await db.collection('subscriptions').doc(uid).get();
+        if (!subDoc.exists) {
+            return res.status(404).json({ error: 'Subscription not found' });
+        }
+
+        const currentEnd = new Date(subDoc.data().trialEnd || new Date());
+        const newEnd = new Date(currentEnd);
+        newEnd.setDate(newEnd.getDate() + (days || 7));
+
+        await db.collection('subscriptions').doc(uid).update({
+            trialEnd: newEnd.toISOString(),
+            status: 'trial_active',
+            updatedAt: new Date().toISOString()
+        });
+
+        res.json({ 
+            success: true, 
+            message: `Trial extended by ${days || 7} days`,
+            newEnd: newEnd.toISOString()
+        });
+    } catch (error) {
+        console.error('Extend trial error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 13. UPGRADE PLAN
+// ============================================================
+app.post('/api/admin/subscriptions/:uid/upgrade', async (req, res) => {
+    try {
+        const { uid } = req.params;
+        const { planId } = req.body;
+
+        const planLimits = {
+            BASIC: { maxProducts: 200, maxSuppliers: 25, maxScansPerMonth: 500 },
+            PROFESSIONAL: { maxProducts: 1000, maxSuppliers: 100, maxScansPerMonth: 2000 },
+            ENTERPRISE: { maxProducts: Infinity, maxSuppliers: Infinity, maxScansPerMonth: Infinity }
+        };
+
+        const planFeatures = {
+            BASIC: { canSupplierReturn: true, canBasicAnalytics: true },
+            PROFESSIONAL: { canOCRScan: true, canSupplierReturn: true, canAdvancedAnalytics: true, canPrioritySupport: true, canExportData: true },
+            ENTERPRISE: { canOCRScan: true, canSupplierReturn: true, canAdvancedAnalytics: true, canPrioritySupport: true, canAPIAccess: true, canMultiUser: true, canExportData: true, canCustomReports: true }
+        };
+
+        const limits = planLimits[planId] || planLimits.BASIC;
+        const features = planFeatures[planId] || planFeatures.BASIC;
+
+        await db.collection('subscriptions').doc(uid).update({
+            planId: planId,
+            status: 'active',
+            limits: limits,
+            features: {
+                canBasicScan: true,
+                canBarcodeScan: true,
+                canFlashSale: true,
+                canBasicAnalytics: true,
+                ...features
+            },
+            updatedAt: new Date().toISOString()
+        });
+
+        res.json({ success: true, message: `Upgraded to ${planId} successfully` });
+    } catch (error) {
+        console.error('Upgrade plan error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// 14. SEED TEST DATA
+// ============================================================
+app.post('/api/seed/data', async (req, res) => {
+    try {
+        const { adminUid } = req.body;
+
+        // Test users with different shop names
+        const testUsers = [
+            {
+                uid: 'test_user_1',
+                name: 'Dineth Perera',
+                email: 'dineth@example.com',
+                role: 'user',
+                businessName: 'Dineth Supermarket',
+                createdAt: new Date().toISOString()
+            },
+            {
+                uid: 'test_user_2',
+                name: 'Kamal Silva',
+                email: 'kamal@example.com',
+                role: 'user',
+                businessName: 'Kamal Grocery Store',
+                createdAt: new Date().toISOString()
+            },
+            {
+                uid: 'test_user_3',
+                name: 'Nimal Fernando',
+                email: 'nimal@example.com',
+                role: 'user',
+                businessName: 'Nimal Fresh Mart',
+                createdAt: new Date().toISOString()
+            }
+        ];
+
+        // Test suppliers per shop
+        const testSuppliers = {
+            'test_user_1': [
+                { name: 'Dairy Farms', contact: '+94 11 234 5678', email: 'orders@dairyfarms.lk', address: 'Colombo', rating: 5, notes: 'Best dairy products' },
+                { name: 'Bakery Hub', contact: '+94 77 345 6789', email: 'info@bakeryhub.lk', address: 'Kandy', rating: 4, notes: 'Fresh bread daily' },
+                { name: 'Global Foods', contact: '+94 11 456 7890', email: 'sales@globalfoods.lk', address: 'Negombo', rating: 3, notes: 'Good canned goods' }
+            ],
+            'test_user_2': [
+                { name: 'Local Mart', contact: '+94 55 678 9012', email: 'orders@localmart.lk', address: 'Galle', rating: 4, notes: 'Reliable supplier' },
+                { name: 'HealthVibe', contact: '+94 77 890 1234', email: 'contact@healthvibe.lk', address: 'Colombo', rating: 5, notes: 'Excellent service' }
+            ],
+            'test_user_3': [
+                { name: 'Fresh Farms', contact: '+94 66 234 5678', email: 'info@freshfarms.lk', address: 'Kurunegala', rating: 4, notes: 'Organic products' },
+                { name: 'Spice World', contact: '+94 88 345 6789', email: 'sales@spiceworld.lk', address: 'Matale', rating: 3, notes: 'Good spices' }
+            ]
+        };
+
+        for (const user of testUsers) {
+            await db.collection('users').doc(user.uid).set(user);
+
+            const trialEnd = new Date();
+            trialEnd.setDate(trialEnd.getDate() + 14);
+            
+            const isPro = user.uid === 'test_user_1';
+            await db.collection('subscriptions').doc(user.uid).set({
+                userId: user.uid,
+                planId: isPro ? 'PROFESSIONAL' : 'FREE_TRIAL',
+                status: isPro ? 'active' : 'trial_active',
+                trialStart: new Date().toISOString(),
+                trialEnd: trialEnd.toISOString(),
+                features: {
+                    canBasicScan: true,
+                    canOCRScan: isPro,
+                    canBarcodeScan: true,
+                    canFlashSale: true,
+                    canSupplierReturn: isPro,
+                    canBasicAnalytics: true,
+                    canAdvancedAnalytics: isPro,
+                    canPrioritySupport: isPro
+                },
+                limits: {
+                    maxProducts: isPro ? 1000 : 50,
+                    maxSuppliers: isPro ? 100 : 10,
+                    maxScansPerMonth: isPro ? 2000 : 100
+                },
+                usage: {
+                    productsCount: isPro ? 8 : 4,
+                    suppliersCount: testSuppliers[user.uid]?.length || 0,
+                    scansThisMonth: 10
+                },
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            });
+
+            // Products per shop
+            const shopProducts = {
+                'test_user_1': [
+                    { id: 1, name: 'Fresh Milk (1L)', batch: 'B001', supplier: 'Dairy Farms', stock: 24, expiryDate: '2026-08-15', costPrice: 280, sellingPrice: 350, lowStockThreshold: 10 },
+                    { id: 2, name: 'Greek Yogurt', batch: 'B002', supplier: 'Dairy Farms', stock: 15, expiryDate: '2026-07-20', costPrice: 180, sellingPrice: 220, lowStockThreshold: 8 },
+                    { id: 3, name: 'Wheat Bread', batch: 'B003', supplier: 'Bakery Hub', stock: 5, expiryDate: '2026-07-05', costPrice: 120, sellingPrice: 150, lowStockThreshold: 10 },
+                    { id: 4, name: 'Canned Beans', batch: 'B004', supplier: 'Global Foods', stock: 40, expiryDate: '2026-09-01', costPrice: 250, sellingPrice: 320, lowStockThreshold: 15 },
+                    { id: 5, name: 'Butter (500g)', batch: 'B005', supplier: 'Dairy Farms', stock: 12, expiryDate: '2026-08-25', costPrice: 450, sellingPrice: 550, lowStockThreshold: 8 }
+                ],
+                'test_user_2': [
+                    { id: 1, name: 'Tomato Ketchup', batch: 'B101', supplier: 'Local Mart', stock: 18, expiryDate: '2026-08-10', costPrice: 380, sellingPrice: 450, lowStockThreshold: 12 },
+                    { id: 2, name: 'Probiotic Drink', batch: 'B102', supplier: 'HealthVibe', stock: 9, expiryDate: '2026-07-14', costPrice: 420, sellingPrice: 520, lowStockThreshold: 15 },
+                    { id: 3, name: 'Chili Sauce', batch: 'B103', supplier: 'Local Mart', stock: 25, expiryDate: '2026-09-20', costPrice: 320, sellingPrice: 400, lowStockThreshold: 10 }
+                ],
+                'test_user_3': [
+                    { id: 1, name: 'Organic Rice (5kg)', batch: 'B201', supplier: 'Fresh Farms', stock: 30, expiryDate: '2026-10-01', costPrice: 850, sellingPrice: 950, lowStockThreshold: 20 },
+                    { id: 2, name: 'Cinnamon Sticks', batch: 'B202', supplier: 'Spice World', stock: 8, expiryDate: '2026-11-15', costPrice: 1200, sellingPrice: 1500, lowStockThreshold: 5 },
+                    { id: 3, name: 'Coconut Oil (1L)', batch: 'B203', supplier: 'Fresh Farms', stock: 20, expiryDate: '2026-09-30', costPrice: 550, sellingPrice: 700, lowStockThreshold: 10 }
+                ]
+            };
+
+            const products = shopProducts[user.uid] || [];
+            const productsWithStatus = products.map(p => {
+                const daysLeft = Math.ceil((new Date(p.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+                let status = 'good';
+                let suggestion = 'Normal Stock';
+                if (daysLeft <= 0) { status = 'expired'; suggestion = 'DISPOSE / Return to supplier'; }
+                else if (daysLeft <= 3) { status = 'critical'; suggestion = 'URGENT: Flash Sale NOW!'; }
+                else if (daysLeft <= 7) { status = 'warning'; suggestion = 'Flash Sale recommended'; }
+                return { ...p, daysLeft, status, suggestion, addedAt: new Date().toISOString() };
+            });
+
+            await db.collection('inventory').doc(user.uid).set({
+                items: productsWithStatus,
+                lastUpdated: new Date().toISOString(),
+                itemCount: productsWithStatus.length
+            });
+
+            // Suppliers for this shop
+            const supplierList = testSuppliers[user.uid] || [];
+            const suppliersWithId = supplierList.map((s, index) => ({
+                id: `supp_${user.uid}_${index}`,
+                ...s,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            }));
+
+            await db.collection('suppliers').doc(user.uid).set({
+                list: suppliersWithId,
+                updatedAt: new Date().toISOString()
+            });
+
+            // Create sample payments for pro user
+            if (isPro) {
+                await db.collection('payments').add({
+                    userId: user.uid,
+                    amount: 5900,
+                    planId: 'PROFESSIONAL',
+                    status: 'completed',
+                    paymentId: `pay_${Date.now()}`,
+                    createdAt: new Date().toISOString()
+                });
+            }
+
+            // Create sample scans
+            await db.collection('scans').add({
+                userId: user.uid,
+                type: 'barcode',
+                value: '8901234567890',
+                result: 'Success',
+                createdAt: new Date().toISOString()
+            });
+        }
+
+        if (adminUid) {
+            await db.collection('users').doc(adminUid).update({
+                role: 'admin',
+                updatedAt: new Date().toISOString()
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Test data added successfully!',
+            users: testUsers.length,
+            subscriptions: testUsers.length,
+            inventory: 'Products added for all users',
+            suppliers: 'Suppliers added for all users'
+        });
+    } catch (error) {
+        console.error('Seed error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// ============================================================
+// 👤 USER ENDPOINTS (Existing)
+// ============================================================
+// ============================================================
+
+// ============================================================
+// SUPPLIER MANAGEMENT (User)
+// ============================================================
+app.get('/api/suppliers/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const docRef = db.collection('suppliers').doc(userId);
+        const doc = await docRef.get();
+        
+        if (!doc.exists) {
+            await docRef.set({ list: [], updatedAt: new Date().toISOString() });
+            return res.json({ list: [] });
+        }
+        
+        res.json(doc.data());
+    } catch (error) {
+        console.error("Get suppliers error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/suppliers/:userId/add', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { name, contact, email, address, rating, notes } = req.body;
+        
+        if (!name) {
+            return res.status(400).json({ error: 'Supplier name is required' });
+        }
+        
+        const docRef = db.collection('suppliers').doc(userId);
+        const doc = await docRef.get();
+        let list = doc.exists ? doc.data().list || [] : [];
+        
+        if (list.some(s => s.name.toLowerCase() === name.toLowerCase())) {
+            return res.status(400).json({ error: 'Supplier with this name already exists' });
+        }
+        
+        const newSupplier = {
+            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+            name: name.trim(),
+            contact: contact || '',
+            email: email || '',
+            address: address || '',
+            rating: rating || 0,
+            notes: notes || '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        
+        list.push(newSupplier);
+        
+        await docRef.set({
+            list: list,
+            updatedAt: new Date().toISOString()
+        });
+        
+        const subRef = db.collection('subscriptions').doc(userId);
+        const subDoc = await subRef.get();
+        if (subDoc.exists) {
+            await subRef.update({
+                'usage.suppliersCount': list.length,
+                updatedAt: new Date().toISOString()
+            });
+        }
+        
+        res.status(201).json({ success: true, supplier: newSupplier, total: list.length });
+    } catch (error) {
+        console.error("Add supplier error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/suppliers/:userId/update/:supplierId', async (req, res) => {
+    try {
+        const { userId, supplierId } = req.params;
+        const updates = req.body;
+        
+        const docRef = db.collection('suppliers').doc(userId);
+        const doc = await docRef.get();
+        
+        if (!doc.exists) {
+            return res.status(404).json({ error: 'Supplier list not found' });
+        }
+        
+        let list = doc.data().list || [];
+        const index = list.findIndex(s => s.id === supplierId);
+        
+        if (index === -1) {
+            return res.status(404).json({ error: 'Supplier not found' });
+        }
+        
+        list[index] = {
+            ...list[index],
+            ...updates,
+            updatedAt: new Date().toISOString()
+        };
+        
+        await docRef.set({
+            list: list,
+            updatedAt: new Date().toISOString()
+        });
+        
+        res.json({ success: true, supplier: list[index] });
+    } catch (error) {
+        console.error("Update supplier error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
+    try {
+        const { userId, supplierId } = req.params;
+        
+        const docRef = db.collection('suppliers').doc(userId);
+        const doc = await docRef.get();
+        
+        if (!doc.exists) {
+            return res.status(404).json({ error: 'Supplier list not found' });
+        }
+        
+        let list = doc.data().list || [];
+        const index = list.findIndex(s => s.id === supplierId);
+        
+        if (index === -1) {
+            return res.status(404).json({ error: 'Supplier not found' });
+        }
+        
+        list.splice(index, 1);
+        
+        await docRef.set({
+            list: list,
+            updatedAt: new Date().toISOString()
+        });
+        
+        const subRef = db.collection('subscriptions').doc(userId);
+        await subRef.update({
+            'usage.suppliersCount': list.length,
+            updatedAt: new Date().toISOString()
+        });
+        
+        res.json({ success: true, total: list.length });
+    } catch (error) {
+        console.error("Delete supplier error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// INVENTORY MANAGEMENT (User)
+// ============================================================
 app.get('/api/inventory/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
         const invDoc = await db.collection('inventory').doc(userId).get();
         
         if (!invDoc.exists) {
-            // Create empty inventory
             await db.collection('inventory').doc(userId).set({
                 items: [],
                 lastUpdated: new Date().toISOString(),
@@ -313,15 +924,13 @@ app.get('/api/inventory/:userId', async (req, res) => {
             return res.json({ items: [], itemCount: 0 });
         }
         
-        const data = invDoc.data();
-        res.json(data);
+        res.json(invDoc.data());
     } catch (error) {
         console.error("Get inventory error:", error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// Add a single product to inventory
 app.post('/api/inventory/:userId/add', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -331,11 +940,9 @@ app.post('/api/inventory/:userId/add', async (req, res) => {
             return res.status(400).json({ error: 'Product name is required' });
         }
         
-        // Get current inventory
         const invDoc = await db.collection('inventory').doc(userId).get();
         let items = invDoc.exists ? invDoc.data().items || [] : [];
         
-        // Check product limits from subscription
         const subDoc = await db.collection('subscriptions').doc(userId).get();
         const maxProducts = subDoc.exists ? subDoc.data().limits?.maxProducts || 50 : 50;
         
@@ -347,15 +954,8 @@ app.post('/api/inventory/:userId/add', async (req, res) => {
             });
         }
         
-        // Generate new ID
         const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
-        
-        const newProduct = {
-            id: newId,
-            ...product,
-            addedAt: new Date().toISOString()
-        };
-        
+        const newProduct = { id: newId, ...product, addedAt: new Date().toISOString() };
         items.push(newProduct);
         
         await db.collection('inventory').doc(userId).set({
@@ -364,7 +964,6 @@ app.post('/api/inventory/:userId/add', async (req, res) => {
             itemCount: items.length
         });
 
-        // Update usage count
         await db.collection('subscriptions').doc(userId).update({
             'usage.productsCount': items.length,
             updatedAt: new Date().toISOString()
@@ -377,7 +976,6 @@ app.post('/api/inventory/:userId/add', async (req, res) => {
     }
 });
 
-// Update inventory item
 app.put('/api/inventory/:userId/update', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -386,35 +984,10 @@ app.put('/api/inventory/:userId/update', async (req, res) => {
         const invDoc = await db.collection('inventory').doc(userId).get();
         let items = invDoc.exists ? invDoc.data().items || [] : [];
         
-        const itemIndex = items.findIndex(i => i.id === itemId);
-        if (itemIndex === -1) {
-            return res.status(404).json({ error: 'Item not found' });
-        }
+        const index = items.findIndex(i => i.id === itemId);
+        if (index === -1) return res.status(404).json({ error: 'Item not found' });
         
-        // Calculate days left if expiry date changed
-        if (updates.expiryDate) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const expiry = new Date(updates.expiryDate);
-            expiry.setHours(0, 0, 0, 0);
-            updates.daysLeft = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-            
-            if (updates.daysLeft <= 0) {
-                updates.status = 'expired';
-                updates.suggestion = 'DISPOSE / Return to supplier';
-            } else if (updates.daysLeft <= 3) {
-                updates.status = 'critical';
-                updates.suggestion = 'URGENT: Flash Sale NOW!';
-            } else if (updates.daysLeft <= 7) {
-                updates.status = 'warning';
-                updates.suggestion = 'Flash Sale recommended';
-            } else {
-                updates.status = 'good';
-                updates.suggestion = 'Monitor regularly';
-            }
-        }
-        
-        items[itemIndex] = { ...items[itemIndex], ...updates, updatedAt: new Date().toISOString() };
+        items[index] = { ...items[index], ...updates, updatedAt: new Date().toISOString() };
         
         await db.collection('inventory').doc(userId).set({
             items: items,
@@ -422,23 +995,20 @@ app.put('/api/inventory/:userId/update', async (req, res) => {
             itemCount: items.length
         });
         
-        res.json({ success: true, item: items[itemIndex] });
+        res.json({ success: true, item: items[index] });
     } catch (error) {
         console.error("Update product error:", error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// Delete inventory item
 app.delete('/api/inventory/:userId/delete/:itemId', async (req, res) => {
     try {
         const { userId, itemId } = req.params;
         
         const invDoc = await db.collection('inventory').doc(userId).get();
         let items = invDoc.exists ? invDoc.data().items || [] : [];
-        
-        const itemIdNum = parseInt(itemId);
-        items = items.filter(i => i.id !== itemIdNum);
+        items = items.filter(i => i.id !== parseInt(itemId));
         
         await db.collection('inventory').doc(userId).set({
             items: items,
@@ -458,16 +1028,15 @@ app.delete('/api/inventory/:userId/delete/:itemId', async (req, res) => {
     }
 });
 
-// ==================== SUBSCRIPTION MANAGEMENT ====================
-
-// Get subscription status
+// ============================================================
+// SUBSCRIPTION MANAGEMENT (User)
+// ============================================================
 app.get('/api/subscription/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
-        let subDoc = await db.collection('subscriptions').doc(userId).get();
+        const subDoc = await db.collection('subscriptions').doc(userId).get();
         
         if (!subDoc.exists) {
-            // Create default trial subscription
             const trialEnd = new Date();
             trialEnd.setDate(trialEnd.getDate() + 14);
             const subscription = {
@@ -490,39 +1059,15 @@ app.get('/api/subscription/:userId', async (req, res) => {
                     canExportData: false,
                     canCustomReports: false
                 },
-                limits: {
-                    maxProducts: 50,
-                    maxSuppliers: 10,
-                    maxScansPerMonth: 100
-                },
-                usage: {
-                    productsCount: 0,
-                    suppliersCount: 0,
-                    scansThisMonth: 0,
-                    lastResetDate: new Date().toISOString()
-                },
+                limits: { maxProducts: 50, maxSuppliers: 10, maxScansPerMonth: 100 },
+                usage: { productsCount: 0, suppliersCount: 0, scansThisMonth: 0 },
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
             await db.collection('subscriptions').doc(userId).set(subscription);
             res.json(subscription);
         } else {
-            let subscription = subDoc.data();
-            
-            // Check if trial expired
-            if (subscription.status === 'trial_active') {
-                const trialEnd = new Date(subscription.trialEnd);
-                const now = new Date();
-                if (now > trialEnd) {
-                    subscription.status = 'trial_expired';
-                    await db.collection('subscriptions').doc(userId).update({
-                        status: 'trial_expired',
-                        updatedAt: now.toISOString()
-                    });
-                }
-            }
-            
-            res.json(subscription);
+            res.json(subDoc.data());
         }
     } catch (error) {
         console.error("Get subscription error:", error);
@@ -530,261 +1075,9 @@ app.get('/api/subscription/:userId', async (req, res) => {
     }
 });
 
-// Upgrade subscription
-app.post('/api/subscription/upgrade', async (req, res) => {
-    try {
-        const { userId, planId } = req.body;
-        
-        let limits = { maxProducts: 50, maxSuppliers: 10, maxScansPerMonth: 100 };
-        let features = {
-            canBasicScan: true,
-            canOCRScan: false,
-            canBarcodeScan: true,
-            canFlashSale: true,
-            canSupplierReturn: false,
-            canBasicAnalytics: true,
-            canAdvancedAnalytics: false,
-            canPrioritySupport: false,
-            canAPIAccess: false,
-            canMultiUser: false,
-            canExportData: false,
-            canCustomReports: false
-        };
-        
-        if (planId === 'BASIC') {
-            limits = { maxProducts: 200, maxSuppliers: 25, maxScansPerMonth: 500 };
-            features.canSupplierReturn = true;
-            features.canBasicAnalytics = true;
-        } else if (planId === 'PROFESSIONAL') {
-            limits = { maxProducts: 1000, maxSuppliers: 100, maxScansPerMonth: 2000 };
-            features.canOCRScan = true;
-            features.canSupplierReturn = true;
-            features.canAdvancedAnalytics = true;
-            features.canPrioritySupport = true;
-            features.canExportData = true;
-        } else if (planId === 'ENTERPRISE') {
-            limits = { maxProducts: Infinity, maxSuppliers: Infinity, maxScansPerMonth: Infinity };
-            features.canOCRScan = true;
-            features.canSupplierReturn = true;
-            features.canAdvancedAnalytics = true;
-            features.canPrioritySupport = true;
-            features.canAPIAccess = true;
-            features.canMultiUser = true;
-            features.canExportData = true;
-            features.canCustomReports = true;
-        }
-        
-        await db.collection('subscriptions').doc(userId).update({
-            planId: planId,
-            status: 'active',
-            limits: limits,
-            features: features,
-            updatedAt: new Date().toISOString()
-        });
-        
-        res.json({ success: true, message: `Upgraded to ${planId} successfully!` });
-    } catch (error) {
-        console.error("Upgrade error:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ==================== SCANS MANAGEMENT ====================
-
-// Log a scan
-app.post('/api/scans/:userId', async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const { type, value, result } = req.body;
-
-        const scanData = {
-            userId,
-            type: type || 'unknown',
-            value: value || '',
-            result: result || 'Success',
-            createdAt: new Date().toISOString()
-        };
-
-        const docRef = await db.collection('scans').add(scanData);
-        
-        // Update usage count
-        const subDoc = await db.collection('subscriptions').doc(userId).get();
-        if (subDoc.exists) {
-            const currentScans = subDoc.data().usage?.scansThisMonth || 0;
-            await db.collection('subscriptions').doc(userId).update({
-                'usage.scansThisMonth': currentScans + 1,
-                updatedAt: new Date().toISOString()
-            });
-        }
-
-        res.status(201).json({ success: true, scanId: docRef.id });
-    } catch (error) {
-        console.error("Log scan error:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Get scan history
-app.get('/api/scans/:userId', async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const snapshot = await db.collection('scans')
-            .where('userId', '==', userId)
-            .orderBy('createdAt', 'desc')
-            .limit(50)
-            .get();
-        
-        const scans = [];
-        snapshot.forEach(doc => scans.push({ id: doc.id, ...doc.data() }));
-        res.json(scans);
-    } catch (error) {
-        console.error("Get scans error:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ==================== PAYMENTS ====================
-
-// Process payment and upgrade
-app.post('/api/payments/process', async (req, res) => {
-    try {
-        const { userId, amount, planId, paymentId } = req.body;
-        
-        if (!userId || !amount || !planId) {
-            return res.status(400).json({ error: 'Missing required fields' });
-        }
-
-        // Save payment record
-        const paymentData = {
-            userId,
-            amount: Number(amount),
-            planId,
-            status: 'completed',
-            paymentId: paymentId || `pay_${Date.now()}`,
-            createdAt: new Date().toISOString()
-        };
-        
-        await db.collection('payments').add(paymentData);
-
-        // Update subscription
-        let limits = { maxProducts: 50, maxScansPerMonth: 100 };
-        if (planId === 'BASIC') {
-            limits = { maxProducts: 200, maxScansPerMonth: 500 };
-        } else if (planId === 'PROFESSIONAL') {
-            limits = { maxProducts: 1000, maxScansPerMonth: 2000 };
-        } else if (planId === 'ENTERPRISE') {
-            limits = { maxProducts: Infinity, maxScansPerMonth: Infinity };
-        }
-        
-        await db.collection('subscriptions').doc(userId).update({
-            planId: planId,
-            status: 'active',
-            limits: limits,
-            updatedAt: new Date().toISOString()
-        });
-
-        res.json({ success: true, message: `Upgraded to ${planId} successfully!` });
-    } catch (error) {
-        console.error("Payment error:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Get payment history
-app.get('/api/payments/:userId', async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const snapshot = await db.collection('payments')
-            .where('userId', '==', userId)
-            .orderBy('createdAt', 'desc')
-            .limit(20)
-            .get();
-        
-        const payments = [];
-        snapshot.forEach(doc => payments.push({ id: doc.id, ...doc.data() }));
-        res.json(payments);
-    } catch (error) {
-        console.error("Get payments error:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ==================== DASHBOARD & ANALYTICS ====================
-
-// Get dashboard data
-app.get('/api/dashboard/:userId', async (req, res) => {
-    try {
-        const { userId } = req.params;
-        
-        const invDoc = await db.collection('inventory').doc(userId).get();
-        const subDoc = await db.collection('subscriptions').doc(userId).get();
-        
-        const items = invDoc.exists ? invDoc.data().items || [] : [];
-        
-        const expiringCount = items.filter(i => i.daysLeft <= 7 && i.daysLeft > 0).length;
-        const criticalCount = items.filter(i => i.daysLeft <= 3 && i.daysLeft > 0).length;
-        const expiredCount = items.filter(i => i.daysLeft <= 0).length;
-        const totalValue = items.reduce((sum, i) => sum + ((i.sellingPrice || 0) * (i.stock || 0)), 0);
-        
-        const lowStockCount = items.filter(i => i.stock <= (i.lowStockThreshold || 10)).length;
-        
-        res.json({
-            totalItems: items.length,
-            totalValue,
-            expiringCount,
-            criticalCount,
-            expiredCount,
-            lowStockCount,
-            recentItems: items.slice(-5).reverse(),
-            subscription: subDoc.exists ? subDoc.data() : null
-        });
-    } catch (error) {
-        console.error("Dashboard error:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Get analytics data
-app.get('/api/analytics/:userId', async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const invDoc = await db.collection('inventory').doc(userId).get();
-        const items = invDoc.exists ? invDoc.data().items || [] : [];
-        
-        const expiringItems = items.filter(i => i.daysLeft <= 7 && i.daysLeft > 0);
-        const expiredItems = items.filter(i => i.daysLeft <= 0);
-        
-        const expiringValue = expiringItems.reduce((sum, i) => sum + ((i.sellingPrice || 0) * (i.stock || 0)), 0);
-        const wasteValue = expiredItems.reduce((sum, i) => sum + ((i.costPrice || 0) * (i.stock || 0)), 0);
-        
-        const totalSales = items.reduce((sum, i) => sum + ((i.sellingPrice || 0) * (i.stock || 0)), 0);
-        const totalCost = items.reduce((sum, i) => sum + ((i.costPrice || 0) * (i.stock || 0)), 0);
-        const avgMargin = totalSales > 0 ? ((totalSales - totalCost) / totalSales) * 100 : 0;
-        
-        const monthlyTrend = [3200, 4100, 3800, 5200, 4800, 6100, 5800, 7200, 6900, 8400, 7900, expiringValue * 0.7];
-        
-        res.json({
-            totalSaved: expiringValue * 0.7,
-            wasteReduction: wasteValue,
-            flashSaleRevenue: expiringValue * 0.5,
-            projectedSavings: expiringValue * 0.7 * 12,
-            turnoverRate: items.length > 0 ? 85 : 0,
-            avgMargin: avgMargin,
-            monthlyTrend: monthlyTrend,
-            categoryData: {
-                labels: ['Dairy', 'Bakery', 'Canned', 'Beverages', 'Other'],
-                values: [35, 20, 25, 15, 5]
-            }
-        });
-    } catch (error) {
-        console.error("Analytics error:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ==================== USAGE CHECK ====================
-
-// Check usage limits
+// ============================================================
+// USAGE CHECK
+// ============================================================
 app.get('/api/usage/:userId/:type', async (req, res) => {
     try {
         const { userId, type } = req.params;
@@ -795,8 +1088,7 @@ app.get('/api/usage/:userId/:type', async (req, res) => {
         }
         
         const subscription = subDoc.data();
-        let current = 0;
-        let limit = 50;
+        let current = 0, limit = 50;
         
         switch (type) {
             case 'products':
@@ -825,8 +1117,9 @@ app.get('/api/usage/:userId/:type', async (req, res) => {
     }
 });
 
-// ==================== START SERVER ====================
-
+// ============================================================
+// START SERVER
+// ============================================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log("=".repeat(50));
@@ -834,6 +1127,7 @@ app.listen(PORT, () => {
     console.log(`📍 URL: http://localhost:${PORT}`);
     console.log(`📡 Firestore: Connected`);
     console.log(`🔐 Firebase Auth: Ready`);
+    console.log(`🛡️ Admin Endpoints: Enabled`);
     console.log("=".repeat(50));
 });
 

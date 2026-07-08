@@ -3769,4 +3769,126 @@
   .admin-subscriptions-table td {
     white-space: nowrap;
   }
+}/* ============================================================
+   ADMIN SUPPLIERS - NEW STYLES
+   ============================================================ */
+.admin-suppliers-table-container {
+  background: var(--admin-bg-card);
+  border-radius: var(--admin-radius-xl);
+  overflow-x: auto;
+  border: 1px solid var(--admin-border);
+  animation: scaleIn 0.5s ease-out;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-suppliers-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 800px;
+}
+
+.admin-suppliers-table th {
+  text-align: left;
+  padding: 12px;
+  background: var(--admin-bg-elevated);
+  color: var(--admin-text-muted);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-suppliers-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--admin-border);
+  color: var(--admin-text-secondary);
+  font-size: 0.75rem;
+}
+
+.admin-suppliers-table tr:hover {
+  background: var(--admin-bg-hover);
+}
+
+.admin-supplier-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-supplier-name i {
+  color: var(--admin-primary);
+  font-size: 0.9rem;
+}
+
+.admin-supplier-rating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-rating-stars {
+  display: flex;
+  gap: 2px;
+}
+
+.admin-star {
+  font-size: 0.9rem;
+  color: #3a4a3a;
+}
+
+.admin-star.filled {
+  color: #f59e0b;
+}
+
+.admin-rating-text {
+  font-size: 0.7rem;
+  color: var(--admin-text-muted);
+}
+
+.admin-store-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-store-avatar {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, var(--admin-primary), var(--admin-primary-dark));
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.7rem;
+  color: #030a03;
+  flex-shrink: 0;
+}
+
+.admin-store-name {
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+
+.admin-store-email {
+  font-size: 0.6rem;
+  color: var(--admin-text-muted);
+}
+
+@media (min-width: 768px) {
+  .admin-suppliers-table th {
+    padding: 14px;
+    font-size: 0.75rem;
+  }
+  .admin-suppliers-table td {
+    padding: 12px;
+    font-size: 0.8rem;
+  }
+  .admin-store-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 0.8rem;
+  }
 }
