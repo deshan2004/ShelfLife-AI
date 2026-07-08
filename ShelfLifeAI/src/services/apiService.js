@@ -1,151 +1,125 @@
 // src/services/apiService.js
-// ✅ Works on Localhost AND Vercel
-
-// Dynamically determine API URL based on environment
-const getApiUrl = () => {
-  // Vercel Production: Use relative path (serverless functions)
-  if (import.meta.env.PROD) {
-    return ''; // Empty = same origin (Vercel handles /api routes)
-  }
-  // Local Development: Use localhost
-  return import.meta.env.VITE_API_URL || 'http://localhost:5000';
-};
-
-const API_URL = getApiUrl();
-
-console.log('🔧 API URL:', API_URL || '(same origin)');
-
-// Helper function for API calls
-const fetchApi = async (endpoint, options = {}) => {
-  const url = `${API_URL}${endpoint}`;
-  console.log(`📡 Fetching: ${url}`);
-  
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      const errorMessage = data.error || data.details?.join(', ') || 'Something went wrong';
-      throw new Error(errorMessage);
-    }
-    return data;
-  } catch (error) {
-    console.error(`❌ API Error (${endpoint}):`, error.message);
-    throw error;
-  }
-};
+const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:5000';
 
 export const api = {
-  // Health
-  async health() {
-    return fetchApi('/api/health');
-  },
+    // Health check
+    async health() {
+        const response = await fetch(`${API_URL}/api/health`);
+        return response.json();
+    },
 
-  // Inventory
-  async getInventory(userId) {
-    return fetchApi(`/api/inventory/${userId}`);
-  },
+    // ============================================================
+    // SUPPLIER ENDPOINTS
+    // ============================================================
 
-  async addProduct(userId, product) {
-    return fetchApi(`/api/inventory/${userId}/add`, {
-      method: 'POST',
-      body: JSON.stringify({ product }),
-    });
-  },
+    async getSuppliers(userId) {
+        const response = await fetch(`${API_URL}/api/suppliers/${userId}`);
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Server error: ${text}`);
+        }
+        return response.json();
+    },
 
-  async updateProduct(userId, itemId, updates) {
-    return fetchApi(`/api/inventory/${userId}/update`, {
-      method: 'PUT',
-      body: JSON.stringify({ itemId, updates }),
-    });
-  },
+    async addSupplier(userId, supplier) {
+        const response = await fetch(`${API_URL}/api/suppliers/${userId}/add`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(supplier)
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Server error: ${text}`);
+        }
+        return response.json();
+    },
 
-  async deleteProduct(userId, itemId) {
-    return fetchApi(`/api/inventory/${userId}/delete/${itemId}`, {
-      method: 'DELETE',
-    });
-  },
+    async updateSupplier(userId, supplierId, updates) {
+        const response = await fetch(`${API_URL}/api/suppliers/${userId}/update/${supplierId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates)
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Server error: ${text}`);
+        }
+        return response.json();
+    },
 
-  // Suppliers
-  async getSuppliers(userId) {
-    if (!userId) {
-      throw new Error('User ID is required');
+    async deleteSupplier(userId, supplierId) {
+        const response = await fetch(`${API_URL}/api/suppliers/${userId}/delete/${supplierId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Server error: ${text}`);
+        }
+        return response.json();
+    },
+
+    // ============================================================
+    // INVENTORY ENDPOINTS
+    // ============================================================
+
+    async getInventory(userId) {
+        const response = await fetch(`${API_URL}/api/inventory/${userId}`);
+        return response.json();
+    },
+
+    async addProduct(userId, product) {
+        const response = await fetch(`${API_URL}/api/inventory/${userId}/add`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ product })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to add product');
+        }
+        return data;
+    },
+
+    async updateProduct(userId, itemId, updates) {
+        const response = await fetch(`${API_URL}/api/inventory/${userId}/update`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemId, updates })
+        });
+        return response.json();
+    },
+
+    async deleteProduct(userId, itemId) {
+        const response = await fetch(`${API_URL}/api/inventory/${userId}/delete/${itemId}`, {
+            method: 'DELETE'
+        });
+        return response.json();
+    },
+
+    // ============================================================
+    // SUBSCRIPTION ENDPOINTS
+    // ============================================================
+
+    async getSubscription(userId) {
+        const response = await fetch(`${API_URL}/api/subscription/${userId}`);
+        return response.json();
+    },
+
+    async upgradeSubscription(userId, planId) {
+        const response = await fetch(`${API_URL}/api/subscription/upgrade`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, planId })
+        });
+        return response.json();
+    },
+
+    // ============================================================
+    // USAGE CHECK
+    // ============================================================
+
+    async checkUsage(userId, type) {
+        const response = await fetch(`${API_URL}/api/usage/${userId}/${type}`);
+        return response.json();
     }
-    return fetchApi(`/api/suppliers/${userId}`);
-  },
-
-  async addSupplier(userId, supplier) {
-    return fetchApi(`/api/suppliers/${userId}/add`, {
-      method: 'POST',
-      body: JSON.stringify(supplier),
-    });
-  },
-
-  async updateSupplier(userId, supplierId, updates) {
-    return fetchApi(`/api/suppliers/${userId}/update/${supplierId}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    });
-  },
-
-  async deleteSupplier(userId, supplierId) {
-    return fetchApi(`/api/suppliers/${userId}/delete/${supplierId}`, {
-      method: 'DELETE',
-    });
-  },
-
-  // Subscription
-  async getSubscription(userId) {
-    return fetchApi(`/api/subscription/${userId}`);
-  },
-
-  async upgradeSubscription(userId, planId) {
-    return fetchApi('/api/subscription/upgrade', {
-      method: 'POST',
-      body: JSON.stringify({ userId, planId }),
-    });
-  },
-
-  // Usage
-  async checkUsage(userId, type) {
-    return fetchApi(`/api/usage/${userId}/${type}`);
-  },
-
-  // Admin
-  async adminGetUsers() {
-    return fetchApi('/api/admin/users');
-  },
-
-  async adminUpdateRole(uid, role) {
-    return fetchApi(`/api/admin/users/${uid}/role`, {
-      method: 'PUT',
-      body: JSON.stringify({ role }),
-    });
-  },
-
-  async adminDeleteUser(uid) {
-    return fetchApi(`/api/admin/users/${uid}`, {
-      method: 'DELETE',
-    });
-  },
-
-  async adminExtendTrial(uid, days) {
-    return fetchApi(`/api/admin/subscriptions/${uid}/extend`, {
-      method: 'POST',
-      body: JSON.stringify({ days }),
-    });
-  },
-
-  async adminUpgradePlan(uid, planId) {
-    return fetchApi(`/api/admin/subscriptions/${uid}/upgrade`, {
-      method: 'POST',
-      body: JSON.stringify({ planId }),
-    });
-  },
 };
