@@ -1,7 +1,8 @@
-// server.mjs - ES Module Version for Vercel
+// server.mjs - Firebase Admin Initialization (Direct File Import)
 import express from 'express';
 import admin from 'firebase-admin';
 import cors from 'cors';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -15,56 +16,31 @@ app.use(express.json());
 let db = null;
 let firebaseReady = false;
 
-console.log('🚀 Starting server (ES Module)...');
+console.log('🚀 Starting server...');
 
 // ============================================================
-// 🔥 FIREBASE ADMIN INITIALIZATION
+// 🔥 FIREBASE ADMIN - DIRECT FROM JSON FILE (NO ENV VARS!)
 // ============================================================
 try {
-    const hasProjectId = !!process.env.FIREBASE_PROJECT_ID;
-    const hasClientEmail = !!process.env.FIREBASE_CLIENT_EMAIL;
-    const hasPrivateKey = !!process.env.FIREBASE_PRIVATE_KEY;
+    // Read serviceAccountKey.json directly from file system
+    const serviceAccountPath = join(__dirname, 'serviceAccountKey.json');
+    const serviceAccountJSON = readFileSync(serviceAccountPath, 'utf8');
+    const serviceAccount = JSON.parse(serviceAccountJSON);
     
-    console.log(`📋 Project ID: ${hasProjectId ? '✅' : '❌'}`);
-    console.log(`📋 Client Email: ${hasClientEmail ? '✅' : '❌'}`);
-    console.log(`📋 Private Key: ${hasPrivateKey ? '✅' : '❌'}`);
+    console.log('📋 Loading serviceAccountKey.json directly...');
+    console.log(`📡 Project: ${serviceAccount.project_id}`);
+
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+
+    db = admin.firestore();
+    firebaseReady = true;
+    console.log('✅ Firebase Admin initialized successfully!');
     
-    if (hasProjectId && hasClientEmail && hasPrivateKey) {
-        let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-        if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-            privateKey = privateKey.slice(1, -1);
-        }
-        privateKey = privateKey.replace(/\\n/g, '\n');
-        
-        admin.initializeApp({
-            credential: admin.credential.cert({
-                projectId: process.env.FIREBASE_PROJECT_ID,
-                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                privateKey: privateKey,
-            })
-        });
-        
-        db = admin.firestore();
-        firebaseReady = true;
-        console.log('✅ Firebase initialized with environment variables!');
-    } else {
-        // Local development - try serviceAccountKey.json
-        try {
-            const serviceAccount = await import('./serviceAccountKey.json', { 
-                assert: { type: 'json' } 
-            });
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount.default)
-            });
-            db = admin.firestore();
-            firebaseReady = true;
-            console.log('✅ Firebase initialized with serviceAccountKey.json');
-        } catch (err) {
-            console.error('❌ No valid credentials found');
-        }
-    }
 } catch (error) {
-    console.error('❌ Firebase error:', error.message);
+    console.error('❌ Failed to load serviceAccountKey.json:', error.message);
+    console.error('   Please ensure serviceAccountKey.json exists in the root folder.');
 }
 
 // ============================================================
@@ -74,12 +50,7 @@ app.get('/api/test', (req, res) => {
     res.json({
         status: 'ok',
         firebaseReady: firebaseReady,
-        timestamp: new Date().toISOString(),
-        env: {
-            PROJECT_ID: !!process.env.FIREBASE_PROJECT_ID,
-            CLIENT_EMAIL: !!process.env.FIREBASE_CLIENT_EMAIL,
-            PRIVATE_KEY: !!process.env.FIREBASE_PRIVATE_KEY
-        }
+        timestamp: new Date().toISOString()
     });
 });
 
@@ -97,9 +68,7 @@ app.get('/api/health', (req, res) => {
 // 🛡️ MIDDLEWARE
 // ============================================================
 app.use((req, res, next) => {
-    if (req.path === '/api/health' || req.path === '/api/test') {
-        return next();
-    }
+    if (req.path === '/api/health' || req.path === '/api/test') return next();
     if (!firebaseReady) {
         return res.status(503).json({ error: 'Firebase not ready' });
     }
@@ -107,14 +76,19 @@ app.use((req, res, next) => {
 });
 
 // ============================================================
-// 👤 SUPPLIERS
+// 👤 SUPPLIERS (Test karanna meka)
 // ============================================================
 app.get('/api/suppliers/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
+        console.log(`📋 Getting suppliers for: ${userId}`);
         const doc = await db.collection('suppliers').doc(userId).get();
+        
         if (!doc.exists) {
-            await db.collection('suppliers').doc(userId).set({ list: [], updatedAt: new Date().toISOString() });
+            await db.collection('suppliers').doc(userId).set({ 
+                list: [], 
+                updatedAt: new Date().toISOString() 
+            });
             return res.json({ list: [] });
         }
         res.json(doc.data());
@@ -124,10 +98,14 @@ app.get('/api/suppliers/:userId', async (req, res) => {
     }
 });
 
+// ============================================================
+// 👤 ADD SUPPLIER
+// ============================================================
 app.post('/api/suppliers/:userId/add', async (req, res) => {
     try {
         const { userId } = req.params;
         const { name, contact, email, address, rating, notes } = req.body;
+        
         if (!name) return res.status(400).json({ error: 'Name required' });
         
         const doc = await db.collection('suppliers').doc(userId).get();
@@ -144,7 +122,10 @@ app.post('/api/suppliers/:userId/add', async (req, res) => {
             createdAt: new Date().toISOString()
         };
         list.push(newSupplier);
-        await db.collection('suppliers').doc(userId).set({ list, updatedAt: new Date().toISOString() });
+        await db.collection('suppliers').doc(userId).set({ 
+            list: list, 
+            updatedAt: new Date().toISOString() 
+        });
         res.status(201).json({ success: true, supplier: newSupplier });
     } catch (error) {
         console.error('❌ Error:', error.message);
@@ -152,17 +133,26 @@ app.post('/api/suppliers/:userId/add', async (req, res) => {
     }
 });
 
+// ============================================================
+// 👤 UPDATE SUPPLIER
+// ============================================================
 app.put('/api/suppliers/:userId/update/:supplierId', async (req, res) => {
     try {
         const { userId, supplierId } = req.params;
         const updates = req.body;
+        
         const doc = await db.collection('suppliers').doc(userId).get();
         if (!doc.exists) return res.status(404).json({ error: 'Not found' });
+        
         let list = doc.data().list || [];
         const index = list.findIndex(s => s.id === supplierId);
         if (index === -1) return res.status(404).json({ error: 'Supplier not found' });
+        
         list[index] = { ...list[index], ...updates, updatedAt: new Date().toISOString() };
-        await db.collection('suppliers').doc(userId).set({ list, updatedAt: new Date().toISOString() });
+        await db.collection('suppliers').doc(userId).set({ 
+            list: list, 
+            updatedAt: new Date().toISOString() 
+        });
         res.json({ success: true, supplier: list[index] });
     } catch (error) {
         console.error('❌ Error:', error.message);
@@ -170,16 +160,25 @@ app.put('/api/suppliers/:userId/update/:supplierId', async (req, res) => {
     }
 });
 
+// ============================================================
+// 👤 DELETE SUPPLIER
+// ============================================================
 app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
     try {
         const { userId, supplierId } = req.params;
+        
         const doc = await db.collection('suppliers').doc(userId).get();
         if (!doc.exists) return res.status(404).json({ error: 'Not found' });
+        
         let list = doc.data().list || [];
         const index = list.findIndex(s => s.id === supplierId);
         if (index === -1) return res.status(404).json({ error: 'Supplier not found' });
+        
         list.splice(index, 1);
-        await db.collection('suppliers').doc(userId).set({ list, updatedAt: new Date().toISOString() });
+        await db.collection('suppliers').doc(userId).set({ 
+            list: list, 
+            updatedAt: new Date().toISOString() 
+        });
         res.json({ success: true, total: list.length });
     } catch (error) {
         console.error('❌ Error:', error.message);
@@ -188,14 +187,18 @@ app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
 });
 
 // ============================================================
-// 👤 INVENTORY
+// 👤 INVENTORY (Basic - Suppliers වැඩ උනාම මේවත් වැඩ කරයි)
 // ============================================================
 app.get('/api/inventory/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
         const doc = await db.collection('inventory').doc(userId).get();
         if (!doc.exists) {
-            await db.collection('inventory').doc(userId).set({ items: [], lastUpdated: new Date().toISOString(), itemCount: 0 });
+            await db.collection('inventory').doc(userId).set({ 
+                items: [], 
+                lastUpdated: new Date().toISOString(), 
+                itemCount: 0 
+            });
             return res.json({ items: [], itemCount: 0 });
         }
         res.json(doc.data());
@@ -210,13 +213,17 @@ app.post('/api/inventory/:userId/add', async (req, res) => {
         const { userId } = req.params;
         const { product } = req.body;
         if (!product || !product.name) return res.status(400).json({ error: 'Name required' });
+        
         const doc = await db.collection('inventory').doc(userId).get();
         let items = doc.exists ? doc.data().items || [] : [];
         const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
-        const newProduct = { id: newId, ...product, addedAt: new Date().toISOString() };
-        items.push(newProduct);
-        await db.collection('inventory').doc(userId).set({ items, lastUpdated: new Date().toISOString(), itemCount: items.length });
-        res.json({ success: true, product: newProduct });
+        items.push({ id: newId, ...product, addedAt: new Date().toISOString() });
+        await db.collection('inventory').doc(userId).set({ 
+            items, 
+            lastUpdated: new Date().toISOString(), 
+            itemCount: items.length 
+        });
+        res.json({ success: true, product: items[items.length - 1] });
     } catch (error) {
         console.error('❌ Error:', error.message);
         res.status(500).json({ error: error.message });
@@ -224,7 +231,7 @@ app.post('/api/inventory/:userId/add', async (req, res) => {
 });
 
 // ============================================================
-// 👤 SUBSCRIPTION
+// 👤 SUBSCRIPTION & USAGE
 // ============================================================
 app.get('/api/subscription/:userId', async (req, res) => {
     try {
@@ -240,17 +247,10 @@ app.get('/api/subscription/:userId', async (req, res) => {
                 trialStart: new Date().toISOString(),
                 trialEnd: trialEnd.toISOString(),
                 features: {
-                    canBasicScan: true,
-                    canOCRScan: true,
-                    canBarcodeScan: true,
-                    canFlashSale: true,
-                    canSupplierReturn: false,
-                    canBasicAnalytics: true,
-                    canAdvancedAnalytics: false,
-                    canPrioritySupport: false,
-                    canAPIAccess: false,
-                    canMultiUser: false,
-                    canExportData: false,
+                    canBasicScan: true, canOCRScan: true, canBarcodeScan: true,
+                    canFlashSale: true, canSupplierReturn: false, canBasicAnalytics: true,
+                    canAdvancedAnalytics: false, canPrioritySupport: false,
+                    canAPIAccess: false, canMultiUser: false, canExportData: false,
                     canCustomReports: false
                 },
                 limits: { maxProducts: 50, maxSuppliers: 10, maxScansPerMonth: 100 },
@@ -267,9 +267,6 @@ app.get('/api/subscription/:userId', async (req, res) => {
     }
 });
 
-// ============================================================
-// 👤 USAGE
-// ============================================================
 app.get('/api/usage/:userId/:type', async (req, res) => {
     try {
         const { userId, type } = req.params;
@@ -292,8 +289,7 @@ app.get('/api/usage/:userId/:type', async (req, res) => {
                 current = data.usage?.scansThisMonth || 0;
                 limit = data.limits?.maxScansPerMonth || 100;
                 break;
-            default:
-                return res.json({ current: 0, limit: 0, remaining: 0, percentageUsed: 0 });
+            default: return res.json({ current: 0, limit: 0, remaining: 0, percentageUsed: 0 });
         }
         const remaining = Math.max(0, limit - current);
         const percentageUsed = limit > 0 ? (current / limit) * 100 : 0;
@@ -338,13 +334,19 @@ app.get('/api/admin/stats', async (req, res) => {
         const activeSubs = subscriptions.filter(s => s.status === 'active').length;
         const trialUsers = subscriptions.filter(s => s.status === 'trial_active').length;
         const planPrices = { BASIC: 2500, PROFESSIONAL: 5900, ENTERPRISE: 14900 };
-        const totalRevenue = subscriptions.filter(s => s.status === 'active').reduce((sum, s) => sum + (planPrices[s.planId] || 0), 0);
+        const totalRevenue = subscriptions
+            .filter(s => s.status === 'active')
+            .reduce((sum, s) => sum + (planPrices[s.planId] || 0), 0);
         res.json({
             totalUsers: users.length,
             activeSubscriptions: activeSubs,
             trialUsers: trialUsers,
             totalRevenue: totalRevenue,
-            recentUsers: users.slice(0, 5).map(u => ({ name: u.name || 'Unknown', email: u.email || '', createdAt: u.createdAt || new Date().toISOString() }))
+            recentUsers: users.slice(0, 5).map(u => ({ 
+                name: u.name || 'Unknown', 
+                email: u.email || '', 
+                createdAt: u.createdAt || new Date().toISOString() 
+            }))
         });
     } catch (error) {
         console.error('❌ Error:', error.message);
@@ -356,7 +358,10 @@ app.get('/api/admin/stats', async (req, res) => {
 // 🌐 ROOT
 // ============================================================
 app.get('/', (req, res) => {
-    res.json({ message: 'ShelfLife AI Backend', status: firebaseReady ? 'Online' : 'Offline' });
+    res.json({ 
+        message: 'ShelfLife AI Backend', 
+        status: firebaseReady ? 'Online' : 'Offline' 
+    });
 });
 
 // ============================================================

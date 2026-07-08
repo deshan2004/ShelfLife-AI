@@ -7,7 +7,7 @@
 .env.test
 
 # Firebase service account
-serviceAccountKey.json
+
 *.key.json
 *.pem
 
