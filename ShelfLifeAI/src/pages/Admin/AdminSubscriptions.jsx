@@ -1,6 +1,5 @@
 // src/pages/Admin/AdminSubscriptions.jsx
 import { useState, useEffect } from 'react'
-import { db, collection, getDocs, doc, updateDoc } from '../../firebaseConfig'
 import './Admin.css'
 
 function AdminSubscriptions() {
@@ -9,56 +8,82 @@ function AdminSubscriptions() {
   const [selectedPlan, setSelectedPlan] = useState('all')
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [toast, setToast] = useState({ show: false, message: '', type: '' })
 
   useEffect(() => {
     loadSubscriptions()
   }, [])
 
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type })
+    setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000)
+  }
+
   const loadSubscriptions = async () => {
     try {
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-      const usersData = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setUsers(usersData);
-      
-      const subsSnapshot = await getDocs(collection(db, 'subscriptions'));
-      const subsData = subsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
+      setLoading(true)
+      // Fetch users
+      const usersRes = await fetch('http://localhost:5000/api/admin/users')
+      if (!usersRes.ok) throw new Error('Failed to fetch users')
+      const usersData = await usersRes.json()
+      setUsers(usersData)
+
+      // Fetch subscriptions
+      const subsRes = await fetch('http://localhost:5000/api/admin/subscriptions')
+      if (!subsRes.ok) throw new Error('Failed to fetch subscriptions')
+      const subsData = await subsRes.json()
+
+      // Combine with user info
       const subscriptionsWithUsers = subsData.map(sub => ({
         ...sub,
         user: usersData.find(u => u.uid === sub.userId)
-      }));
-      
-      setSubscriptions(subscriptionsWithUsers);
+      }))
+      setSubscriptions(subscriptionsWithUsers)
     } catch (error) {
-      console.error('Error loading subscriptions:', error);
+      console.error('Error loading subscriptions:', error)
+      showToast('Error loading subscriptions', 'error')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
   const handleExtendTrial = async (userId, days) => {
-    const subscription = subscriptions.find(s => s.userId === userId);
-    if (subscription) {
-      const newTrialEnd = new Date(subscription.trialEnd);
-      newTrialEnd.setDate(newTrialEnd.getDate() + days);
-      
-      try {
-        await updateDoc(doc(db, 'subscriptions', userId), {
-          trialEnd: newTrialEnd.toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-        await loadSubscriptions();
-      } catch (error) {
-        console.error('Error extending trial:', error);
-      }
+    try {
+      const response = await fetch(`http://localhost:5000/api/admin/subscriptions/${userId}/extend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days })
+      })
+      if (!response.ok) throw new Error('Failed to extend trial')
+      await loadSubscriptions()
+      showToast(`Trial extended by ${days} days`)
+    } catch (error) {
+      console.error('Error extending trial:', error)
+      showToast('Error extending trial', 'error')
+    }
+  }
+
+  const handleUpgrade = async (userId, planId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/admin/subscriptions/${userId}/upgrade`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId })
+      })
+      if (!response.ok) throw new Error('Failed to upgrade')
+      await loadSubscriptions()
+      showToast(`Upgraded to ${planId}`)
+    } catch (error) {
+      console.error('Error upgrading:', error)
+      showToast('Error upgrading', 'error')
     }
   }
 
   const filteredSubscriptions = subscriptions.filter(sub => {
-    const matchesPlan = selectedPlan === 'all' || sub.planId === selectedPlan;
-    const matchesStatus = selectedStatus === 'all' || sub.status === selectedStatus;
-    return matchesPlan && matchesStatus;
-  });
+    const matchesPlan = selectedPlan === 'all' || sub.planId === selectedPlan
+    const matchesStatus = selectedStatus === 'all' || sub.status === selectedStatus
+    return matchesPlan && matchesStatus
+  })
 
   const planStats = {
     trial: subscriptions.filter(s => s.status === 'trial_active').length,
@@ -66,8 +91,8 @@ function AdminSubscriptions() {
     expired: subscriptions.filter(s => s.status === 'trial_expired').length,
     total: subscriptions.length,
     monthlyRevenue: subscriptions.filter(s => s.status === 'active').reduce((sum, s) => {
-      const prices = { BASIC: 2500, PROFESSIONAL: 5900, ENTERPRISE: 14900 };
-      return sum + (prices[s.planId] || 0);
+      const prices = { BASIC: 2500, PROFESSIONAL: 5900, ENTERPRISE: 14900 }
+      return sum + (prices[s.planId] || 0)
     }, 0)
   }
 
@@ -82,55 +107,39 @@ function AdminSubscriptions() {
 
   return (
     <div className="admin-subscriptions">
+      {toast.show && (
+        <div className={`admin-toast ${toast.type}`}>
+          <i className={`fas ${toast.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}`}></i>
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       <div className="admin-page-header">
         <div>
-          <h1>
-            <i className="fas fa-credit-card"></i>
-            Subscription Management
-          </h1>
+          <h1><i className="fas fa-credit-card"></i> Subscription Management</h1>
           <p>Manage user subscriptions, trials, and payment plans</p>
         </div>
       </div>
-      
+
       <div className="admin-subscription-stats">
         <div className="admin-stats-card">
-          <div className="admin-stats-icon trial">
-            <i className="fas fa-hourglass-half"></i>
-          </div>
-          <div className="admin-stats-info">
-            <h3>{planStats.trial}</h3>
-            <p>Trial Users</p>
-          </div>
+          <div className="admin-stats-icon trial"><i className="fas fa-hourglass-half"></i></div>
+          <div className="admin-stats-info"><h3>{planStats.trial}</h3><p>Trial Users</p></div>
         </div>
         <div className="admin-stats-card">
-          <div className="admin-stats-icon active">
-            <i className="fas fa-check-circle"></i>
-          </div>
-          <div className="admin-stats-info">
-            <h3>{planStats.active}</h3>
-            <p>Active Subscriptions</p>
-          </div>
+          <div className="admin-stats-icon active"><i className="fas fa-check-circle"></i></div>
+          <div className="admin-stats-info"><h3>{planStats.active}</h3><p>Active Subscriptions</p></div>
         </div>
         <div className="admin-stats-card">
-          <div className="admin-stats-icon expired">
-            <i className="fas fa-clock"></i>
-          </div>
-          <div className="admin-stats-info">
-            <h3>{planStats.expired}</h3>
-            <p>Expired Trials</p>
-          </div>
+          <div className="admin-stats-icon expired"><i className="fas fa-clock"></i></div>
+          <div className="admin-stats-info"><h3>{planStats.expired}</h3><p>Expired Trials</p></div>
         </div>
         <div className="admin-stats-card">
-          <div className="admin-stats-icon revenue">
-            <i className="fas fa-chart-line"></i>
-          </div>
-          <div className="admin-stats-info">
-            <h3>LKR {planStats.monthlyRevenue.toLocaleString()}</h3>
-            <p>Monthly Revenue</p>
-          </div>
+          <div className="admin-stats-icon revenue"><i className="fas fa-chart-line"></i></div>
+          <div className="admin-stats-info"><h3>LKR {planStats.monthlyRevenue.toLocaleString()}</h3><p>Monthly Revenue</p></div>
         </div>
       </div>
-      
+
       <div className="admin-filters-bar">
         <div className="admin-plan-filters">
           <button className={`admin-plan-filter ${selectedPlan === 'all' ? 'active' : ''}`} onClick={() => setSelectedPlan('all')}>All Plans</button>
@@ -146,7 +155,7 @@ function AdminSubscriptions() {
           <button className={`admin-filter-btn ${selectedStatus === 'trial_expired' ? 'active' : ''}`} onClick={() => setSelectedStatus('trial_expired')}>Expired</button>
         </div>
       </div>
-      
+
       <div className="admin-subscriptions-table-container">
         <table className="admin-subscriptions-table">
           <thead>
@@ -162,25 +171,19 @@ function AdminSubscriptions() {
           </thead>
           <tbody>
             {filteredSubscriptions.map(sub => {
-              const daysLeft = sub.trialEnd ? Math.ceil((new Date(sub.trialEnd) - new Date()) / (1000 * 60 * 60 * 24)) : 0;
+              const daysLeft = sub.trialEnd ? Math.ceil((new Date(sub.trialEnd) - new Date()) / (1000 * 60 * 60 * 24)) : 0
               return (
                 <tr key={sub.userId}>
                   <td>
                     <div className="admin-user-info">
-                      <div className="admin-user-avatar">
-                        {sub.user?.name?.charAt(0) || 'U'}
-                      </div>
+                      <div className="admin-user-avatar">{sub.user?.name?.charAt(0) || 'U'}</div>
                       <div>
                         <div className="admin-user-name">{sub.user?.name || 'Unknown'}</div>
                         <div className="admin-user-email">{sub.user?.email}</div>
                       </div>
                     </div>
                   </td>
-                  <td>
-                    <span className={`admin-plan-badge ${sub.planId?.toLowerCase()}`}>
-                      {sub.planId === 'FREE_TRIAL' ? 'Free Trial' : sub.planId}
-                    </span>
-                  </td>
+                  <td><span className={`admin-plan-badge ${sub.planId?.toLowerCase()}`}>{sub.planId === 'FREE_TRIAL' ? 'Free Trial' : sub.planId}</span></td>
                   <td>
                     <span className={`admin-status-badge ${sub.status}`}>
                       {sub.status === 'trial_active' ? 'Trial Active' : 
@@ -188,48 +191,45 @@ function AdminSubscriptions() {
                        sub.status === 'trial_expired' ? 'Trial Expired' : 'Inactive'}
                     </span>
                   </td>
-                  <td>{new Date(sub.createdAt).toLocaleDateString()}</td>
+                  <td>{sub.createdAt ? new Date(sub.createdAt).toLocaleDateString() : 'N/A'}</td>
                   <td>{sub.trialEnd ? new Date(sub.trialEnd).toLocaleDateString() : 'N/A'}</td>
                   <td>
                     {sub.status === 'trial_active' && (
-                      <span className={`admin-days-badge ${daysLeft <= 3 ? 'critical' : daysLeft <= 7 ? 'warning' : ''}`}>
-                        {daysLeft} days
-                      </span>
+                      <span className={`admin-days-badge ${daysLeft <= 3 ? 'critical' : daysLeft <= 7 ? 'warning' : ''}`}>{daysLeft} days</span>
                     )}
                     {sub.status === 'active' && <span className="admin-days-badge active">Active</span>}
                     {sub.status === 'trial_expired' && <span className="admin-days-badge expired">Expired</span>}
-                   </td>
+                  </td>
                   <td>
                     <div className="admin-action-buttons">
                       {sub.status === 'trial_active' && (
                         <>
-                          <button 
-                            className="admin-extend-btn" 
-                            onClick={() => handleExtendTrial(sub.userId, 7)}
-                            title="Extend trial by 7 days"
-                          >
+                          <button className="admin-extend-btn" onClick={() => handleExtendTrial(sub.userId, 7)} title="Extend trial by 7 days">
                             <i className="fas fa-calendar-plus"></i>
                           </button>
-                          <button 
-                            className="admin-upgrade-btn" 
-                            onClick={() => handleExtendTrial(sub.userId, 14)}
-                            title="Extend trial by 14 days"
-                          >
+                          <button className="admin-extend-btn" onClick={() => handleExtendTrial(sub.userId, 14)} title="Extend trial by 14 days">
                             <i className="fas fa-gift"></i>
                           </button>
                         </>
+                      )}
+                      {sub.status !== 'active' && (
+                        <button className="admin-upgrade-btn" onClick={() => {
+                          const plan = prompt('Enter plan to upgrade (BASIC, PROFESSIONAL, ENTERPRISE):', 'PROFESSIONAL')
+                          if (plan) handleUpgrade(sub.userId, plan)
+                        }} title="Upgrade Plan">
+                          <i className="fas fa-arrow-up"></i>
+                        </button>
                       )}
                       <button className="admin-view-btn" title="View Details">
                         <i className="fas fa-eye"></i>
                       </button>
                     </div>
-                   </td>
-                 </tr>
-              );
+                  </td>
+                </tr>
+              )
             })}
           </tbody>
         </table>
-        
         {filteredSubscriptions.length === 0 && (
           <div className="admin-empty-state">
             <i className="fas fa-credit-card"></i>

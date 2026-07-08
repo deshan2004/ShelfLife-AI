@@ -1,8 +1,9 @@
-// src/pages/Inventory.jsx (updated scanner section)
+// src/pages/Inventory.jsx
 import { useState } from 'react'
 import BarcodeScanner from '../components/AdvancedBarcodeScanner'
 import OCRScanner from '../components/AdvancedOCRScanner'
 import SubscriptionGuard from '../components/subscription/SubscriptionGuard'
+import { api } from '../services/apiService' // ✅ API Service import කරන්න
 import './Pages.css'
 
 function Inventory({ 
@@ -15,7 +16,8 @@ function Inventory({
   onLimitReached,
   subscriptionStatus,
   isTrialActive,
-  isTrialExpired 
+  isTrialExpired,
+  user  // ✅ user prop එක add කරන්න (UID එක සඳහා)
 }) {
   const [showScanner, setShowScanner] = useState(false)
   const [scanType, setScanType] = useState(null)
@@ -44,7 +46,11 @@ function Inventory({
     lowStockCount: inventory.filter(i => i.stock <= i.lowStockThreshold).length
   }
 
-  const handleAddProduct = (productData) => {
+  // ============================================================
+  // 🔥 UPDATED: handleAddProduct - දැන් Firebase API එක CALL කරනවා
+  // ============================================================
+  const handleAddProduct = async (productData) => {
+    // Trial limits check
     if (!canAddProduct) {
       if (isTrialActive) {
         onLimitReached('products', usage.productsUsed, usage.productsLimit);
@@ -55,6 +61,7 @@ function Inventory({
       return;
     }
 
+    // Generate new ID for local state
     const newId = Math.max(...inventory.map(i => i.id), 0) + 1;
     const daysLeft = Math.ceil((new Date(productData.expiryDate || new Date(Date.now() + 30 * 86400000)) - new Date()) / (1000 * 60 * 60 * 24));
     
@@ -75,38 +82,65 @@ function Inventory({
       costPrice: productData.costPrice || 100,
       sellingPrice: productData.sellingPrice || 150
     };
-    
-    onUpdateInventory([...inventory, newProduct]);
-    showToast(`✅ ${newProduct.name} added to inventory!`);
+
+    // 🔥 1. API එක හරහා Firebase Firestore එකට Save කරන්න
+    try {
+      const result = await api.addProduct(user.uid, newProduct);
+      if (result.success) {
+        // 2. Local state එක update කරන්න (Server response එකෙන් product එක ගන්න)
+        const addedProduct = result.product;
+        const finalProduct = { ...newProduct, ...addedProduct };
+        onUpdateInventory([...inventory, finalProduct]);
+        showToast(`✅ ${finalProduct.name} added to inventory!`);
+      } else {
+        showToast(`❌ Failed to add product: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Add product error:', error);
+      showToast('❌ Failed to add product. Please try again.');
+    }
   };
 
+  // ============================================================
+  // 🔥 UPDATED: handleScan - Barcode / OCR Scan results handle කරනවා
+  // ============================================================
   const handleScan = (scanData) => {
     if (scanData.type === 'barcode') {
+      // Barcode එකෙන් product එක හොයන්න
       const existingProduct = inventory.find(p => p.batch === scanData.value);
       if (existingProduct) {
         showToast(`📦 Product found: ${existingProduct.name} - Stock: ${existingProduct.stock}`);
         setSelectedProduct(existingProduct);
         setShowEditModal(true);
       } else {
+        // ✅ New Product - Auto Add කරන්න
         if (!canAddProduct && isTrialActive) {
           onLimitReached('products', usage.productsUsed, usage.productsLimit);
           setShowScanner(false);
           return;
         }
         
-        const productName = window.prompt('Enter product name:', 'New Product');
+        const productName = window.prompt('Enter product name:', scanData.productInfo?.name || 'New Product');
         if (productName) {
+          // 🔥 මෙතනින් handleAddProduct call වෙනවා -> API call යනවා
           handleAddProduct({
             name: productName,
             batch: scanData.value,
-            supplier: 'Scanned Item'
+            supplier: scanData.productInfo?.brand || 'Scanned Item',
+            expiryDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+            stock: 1,
+            costPrice: 100,
+            sellingPrice: 150
           });
         }
       }
     } else if (scanData.type === 'ocr') {
+      // OCR - Expiry date detection
       showToast(`📅 Expiry date detected: ${scanData.value}`);
       const expiringProducts = inventory.filter(p => p.daysLeft <= 14 && p.daysLeft > 0);
+      
       if (expiringProducts.length > 0) {
+        // Existing product එකක expiry date එක update කරන්න
         const productToUpdate = expiringProducts[0];
         if (window.confirm(`Update expiry for ${productToUpdate.name} to ${scanData.value}?`)) {
           const daysLeft = Math.ceil((new Date(scanData.value) - new Date()) / (1000 * 60 * 60 * 24));
@@ -121,12 +155,51 @@ function Inventory({
           onUpdateInventory(updatedInventory);
           showToast(`✅ Expiry updated for ${productToUpdate.name}`);
         }
+      } else {
+        // ✅ New Product - Scanned Expiry Date එකත් එක්ක Auto Add කරන්න
+        const productName = window.prompt('Enter product name:', 'New Product');
+        if (productName) {
+          handleAddProduct({
+            name: productName,
+            batch: `OCR-${Date.now().toString().slice(-6)}`,
+            supplier: 'OCR Scanned',
+            expiryDate: scanData.value,
+            stock: 1,
+            costPrice: 100,
+            sellingPrice: 150
+          });
+        }
       }
     }
     setShowScanner(false);
     setScanType(null);
   };
 
+  // ============================================================
+  // Edit Modal & Delete Functions (Local state update + API call optional)
+  // ============================================================
+  const handleEditProduct = (updatedProduct) => {
+    const updatedInventory = inventory.map(item => 
+      item.id === updatedProduct.id ? updatedProduct : item
+    );
+    onUpdateInventory(updatedInventory);
+    showToast(`✏️ ${updatedProduct.name} updated`);
+    setShowEditModal(false);
+    setSelectedProduct(null);
+  };
+
+  const handleDeleteProduct = (productId) => {
+    const product = inventory.find(p => p.id === productId);
+    if (product && window.confirm(`Delete ${product.name} from inventory?`)) {
+      const updatedInventory = inventory.filter(item => item.id !== productId);
+      onUpdateInventory(updatedInventory);
+      showToast(`🗑️ ${product.name} removed from inventory`);
+    }
+  };
+
+  // ============================================================
+  // UI RENDER (Unchanged)
+  // ============================================================
   return (
     <div className="page-container">
       <div className="page-header">
@@ -156,6 +229,7 @@ function Inventory({
         </button>
       </div>
 
+      {/* Stats Cards */}
       <div className="stats-grid-inline">
         <div className="stat-card-mini">
           <div className="stat-icon"><i className="fas fa-box"></i></div>
@@ -187,14 +261,13 @@ function Inventory({
         </div>
       </div>
 
-      {/* Scanner Section */}
+      {/* Scanner Selection */}
       {showScanner && !scanType && (
         <div className="scanner-section">
           <div className="scanner-tabs">
             <button className="scanner-tab" onClick={() => setScanType('barcode')}>
               <i className="fas fa-barcode"></i> Barcode Scanner
             </button>
-            {/* OCR Scanner - Now enabled for testing */}
             <button 
               className="scanner-tab" 
               onClick={() => setScanType('ocr')}
@@ -285,13 +358,7 @@ function Inventory({
                     }}>
                       <i className="fas fa-edit"></i>
                     </button>
-                    <button className="btn-delete" onClick={() => {
-                      if (window.confirm(`Delete ${item.name}?`)) {
-                        const updatedInventory = inventory.filter(i => i.id !== item.id);
-                        onUpdateInventory(updatedInventory);
-                        showToast(`🗑️ ${item.name} removed`);
-                      }
-                    }}>
+                    <button className="btn-delete" onClick={() => handleDeleteProduct(item.id)}>
                       <i className="fas fa-trash"></i>
                     </button>
                   </div>
@@ -323,18 +390,7 @@ function Inventory({
             </div>
             <form className="modal-form" onSubmit={(e) => {
               e.preventDefault();
-              const daysLeft = Math.ceil((new Date(selectedProduct.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
-              const updatedInventory = inventory.map(item => 
-                item.id === selectedProduct.id ? {
-                  ...selectedProduct,
-                  daysLeft: daysLeft,
-                  status: daysLeft <= 0 ? 'expired' : daysLeft <= 7 ? 'warning' : 'good'
-                } : item
-              );
-              onUpdateInventory(updatedInventory);
-              showToast(`✏️ ${selectedProduct.name} updated`);
-              setShowEditModal(false);
-              setSelectedProduct(null);
+              handleEditProduct(selectedProduct);
             }}>
               <div className="form-group">
                 <label>Product Name</label>
