@@ -38,14 +38,10 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-
-// Initialize services
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Social Providers
 const googleProvider = new GoogleAuthProvider();
 const githubProvider = new GithubAuthProvider();
 const facebookProvider = new FacebookAuthProvider();
@@ -86,10 +82,7 @@ export {
 export const getUserRole = async (userId) => {
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
-    if (userDoc.exists()) {
-      return userDoc.data().role || 'user';
-    }
-    return 'user';
+    return userDoc.exists() ? userDoc.data().role || 'user' : 'user';
   } catch (error) {
     console.error('Error getting user role:', error);
     return 'user';
@@ -112,10 +105,7 @@ export const setUserRole = async (userId, role) => {
 export const getUserSubscription = async (userId) => {
   try {
     const subDoc = await getDoc(doc(db, 'subscriptions', userId));
-    if (subDoc.exists()) {
-      return subDoc.data();
-    }
-    return null;
+    return subDoc.exists() ? subDoc.data() : null;
   } catch (error) {
     console.error('Error getting user subscription:', error);
     return null;
