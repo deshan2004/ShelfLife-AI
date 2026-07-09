@@ -41,17 +41,77 @@ function App() {
   const [inventory, setInventory] = useState([])
   const [toastMsg, setToastMsg] = useState(null)
 
+  // ✅ Load inventory from Firebase via API
+  const loadUserInventory = async (userId, forceRefresh = false) => {
+    if (!userId) return;
+    
+    try {
+      console.log('🔄 Loading inventory from backend for user:', userId);
+      const data = await api.getInventory(userId);
+      const items = data.items || [];
+      console.log(`✅ Loaded ${items.length} products from backend`);
+      setInventory(items);
+      
+      // Update localStorage as backup
+      localStorage.setItem(`shelflife_inventory_${userId}`, JSON.stringify(items));
+      return items;
+    } catch (error) {
+      console.error('❌ Error loading inventory from server:', error);
+      
+      // Try localStorage as fallback
+      const savedInventory = localStorage.getItem(`shelflife_inventory_${userId}`);
+      if (savedInventory) {
+        try {
+          const items = JSON.parse(savedInventory);
+          console.log(`📦 Loaded ${items.length} products from localStorage fallback`);
+          setInventory(items);
+          return items;
+        } catch (e) {
+          console.error('❌ Error parsing localStorage:', e);
+        }
+      }
+      
+      // If nothing works, try to seed initial data
+      await seedInitialInventory(userId);
+      return [];
+    }
+  };
+
+  // ✅ Seed initial inventory if empty
+  const seedInitialInventory = async (userId) => {
+    try {
+      const { initialInventory } = await import('./data/inventoryData');
+      console.log('🌱 Seeding initial inventory...');
+      
+      let addedCount = 0;
+      for (const product of initialInventory) {
+        try {
+          const result = await api.addProduct(userId, product);
+          if (result.success) addedCount++;
+        } catch (e) {
+          console.error('Error seeding product:', e);
+        }
+      }
+      
+      console.log(`✅ Seeded ${addedCount} products`);
+      await loadUserInventory(userId, true);
+    } catch (error) {
+      console.error('❌ Seed error:', error);
+    }
+  };
+
+  // ✅ Auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
-          let role = 'user'
-          let userData = {}
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          let role = 'user';
+          let userData = {};
 
           if (userDoc.exists()) {
-            userData = userDoc.data()
-            role = userData.role || 'user'
+            userData = userDoc.data();
+            role = userData.role || 'user';
           } else {
             const newUserData = {
               uid: firebaseUser.uid,
@@ -60,10 +120,10 @@ function App() {
               role: 'user',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
-            }
-            await setDoc(doc(db, 'users', firebaseUser.uid), newUserData)
-            userData = newUserData
-            role = 'user'
+            };
+            await setDoc(doc(db, 'users', firebaseUser.uid), newUserData);
+            userData = newUserData;
+            role = 'user';
           }
 
           const fullUserData = {
@@ -73,98 +133,68 @@ function App() {
             photoURL: firebaseUser.photoURL,
             role: role,
             ...userData
-          }
+          };
 
-          setUser(fullUserData)
-          setUserRole(role)
-          localStorage.setItem('shelflife_user', JSON.stringify(fullUserData))
+          setUser(fullUserData);
+          setUserRole(role);
+          localStorage.setItem('shelflife_user', JSON.stringify(fullUserData));
 
+          // ✅ Load inventory from backend
           if (role === 'user' || role === 'admin') {
-            await loadUserInventory(firebaseUser.uid)
+            await loadUserInventory(firebaseUser.uid);
           }
         } catch (error) {
-          console.error("Error loading user data:", error)
+          console.error("❌ Error loading user data:", error);
         }
       } else {
-        setUser(null)
-        setUserRole('user')
-        localStorage.removeItem('shelflife_user')
-        setInventory([])
+        setUser(null);
+        setUserRole('user');
+        localStorage.removeItem('shelflife_user');
+        setInventory([]);
       }
-      setLoading(false)
-    })
+      setLoading(false);
+    });
 
-    return () => unsubscribe()
-  }, [])
-
-  // ✅ UPDATED: Load inventory from Firebase via API
-  const loadUserInventory = async (userId) => {
-    try {
-      const data = await api.getInventory(userId);
-      const items = data.items || [];
-      setInventory(items);
-      localStorage.setItem(`shelflife_inventory_${userId}`, JSON.stringify(items));
-    } catch (error) {
-      console.error('Error loading inventory from server:', error);
-      const savedInventory = localStorage.getItem(`shelflife_inventory_${userId}`);
-      if (savedInventory) {
-        try {
-          setInventory(JSON.parse(savedInventory));
-        } catch (e) {
-          await loadInitialInventory(userId);
-        }
-      } else {
-        await loadInitialInventory(userId);
-      }
-    }
-  };
-
-  const loadInitialInventory = async (userId) => {
-    const { initialInventory } = await import('./data/inventoryData');
-    setInventory(initialInventory);
-    localStorage.setItem(`shelflife_inventory_${userId}`, JSON.stringify(initialInventory));
-    if (userId) {
-      try {
-        for (const product of initialInventory) {
-          await api.addProduct(userId, product);
-        }
-      } catch (e) {
-        console.error('Error seeding initial inventory:', e);
-      }
-    }
-  };
+    return () => unsubscribe();
+  }, []);
 
   const showToast = (message) => {
-    setToastMsg(message)
-    setTimeout(() => setToastMsg(null), 4000)
-  }
+    setToastMsg(message);
+    setTimeout(() => setToastMsg(null), 4000);
+  };
 
   const handleLogin = (userData) => {
-    setUser(userData)
-    setUserRole(userData.role || 'user')
-    setShowLogin(false)
-    showToast(`Welcome back, ${userData.name}!`)
-  }
+    setUser(userData);
+    setUserRole(userData.role || 'user');
+    setShowLogin(false);
+    showToast(`Welcome back, ${userData.name}!`);
+    
+    // Load inventory after login
+    if (userData.uid) {
+      loadUserInventory(userData.uid);
+    }
+  };
 
   const handleLogout = async () => {
     try {
-      await auth.signOut()
-      setUser(null)
-      setUserRole('user')
-      showToast('You have been signed out')
+      await auth.signOut();
+      setUser(null);
+      setUserRole('user');
+      setInventory([]);
+      showToast('You have been signed out');
     } catch (error) {
-      console.error("Logout error:", error)
+      console.error("Logout error:", error);
     }
-  }
+  };
 
   const handleUpdateInventory = (newInventory) => {
-    setInventory(newInventory)
+    setInventory(newInventory);
     if (user && user.uid) {
-      localStorage.setItem(`shelflife_inventory_${user.uid}`, JSON.stringify(newInventory))
+      localStorage.setItem(`shelflife_inventory_${user.uid}`, JSON.stringify(newInventory));
     }
-  }
+  };
 
-  const isAdmin = userRole === 'admin' || userRole === 'super_admin'
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
   if (loading) {
     return (
@@ -172,7 +202,7 @@ function App() {
         <div className="loading-spinner"></div>
         <p>Loading ShelfLife AI...</p>
       </div>
-    )
+    );
   }
 
   return (
@@ -187,13 +217,11 @@ function App() {
 
         <main className="main-content">
           <Routes>
-            {/* Public Route */}
             <Route path="/" element={
               user ? <Navigate to={isAdmin ? "/admin/dashboard" : "/dashboard"} replace /> :
                 <LandingPage onLoginClick={() => setShowLogin(true)} />
             } />
 
-            {/* User Routes */}
             <Route path="/dashboard" element={
               <ProtectedRoute user={user}>
                 {isAdmin ? <Navigate to="/admin/dashboard" replace /> : (
@@ -214,6 +242,7 @@ function App() {
                     onUpdateInventory={handleUpdateInventory}
                     showToast={showToast}
                     user={user}
+                    refreshInventory={() => loadUserInventory(user?.uid, true)}
                   />
                 )}
               </ProtectedRoute>
@@ -227,6 +256,7 @@ function App() {
                     onUpdateInventory={handleUpdateInventory}
                     showToast={showToast}
                     user={user}
+                    refreshInventory={() => loadUserInventory(user?.uid, true)}
                   />
                 )}
               </ProtectedRoute>
@@ -252,7 +282,6 @@ function App() {
               </ProtectedRoute>
             } />
 
-            {/* Admin Routes */}
             <Route path="/admin/dashboard" element={
               <ProtectedRoute user={user}>
                 {isAdmin ? <AdminDashboard admin={user} /> : <Navigate to="/dashboard" replace />}
@@ -289,7 +318,6 @@ function App() {
               </ProtectedRoute>
             } />
 
-            {/* Payment Routes */}
             <Route path="/payment-success" element={<PaymentSuccess />} />
             <Route path="/payment-cancel" element={<PaymentCancel />} />
 
@@ -315,7 +343,7 @@ function App() {
         <Chatbot />
       </div>
     </Router>
-  )
+  );
 }
 
-export default App
+export default App;
