@@ -8,75 +8,60 @@ export const api = {
     return response.json();
   },
 
-  // ===== AUTH =====
-  async signup(data) {
-    const response = await fetch(`${API_URL}/api/signup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Signup failed');
-    }
-    return response.json();
-  },
-
-  async login(idToken) {
-    const response = await fetch(`${API_URL}/api/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken })
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Login failed');
-    }
-    return response.json();
-  },
-
-  async socialLogin(data) {
-    const response = await fetch(`${API_URL}/api/social-login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return response.json();
-  },
-
   // ===== INVENTORY =====
   async getInventory(userId) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/inventory/${userId}`);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch inventory');
+    }
     return response.json();
   },
 
   async addProduct(userId, product) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/inventory/${userId}/add`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ product })
     });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to add product');
+    }
     return response.json();
   },
 
   async updateProduct(userId, itemId, updates) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/inventory/${userId}/update`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ itemId, updates })
     });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update product');
+    }
     return response.json();
   },
 
   async deleteProduct(userId, itemId) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/inventory/${userId}/delete/${itemId}`, {
       method: 'DELETE'
     });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete product');
+    }
     return response.json();
   },
 
   // ===== SUPPLIERS =====
   async getSuppliers(userId) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/suppliers/${userId}`);
     if (!response.ok) {
       const error = await response.json();
@@ -86,6 +71,7 @@ export const api = {
   },
 
   async addSupplier(userId, supplierData) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/suppliers/${userId}/add`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -99,6 +85,7 @@ export const api = {
   },
 
   async updateSupplier(userId, supplierId, updates) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/suppliers/${userId}/update`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -112,6 +99,7 @@ export const api = {
   },
 
   async deleteSupplier(userId, supplierId) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/suppliers/${userId}/delete/${supplierId}`, {
       method: 'DELETE'
     });
@@ -124,21 +112,32 @@ export const api = {
 
   // ===== SUBSCRIPTION =====
   async getSubscription(userId) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/subscription/${userId}`);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch subscription');
+    }
     return response.json();
   },
 
   async upgradeSubscription(userId, planId) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/subscription/upgrade`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, planId })
     });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to upgrade subscription');
+    }
     return response.json();
   },
 
   // ===== SCANS =====
   async logScan(userId, scanData) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/scans/${userId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -148,12 +147,14 @@ export const api = {
   },
 
   async getScanHistory(userId) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/scans/${userId}`);
     return response.json();
   },
 
   // ===== PAYMENTS =====
   async processPayment(userId, amount, planId, paymentId) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/payments/process`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -163,23 +164,27 @@ export const api = {
   },
 
   async getPaymentHistory(userId) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/payments/${userId}`);
     return response.json();
   },
 
   // ===== DASHBOARD & ANALYTICS =====
   async getDashboard(userId) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/dashboard/${userId}`);
     return response.json();
   },
 
   async getAnalytics(userId) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/analytics/${userId}`);
     return response.json();
   },
 
   // ===== USAGE =====
   async checkUsage(userId, type) {
+    if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/usage/${userId}/${type}`);
     return response.json();
   }

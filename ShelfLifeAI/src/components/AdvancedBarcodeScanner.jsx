@@ -96,11 +96,14 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
     animationRef.current = requestAnimationFrame(detectBarcode);
   };
 
-  // Start camera
+  // ✅ FIXED: Start camera - Set cameraActive TRUE first, so video renders
   const startCamera = async () => {
     setCameraError(null);
     setScanning(true);
     
+    // 🔥 CRITICAL FIX: Activate camera UI FIRST so videoRef.current exists
+    setCameraActive(true);
+
     try {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -118,17 +121,21 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
       
+      // Now videoRef.current is DEFINITELY available because cameraActive is true
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
           videoRef.current.play();
-          setCameraActive(true);
+          // cameraActive is already true, no need to set again
           setScanning(false);
           animationRef.current = requestAnimationFrame(detectBarcode);
         };
       }
     } catch (err) {
       console.error('Camera error:', err);
+      // If error, deactivate camera
+      setCameraActive(false);
+      
       let errorMessage = 'Could not access camera. ';
       if (err.name === 'NotAllowedError') {
         errorMessage = 'Please allow camera access in your browser.';
@@ -232,34 +239,44 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
         </div>
       )}
 
-      {/* Active Camera View */}
-      {cameraActive && !showMobileScanner && (
-        <div className="camera-container">
-          <video 
-            ref={videoRef} 
-            className="camera-preview" 
-            autoPlay 
-            playsInline 
-            muted
-          />
-          <div className="scan-overlay">
-            <div className="scan-frame">
-              <div className="scan-line"></div>
-              <div className="corner tl"></div>
-              <div className="corner tr"></div>
-              <div className="corner bl"></div>
-              <div className="corner br"></div>
+      {/* 
+        ✅ FIXED: Camera Container - Always rendered but hidden when inactive.
+        This ensures videoRef.current exists when startCamera runs.
+      */}
+      <div 
+        className="camera-container" 
+        style={{ display: cameraActive && !showMobileScanner ? 'block' : 'none' }}
+      >
+        <video 
+          ref={videoRef} 
+          className="camera-preview" 
+          autoPlay 
+          playsInline 
+          muted
+        />
+        
+        {/* Show overlay ONLY when camera is active */}
+        {cameraActive && !showMobileScanner && (
+          <>
+            <div className="scan-overlay">
+              <div className="scan-frame">
+                <div className="scan-line"></div>
+                <div className="corner tl"></div>
+                <div className="corner tr"></div>
+                <div className="corner bl"></div>
+                <div className="corner br"></div>
+              </div>
+              <div className="scan-instruction">
+                <i className="fas fa-qrcode"></i>
+                <span>Position barcode within the frame</span>
+              </div>
             </div>
-            <div className="scan-instruction">
-              <i className="fas fa-qrcode"></i>
-              <span>Position barcode within the frame</span>
-            </div>
-          </div>
-          <button onClick={stopCamera} className="btn-stop-camera">
-            <i className="fas fa-stop"></i> Stop Scanner
-          </button>
-        </div>
-      )}
+            <button onClick={stopCamera} className="btn-stop-camera">
+              <i className="fas fa-stop"></i> Stop Scanner
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Camera Error */}
       {cameraError && !showMobileScanner && (
