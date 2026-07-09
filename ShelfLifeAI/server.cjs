@@ -1,6 +1,4 @@
-// server.cjs - Complete backend with dotenv, Email + Twilio SMS Alerts
-require('dotenv').config(); // ✅ Load .env file
-
+// server.cjs - Complete backend with Email + Twilio SMS Alerts
 const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
@@ -32,11 +30,6 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 const auth = admin.auth();
 
-// ==================== ENV CHECK ====================
-console.log('📧 Email User:', process.env.EMAIL_USER ? '✅ Set' : '❌ Missing');
-console.log('📱 Twilio SID:', process.env.TWILIO_ACCOUNT_SID ? '✅ Set' : '❌ Missing');
-console.log('📱 Twilio Number:', process.env.TWILIO_PHONE_NUMBER || 'Not set');
-
 // ==================== TWILIO SMS SETUP ====================
 const twilioClient = twilio(
     process.env.TWILIO_ACCOUNT_SID,
@@ -44,24 +37,22 @@ const twilioClient = twilio(
 );
 const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '+15077087757';
 
+console.log(`📱 Twilio Number: ${TWILIO_PHONE_NUMBER}`);
+
 // ==================== EMAIL ALERTS SYSTEM ====================
 const emailTransporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+        user: process.env.EMAIL_USER || 'your-email@gmail.com',
+        pass: process.env.EMAIL_PASS || 'your-app-password'
     }
 });
 
 // ==================== EMAIL FUNCTIONS ====================
 async function sendEmailAlert(to, subject, htmlContent) {
     try {
-        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-            console.log('⚠️ Email not configured. Skipping...');
-            return { success: false, error: 'Email not configured' };
-        }
         const mailOptions = {
-            from: process.env.EMAIL_USER,
+            from: process.env.EMAIL_USER || 'your-email@gmail.com',
             to: to,
             subject: subject,
             html: htmlContent
@@ -183,10 +174,6 @@ function generateAlertEmail(products, alertType) {
 // ==================== SMS FUNCTIONS ====================
 async function sendTwilioSms(to, message) {
     try {
-        if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-            console.log('⚠️ Twilio not configured. Skipping SMS...');
-            return { success: false, error: 'Twilio not configured' };
-        }
         let formattedTo = to.trim();
         if (!formattedTo.startsWith('+')) {
             if (formattedTo.startsWith('0')) {
@@ -1655,16 +1642,6 @@ app.post('/api/send-sms', async (req, res) => {
 app.post('/api/run-alert-check', async (req, res) => {
     const result = await checkAllUsers();
     res.json(result);
-});
-
-// ✅ Test SMS endpoint (debugging)
-app.get('/test-sms', async (req, res) => {
-    try {
-        const result = await sendTwilioSms('0712345678', '🛒 Test SMS from ShelfLife AI!');
-        res.json({ success: result.success, result });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
 });
 
 // ==================== START SERVER ====================
