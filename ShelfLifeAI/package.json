@@ -32,6 +32,7 @@
     "twilio": "^6.0.2"
   },
   "devDependencies": {
+    "@vercel/node": "^5.8.22",
     "@vitejs/plugin-react": "^4.2.1",
     "vite": "^5.0.8"
   }
