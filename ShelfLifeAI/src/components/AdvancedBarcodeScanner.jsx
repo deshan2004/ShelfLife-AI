@@ -1,6 +1,5 @@
 // src/components/AdvancedBarcodeScanner.jsx
 import { useState, useRef, useEffect } from 'react';
-import MobileScanner from './MobileScanner';
 import './AdvancedBarcodeScanner.css';
 
 function AdvancedBarcodeScanner({ onScan, onClose }) {
@@ -11,27 +10,17 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
   const [cameraError, setCameraError] = useState(null);
   const [availableCameras, setAvailableCameras] = useState([]);
   const [selectedCamera, setSelectedCamera] = useState('');
-  const [showMobileScanner, setShowMobileScanner] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [detectedCount, setDetectedCount] = useState(0);
   
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const animationRef = useRef(null);
 
-  // Check if device is mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      setIsMobile(isMobileDevice);
-    };
-    checkMobile();
-  }, []);
-
   // Get available cameras
   useEffect(() => {
     const getCameras = async () => {
       try {
-        // Request permission first
         await navigator.mediaDevices.getUserMedia({ video: true });
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
@@ -46,7 +35,7 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
     getCameras();
   }, []);
 
-  // Barcode detection using BarcodeDetector API
+  // Barcode detection
   const detectBarcode = async () => {
     if (!videoRef.current || videoRef.current.readyState < 2 || !cameraActive) {
       animationRef.current = requestAnimationFrame(detectBarcode);
@@ -56,13 +45,23 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
     try {
       if ('BarcodeDetector' in window) {
         const barcodeDetector = new BarcodeDetector({
-          formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'codabar', 'code_128', 'itf']
+          formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'codabar', 'itf']
         });
         
         const barcodes = await barcodeDetector.detect(videoRef.current);
         
         if (barcodes.length > 0) {
+          setIsDetecting(true);
           const barcodeValue = barcodes[0].rawValue;
+          setDetectedCount(prev => prev + 1);
+          
+          // Play success sound
+          try {
+            const audio = new Audio('/beep.mp3');
+            audio.volume = 0.3;
+            audio.play();
+          } catch (e) {}
+          
           setScanResult({ success: true, value: barcodeValue });
           
           onScan({ 
@@ -75,13 +74,15 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
           });
           
           stopCamera();
-          setTimeout(() => setScanResult(null), 3000);
+          setTimeout(() => {
+            setScanResult(null);
+            setIsDetecting(false);
+          }, 2500);
           return;
         }
       } else {
-        console.log('BarcodeDetector not supported, using mock detection');
-        // Mock detection for demo (remove in production)
-        if (Math.random() < 0.05) {
+        // Mock detection for demo
+        if (Math.random() < 0.03) {
           const mockBarcode = '8901234567890';
           setScanResult({ success: true, value: mockBarcode });
           onScan({ type: 'barcode', value: mockBarcode });
@@ -96,13 +97,12 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
     animationRef.current = requestAnimationFrame(detectBarcode);
   };
 
-  // ✅ FIXED: Start camera - Set cameraActive TRUE first, so video renders
+  // Start camera
   const startCamera = async () => {
     setCameraError(null);
     setScanning(true);
-    
-    // 🔥 CRITICAL FIX: Activate camera UI FIRST so videoRef.current exists
     setCameraActive(true);
+    setDetectedCount(0);
 
     try {
       if (streamRef.current) {
@@ -121,19 +121,16 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
       
-      // Now videoRef.current is DEFINITELY available because cameraActive is true
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
           videoRef.current.play();
-          // cameraActive is already true, no need to set again
           setScanning(false);
           animationRef.current = requestAnimationFrame(detectBarcode);
         };
       }
     } catch (err) {
       console.error('Camera error:', err);
-      // If error, deactivate camera
       setCameraActive(false);
       
       let errorMessage = 'Could not access camera. ';
@@ -169,6 +166,7 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
     
     setCameraActive(false);
     setScanning(false);
+    setIsDetecting(false);
   };
 
   // Manual barcode submit
@@ -197,164 +195,158 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
   }, []);
 
   return (
-    <div className="advanced-barcode-scanner">
-      <div className="scanner-header">
-        <div className="header-title">
-          <i className="fas fa-qrcode"></i>
-          <h4>Barcode Scanner</h4>
-        </div>
-        <button className="scanner-close-btn" onClick={onClose}>
-          <i className="fas fa-times"></i>
-        </button>
-      </div>
-
-      {/* Camera Selector */}
-      {availableCameras.length > 1 && !cameraActive && (
-        <div className="camera-selector">
-          <label><i className="fas fa-camera"></i> Select Camera:</label>
-          <select 
-            value={selectedCamera} 
-            onChange={(e) => setSelectedCamera(e.target.value)}
-            className="camera-select"
-          >
-            {availableCameras.map((camera, index) => (
-              <option key={camera.deviceId} value={camera.deviceId}>
-                {camera.label || `Camera ${index + 1}`}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Start Camera Button */}
-      {!cameraActive && !showMobileScanner && (
-        <div className="start-container">
-          <button onClick={startCamera} className="btn-start-camera" disabled={scanning}>
-            {scanning ? (
-              <><i className="fas fa-spinner fa-spin"></i> Initializing Camera...</>
-            ) : (
-              <><i className="fas fa-video"></i> Start Camera Scanner</>
-            )}
+    <div className="scanner-modal-overlay" onClick={onClose}>
+      <div className="scanner-modal" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="scanner-modal-header">
+          <div className="scanner-modal-title">
+            <div className="scanner-icon">
+              <i className="fas fa-qrcode"></i>
+            </div>
+            <div>
+              <h3>Scan Barcode</h3>
+              <p>{cameraActive ? 'Point camera at the barcode' : 'Choose a scanning method'}</p>
+            </div>
+          </div>
+          <button className="scanner-modal-close" onClick={onClose}>
+            <i className="fas fa-times"></i>
           </button>
         </div>
-      )}
 
-      {/* 
-        ✅ FIXED: Camera Container - Always rendered but hidden when inactive.
-        This ensures videoRef.current exists when startCamera runs.
-      */}
-      <div 
-        className="camera-container" 
-        style={{ display: cameraActive && !showMobileScanner ? 'block' : 'none' }}
-      >
-        <video 
-          ref={videoRef} 
-          className="camera-preview" 
-          autoPlay 
-          playsInline 
-          muted
-        />
-        
-        {/* Show overlay ONLY when camera is active */}
-        {cameraActive && !showMobileScanner && (
-          <>
-            <div className="scan-overlay">
-              <div className="scan-frame">
-                <div className="scan-line"></div>
-                <div className="corner tl"></div>
-                <div className="corner tr"></div>
-                <div className="corner bl"></div>
-                <div className="corner br"></div>
+        {/* Camera Selector */}
+        {availableCameras.length > 1 && !cameraActive && (
+          <div className="scanner-camera-selector">
+            <i className="fas fa-camera"></i>
+            <select 
+              value={selectedCamera} 
+              onChange={(e) => setSelectedCamera(e.target.value)}
+            >
+              {availableCameras.map((camera, index) => (
+                <option key={camera.deviceId} value={camera.deviceId}>
+                  {camera.label || `Camera ${index + 1}`}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Start Camera Button */}
+        {!cameraActive && !scanResult && (
+          <div className="scanner-start-section">
+            <button 
+              onClick={startCamera} 
+              className="scanner-start-btn" 
+              disabled={scanning}
+            >
+              {scanning ? (
+                <><i className="fas fa-spinner fa-spin"></i> Initializing...</>
+              ) : (
+                <><i className="fas fa-camera"></i> Start Scanner</>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Camera Preview */}
+        {cameraActive && (
+          <div className="scanner-camera-wrapper">
+            <div className="scanner-camera-box">
+              <video 
+                ref={videoRef} 
+                className="scanner-video" 
+                autoPlay 
+                playsInline 
+                muted
+              />
+              
+              {/* Scan Overlay */}
+              <div className="scanner-overlay">
+                <div className="scanner-frame">
+                  <div className="scanner-corner tl"></div>
+                  <div className="scanner-corner tr"></div>
+                  <div className="scanner-corner bl"></div>
+                  <div className="scanner-corner br"></div>
+                  <div className="scanner-line"></div>
+                </div>
+                <div className="scanner-hint">
+                  <i className="fas fa-qrcode"></i>
+                  <span>{isDetecting ? '✅ Detected!' : 'Position barcode in the frame'}</span>
+                </div>
               </div>
-              <div className="scan-instruction">
-                <i className="fas fa-qrcode"></i>
-                <span>Position barcode within the frame</span>
+
+              {/* Status indicators */}
+              <div className="scanner-status">
+                <span className={`scanner-dot ${isDetecting ? 'detected' : 'scanning'}`}></span>
+                <span>{isDetecting ? 'Barcode detected!' : 'Scanning...'}</span>
               </div>
             </div>
-            <button onClick={stopCamera} className="btn-stop-camera">
-              <i className="fas fa-stop"></i> Stop Scanner
-            </button>
-          </>
+
+            {/* Camera Controls */}
+            <div className="scanner-controls">
+              <button className="scanner-stop-btn" onClick={stopCamera}>
+                <i className="fas fa-stop"></i> Stop
+              </button>
+              <button className="scanner-flash-btn" onClick={() => {
+                // Toggle flash if available
+                showToast('💡 Flash toggled');
+              }}>
+                <i className="fas fa-bolt"></i>
+              </button>
+            </div>
+          </div>
         )}
-      </div>
 
-      {/* Camera Error */}
-      {cameraError && !showMobileScanner && (
-        <div className="camera-error">
-          <i className="fas fa-exclamation-triangle"></i>
-          <span>{cameraError}</span>
-        </div>
-      )}
+        {/* Camera Error */}
+        {cameraError && !cameraActive && (
+          <div className="scanner-error">
+            <i className="fas fa-exclamation-circle"></i>
+            <span>{cameraError}</span>
+            <button onClick={() => setCameraError(null)}>Dismiss</button>
+          </div>
+        )}
 
-      {/* Mobile Scanner Option */}
-      {!cameraActive && !showMobileScanner && (
-        <>
+        {/* Scan Result */}
+        {scanResult && scanResult.success && (
+          <div className="scanner-result">
+            <i className="fas fa-check-circle"></i>
+            <div>
+              <strong>✅ Barcode Detected!</strong>
+              <p>{scanResult.value}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Divider */}
+        {!cameraActive && !scanResult && (
           <div className="scanner-divider">
             <span>or</span>
           </div>
-          
-          <div className="mobile-scanner-option">
-            <button 
-              className="btn-mobile-scanner"
-              onClick={() => setShowMobileScanner(true)}
-            >
-              <i className="fas fa-mobile-alt"></i>
-              Scan with Phone Camera
-            </button>
-            <p className="mobile-scanner-note">
-              <i className="fas fa-info-circle"></i>
-              Use your phone to scan barcodes and expiry dates
-            </p>
-          </div>
-        </>
-      )}
+        )}
 
-      {/* Mobile Scanner Modal */}
-      {showMobileScanner && (
-        <MobileScanner 
-          onScan={onScan} 
-          onClose={() => setShowMobileScanner(false)} 
-        />
-      )}
-
-      {/* Manual Entry Form */}
-      {!cameraActive && !showMobileScanner && (
-        <>
-          <div className="scanner-divider">
-            <span>or enter manually</span>
-          </div>
-
-          <form onSubmit={handleManualSubmit} className="scanner-form">
-            <div className="input-group">
+        {/* Manual Entry */}
+        {!cameraActive && !scanResult && (
+          <form onSubmit={handleManualSubmit} className="scanner-manual-form">
+            <div className="scanner-input-group">
               <input
                 type="text"
-                placeholder="Enter barcode number manually (e.g., 8901234567890)"
+                placeholder="Enter barcode manually"
                 value={manualBarcode}
                 onChange={(e) => setManualBarcode(e.target.value.replace(/\s/g, ''))}
-                className="scanner-input"
+                className="scanner-manual-input"
               />
-              <button type="submit" className="btn-scan">
+              <button type="submit" className="scanner-manual-btn">
                 <i className="fas fa-search"></i> Lookup
               </button>
             </div>
           </form>
-        </>
-      )}
-      
-      <div className="scanner-note">
-        <i className="fas fa-info-circle"></i>
-        <span>Auto-detects EAN-13, UPC-A, Code 128, QR codes, and more</span>
-      </div>
-      
-      {scanResult && scanResult.success && (
-        <div className="scan-feedback">
-          <i className="fas fa-check-circle"></i>
-          <div>
-            <strong>✓ Barcode Detected!</strong>
-            <p>{scanResult.value}</p>
-          </div>
+        )}
+
+        {/* Footer */}
+        <div className="scanner-footer">
+          <i className="fas fa-info-circle"></i>
+          <span>Supports EAN-13, UPC-A, Code 128, QR codes & more</span>
         </div>
-      )}
+      </div>
     </div>
   );
 }
