@@ -1,11 +1,8 @@
-// server.cjs - Complete backend with Email + Twilio SMS Alerts
+// server.cjs - Complete backend WITHOUT Email/SMS (No .env needed)
 const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
-const crypto = require('crypto');
 const path = require('path');
-const nodemailer = require('nodemailer');
-const twilio = require('twilio');
 
 // Initialize express
 const app = express();
@@ -18,7 +15,9 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Initialize Firebase Admin
+// ============================================================
+// 1. FIREBASE ADMIN SDK - (serviceAccountKey.json භාවිතා කරයි)
+// ============================================================
 const serviceAccount = require('./serviceAccountKey.json');
 
 if (!admin.apps.length) {
@@ -30,332 +29,13 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 const auth = admin.auth();
 
-// ==================== TWILIO SMS SETUP ====================
-const twilioClient = twilio(
-    process.env.TWILIO_ACCOUNT_SID,
-    process.env.TWILIO_AUTH_TOKEN
-);
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '+15077087757';
+console.log('✅ Firebase Admin SDK initialized successfully!');
+console.log('📡 Firestore: Connected');
+console.log('🔐 Firebase Auth: Ready');
 
-console.log(`📱 Twilio Number: ${TWILIO_PHONE_NUMBER}`);
-
-// ==================== EMAIL ALERTS SYSTEM ====================
-const emailTransporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER || 'your-email@gmail.com',
-        pass: process.env.EMAIL_PASS || 'your-app-password'
-    }
-});
-
-// ==================== EMAIL FUNCTIONS ====================
-async function sendEmailAlert(to, subject, htmlContent) {
-    try {
-        const mailOptions = {
-            from: process.env.EMAIL_USER || 'your-email@gmail.com',
-            to: to,
-            subject: subject,
-            html: htmlContent
-        };
-
-        const info = await emailTransporter.sendMail(mailOptions);
-        console.log('✅ Email sent:', info.messageId);
-        return { success: true, messageId: info.messageId };
-    } catch (error) {
-        console.error('❌ Email error:', error.message);
-        return { success: false, error: error.message };
-    }
-}
-
-function generateAlertEmail(products, alertType) {
-    const isLowStock = alertType === 'low_stock';
-    const title = isLowStock ? '⚠️ Low Stock Alert' : '⏰ Near Expiry Alert';
-    const emoji = isLowStock ? '⚠️' : '⏰';
-    const description = isLowStock
-        ? 'The following products are running low on stock. Please reorder immediately!'
-        : 'The following products are approaching their expiry date. Take action now!';
-
-    const productRows = products.map(p => `
-    <tr>
-      <td style="padding: 10px; border-bottom: 1px solid #2a402a; color: #e8f0e8;">
-        <strong>${p.name}</strong>
-      </td>
-      <td style="padding: 10px; border-bottom: 1px solid #2a402a; color: #9bbf9b;">
-        ${p.supplier || 'N/A'}
-      </td>
-      <td style="padding: 10px; border-bottom: 1px solid #2a402a; color: #9bbf9b;">
-        ${isLowStock ? `${p.stock} units` : `${p.daysLeft} days`}
-      </td>
-      <td style="padding: 10px; border-bottom: 1px solid #2a402a; 
-        ${p.daysLeft && p.daysLeft <= 3 ? 'color: #ef4444; font-weight: bold;' : 
-          p.daysLeft && p.daysLeft <= 7 ? 'color: #f59e0b;' : 
-          isLowStock && p.stock <= 5 ? 'color: #ef4444; font-weight: bold;' : 'color: #22c55e;'}">
-        ${isLowStock ? 
-          (p.stock <= 5 ? '🔴 CRITICAL' : p.stock <= p.lowStockThreshold ? '🟡 LOW' : '✅ OK') : 
-          (p.daysLeft <= 0 ? '🔴 EXPIRED' : 
-           p.daysLeft <= 3 ? '🔴 CRITICAL' : 
-           p.daysLeft <= 7 ? '🟡 WARNING' : '✅ GOOD')}
-      </td>
-    </tr>
-  `).join('');
-
-    return `
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title}</title>
-  </head>
-  <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background: #030a03;">
-    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #0c190c, #071007); border: 1px solid #1a2c1a; border-radius: 16px; padding: 30px; margin-bottom: 20px;">
-        <div style="text-align: center; border-bottom: 1px solid #1a2c1a; padding-bottom: 20px; margin-bottom: 20px;">
-          <div style="display: inline-flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-            <span style="font-size: 28px;">🌿</span>
-            <span style="font-size: 24px; font-weight: 700; color: #39e75f;">ShelfLife AI</span>
-          </div>
-          <h2 style="color: ${isLowStock ? '#f59e0b' : '#f97316'}; margin: 10px 0 5px; font-size: 22px;">
-            ${emoji} ${title}
-          </h2>
-          <p style="color: #9bbf9b; font-size: 14px; margin: 0;">${description}</p>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;">
-          <div style="background: #0f1a0f; border: 1px solid #1a2c1a; border-radius: 10px; padding: 12px; text-align: center;">
-            <div style="font-size: 20px; font-weight: 700; color: #39e75f;">${products.length}</div>
-            <div style="font-size: 10px; color: #5f8b5f; text-transform: uppercase;">Products</div>
-          </div>
-          <div style="background: #0f1a0f; border: 1px solid #1a2c1a; border-radius: 10px; padding: 12px; text-align: center;">
-            <div style="font-size: 20px; font-weight: 700; color: ${isLowStock ? '#f59e0b' : '#f97316'};">${isLowStock ? '⚠️' : '⏰'}</div>
-            <div style="font-size: 10px; color: #5f8b5f; text-transform: uppercase;">${isLowStock ? 'Low Stock' : 'Near Expiry'}</div>
-          </div>
-          <div style="background: #0f1a0f; border: 1px solid #1a2c1a; border-radius: 10px; padding: 12px; text-align: center;">
-            <div style="font-size: 20px; font-weight: 700; color: #ef4444;">
-              ${isLowStock ? 
-                products.filter(p => p.stock <= 5).length : 
-                products.filter(p => p.daysLeft <= 3).length}
-            </div>
-            <div style="font-size: 10px; color: #5f8b5f; text-transform: uppercase;">Critical</div>
-          </div>
-        </div>
-
-        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-          <thead>
-            <tr style="background: #1a2c1a;">
-              <th style="padding: 10px; text-align: left; color: #9bbf9b; font-size: 12px; text-transform: uppercase;">Product</th>
-              <th style="padding: 10px; text-align: left; color: #9bbf9b; font-size: 12px; text-transform: uppercase;">Supplier</th>
-              <th style="padding: 10px; text-align: left; color: #9bbf9b; font-size: 12px; text-transform: uppercase;">${isLowStock ? 'Stock' : 'Days Left'}</th>
-              <th style="padding: 10px; text-align: left; color: #9bbf9b; font-size: 12px; text-transform: uppercase;">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${productRows}
-          </tbody>
-        </table>
-
-        <div style="text-align: center; padding: 20px 0 10px; border-top: 1px solid #1a2c1a;">
-          <a href="${process.env.FRONTEND_URL || 'https://shelflife-ai.vercel.app'}/inventory" 
-             style="display: inline-block; background: linear-gradient(135deg, #16a34a, #39e75f); color: #030a03; padding: 12px 30px; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 14px;">
-            📦 View Inventory
-          </a>
-          <p style="color: #5f8b5f; font-size: 12px; margin-top: 15px;">
-            This is an automated alert from ShelfLife AI.
-            <br>© ${new Date().getFullYear()} ShelfLife AI – Eliminating expiry losses
-          </p>
-        </div>
-      </div>
-    </div>
-  </body>
-  </html>
-  `;
-}
-
-// ==================== SMS FUNCTIONS ====================
-async function sendTwilioSms(to, message) {
-    try {
-        let formattedTo = to.trim();
-        if (!formattedTo.startsWith('+')) {
-            if (formattedTo.startsWith('0')) {
-                formattedTo = formattedTo.substring(1);
-            }
-            formattedTo = `+94${formattedTo}`;
-        }
-        
-        console.log(`📱 Sending SMS to: ${formattedTo}`);
-        console.log(`📝 Message: ${message.substring(0, 50)}...`);
-
-        const result = await twilioClient.messages.create({
-            body: message,
-            from: TWILIO_PHONE_NUMBER,
-            to: formattedTo
-        });
-
-        console.log(`✅ SMS sent! SID: ${result.sid}`);
-        return { success: true, sid: result.sid, status: result.status };
-    } catch (error) {
-        console.error('❌ Twilio SMS Error:', error.message);
-        if (error.code === 21211) {
-            return { success: false, error: 'Invalid phone number format' };
-        }
-        if (error.code === 21608) {
-            return { success: false, error: 'Unverified phone number (Trial account)' };
-        }
-        return { success: false, error: error.message };
-    }
-}
-
-function generateSmsAlertMessage(products, alertType) {
-    const emoji = alertType === 'low_stock' ? '⚠️' : '⏰';
-    const title = alertType === 'low_stock' ? 'LOW STOCK' : 'NEAR EXPIRY';
-    
-    let message = `${emoji} ${title} - ShelfLife AI\n`;
-    message += `📦 ${products.length} products need attention:\n\n`;
-    
-    const sortedItems = [...products].sort((a, b) => {
-        const aCritical = alertType === 'low_stock' ? (a.stock <= 3) : (a.daysLeft <= 3);
-        const bCritical = alertType === 'low_stock' ? (b.stock <= 3) : (b.daysLeft <= 3);
-        return bCritical - aCritical;
-    });
-    
-    sortedItems.slice(0, 5).forEach((p, i) => {
-        const status = alertType === 'low_stock' 
-            ? `Stock: ${p.stock}`
-            : `${p.daysLeft}d left`;
-        const critical = alertType === 'low_stock' 
-            ? (p.stock <= 3 ? ' 🔴' : '')
-            : (p.daysLeft <= 3 ? ' 🔴' : '');
-        message += `${i+1}. ${p.name}${critical}\n`;
-        message += `   ${status} | ${p.supplier || 'N/A'}\n`;
-    });
-    
-    if (products.length > 5) {
-        message += `\n+ ${products.length - 5} more items...`;
-    }
-    
-    message += `\n\n🔗 ${process.env.FRONTEND_URL || 'https://shelflife-ai.vercel.app'}/inventory`;
-    message += `\n🕐 ${new Date().toLocaleString()}`;
-    
-    return message;
-}
-
-// ==================== ALERT CHECK FUNCTIONS ====================
-async function checkAndSendAlerts(userId, userEmail, userPhone) {
-    try {
-        const invDoc = await db.collection('inventory').doc(userId).get();
-        const items = invDoc.exists ? invDoc.data().items || [] : [];
-
-        if (items.length === 0) {
-            return { success: true, message: 'No products in inventory' };
-        }
-
-        const lowStockItems = items.filter(i => i.stock <= i.lowStockThreshold && i.stock > 0);
-        const nearExpiryItems = items.filter(i => i.daysLeft <= 7 && i.daysLeft > 0);
-        const criticalItems = items.filter(i => i.daysLeft <= 3 && i.daysLeft > 0);
-
-        let alerts = { email: 0, sms: 0 };
-
-        // Send Email Alerts
-        if (userEmail) {
-            if (lowStockItems.length > 0) {
-                const html = generateAlertEmail(lowStockItems, 'low_stock');
-                const result = await sendEmailAlert(
-                    userEmail,
-                    `⚠️ Low Stock Alert: ${lowStockItems.length} items need reordering`,
-                    html
-                );
-                if (result.success) alerts.email++;
-            }
-
-            if (nearExpiryItems.length > 0) {
-                const lowStockIds = new Set(lowStockItems.map(p => p.id));
-                const newExpiryItems = nearExpiryItems.filter(p => !lowStockIds.has(p.id));
-
-                if (newExpiryItems.length > 0 || lowStockItems.length === 0) {
-                    const allItems = [...lowStockItems, ...nearExpiryItems];
-                    const uniqueItems = allItems.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-
-                    const html = generateAlertEmail(
-                        lowStockItems.length > 0 ? uniqueItems : nearExpiryItems,
-                        lowStockItems.length > 0 ? 'low_stock' : 'near_expiry'
-                    );
-                    const subject = lowStockItems.length > 0
-                        ? `⚠️ ${uniqueItems.length} products need attention!`
-                        : `⏰ ${nearExpiryItems.length} products expiring soon!`;
-
-                    const result = await sendEmailAlert(userEmail, subject, html);
-                    if (result.success) alerts.email++;
-                }
-            }
-        }
-
-        // Send SMS Alerts (Only for critical items first)
-        if (userPhone) {
-            if (criticalItems.length > 0) {
-                const message = generateSmsAlertMessage(criticalItems, 'near_expiry');
-                const result = await sendTwilioSms(userPhone, message);
-                if (result.success) alerts.sms++;
-            } else if (lowStockItems.length > 0) {
-                const message = generateSmsAlertMessage(lowStockItems, 'low_stock');
-                const result = await sendTwilioSms(userPhone, message);
-                if (result.success) alerts.sms++;
-            } else if (nearExpiryItems.length > 0) {
-                const message = generateSmsAlertMessage(nearExpiryItems, 'near_expiry');
-                const result = await sendTwilioSms(userPhone, message);
-                if (result.success) alerts.sms++;
-            }
-        }
-
-        return {
-            success: true,
-            alerts,
-            summary: {
-                lowStock: lowStockItems.length,
-                nearExpiry: nearExpiryItems.length,
-                critical: criticalItems.length
-            }
-        };
-    } catch (error) {
-        console.error('Alert check error:', error);
-        return { success: false, error: error.message };
-    }
-}
-
-async function checkAllUsers() {
-    try {
-        console.log('🔄 Running scheduled alert check...');
-
-        const usersSnapshot = await db.collection('users').get();
-        let totalEmails = 0;
-        let totalSms = 0;
-
-        for (const doc of usersSnapshot.docs) {
-            const userData = doc.data();
-            const userId = doc.id;
-            const userEmail = userData.email;
-            const userPhone = userData.phone;
-
-            if (!userEmail && !userPhone) continue;
-
-            const result = await checkAndSendAlerts(userId, userEmail, userPhone);
-            if (result.success) {
-                totalEmails += result.alerts?.email || 0;
-                totalSms += result.alerts?.sms || 0;
-                if (result.alerts?.email > 0 || result.alerts?.sms > 0) {
-                    console.log(`📧📱 Sent ${result.alerts.email} email(s) and ${result.alerts.sms} SMS to ${userEmail || userPhone}`);
-                }
-            }
-        }
-
-        console.log(`✅ Alert check complete. Emails: ${totalEmails}, SMS: ${totalSms}`);
-        return { success: true, totalEmails, totalSms };
-    } catch (error) {
-        console.error('Auto-check error:', error);
-        return { success: false, error: error.message };
-    }
-}
-
-// ==================== HELPER FUNCTIONS ====================
+// ============================================================
+// 2. HELPER FUNCTIONS
+// ============================================================
 async function getUserSuppliers(userId) {
     const doc = await db.collection('suppliers').doc(userId).get();
     if (!doc.exists) return [];
@@ -370,47 +50,32 @@ async function saveUserSuppliers(userId, suppliers) {
     });
 }
 
-// ==================== ROOT ROUTE ====================
+// ============================================================
+// 3. ROOT ROUTE
+// ============================================================
 app.get('/', (req, res) => {
     res.json({
-        message: 'ShelfLife AI Backend is running!',
+        message: 'ShelfLife AI Backend is running! (Email/SMS Disabled)',
         status: 'Online',
         timestamp: new Date().toISOString(),
         endpoints: {
-            auth: { signup: 'POST /api/signup', login: 'POST /api/login' },
             inventory: { get: 'GET /api/inventory/:userId', add: 'POST /api/inventory/:userId/add', update: 'PUT /api/inventory/:userId/update', delete: 'DELETE /api/inventory/:userId/delete/:itemId' },
             suppliers: { get: 'GET /api/suppliers/:userId', add: 'POST /api/suppliers/:userId/add', update: 'PUT /api/suppliers/:userId/update', delete: 'DELETE /api/suppliers/:userId/delete/:supplierId' },
             subscription: { get: 'GET /api/subscription/:userId', upgrade: 'POST /api/subscription/upgrade' },
-            scans: { log: 'POST /api/scans/:userId' },
             payments: { process: 'POST /api/payments/process', history: 'GET /api/payments/:userId' },
-            dashboard: { get: 'GET /api/dashboard/:userId' },
-            analytics: { get: 'GET /api/analytics/:userId' },
-            alerts: {
-                email: 'POST /api/send-email-alert',
-                sms: 'POST /api/send-sms',
-                check: 'POST /api/run-alert-check'
-            },
-            admin: {
-                users: 'GET /api/admin/users',
-                subscriptions: 'GET /api/admin/subscriptions',
-                stats: 'GET /api/admin/stats',
-                inventory: 'GET /api/admin/inventory/by-shop',
-                suppliers: 'GET /api/admin/suppliers',
-                role: 'PUT /api/admin/users/:uid/role',
-                delete: 'DELETE /api/admin/users/:uid',
-                extend: 'POST /api/admin/subscriptions/:uid/extend',
-                upgrade: 'POST /api/admin/subscriptions/:uid/upgrade',
-                seed: 'POST /api/seed/data'
-            }
+            admin: { users: 'GET /api/admin/users', stats: 'GET /api/admin/stats', inventory: 'GET /api/admin/inventory/by-shop' },
+            seed: 'POST /api/seed/data'
         }
     });
 });
 
-// ==================== AUTHENTICATION ====================
 app.get('/api/health', (req, res) => {
     res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+// ============================================================
+// 4. AUTHENTICATION
+// ============================================================
 app.post('/api/signup', async (req, res) => {
     console.log("=".repeat(50));
     console.log(`[SIGNUP REQUEST] Email: ${req.body.email}`);
@@ -652,7 +317,9 @@ app.post('/api/social-login', async (req, res) => {
     }
 });
 
-// ==================== INVENTORY MANAGEMENT ====================
+// ============================================================
+// 5. INVENTORY MANAGEMENT
+// ============================================================
 app.get('/api/inventory/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -804,7 +471,9 @@ app.delete('/api/inventory/:userId/delete/:itemId', async (req, res) => {
     }
 });
 
-// ==================== SUPPLIER MANAGEMENT ====================
+// ============================================================
+// 6. SUPPLIER MANAGEMENT
+// ============================================================
 app.get('/api/suppliers/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -910,7 +579,9 @@ app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
     }
 });
 
-// ==================== SUBSCRIPTION MANAGEMENT ====================
+// ============================================================
+// 7. SUBSCRIPTION MANAGEMENT
+// ============================================================
 app.get('/api/subscription/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -1036,7 +707,9 @@ app.post('/api/subscription/upgrade', async (req, res) => {
     }
 });
 
-// ==================== SCANS MANAGEMENT ====================
+// ============================================================
+// 8. SCANS MANAGEMENT
+// ============================================================
 app.post('/api/scans/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -1086,7 +759,9 @@ app.get('/api/scans/:userId', async (req, res) => {
     }
 });
 
-// ==================== PAYMENTS ====================
+// ============================================================
+// 9. PAYMENTS
+// ============================================================
 app.post('/api/payments/process', async (req, res) => {
     try {
         const { userId, amount, planId, paymentId } = req.body;
@@ -1147,7 +822,9 @@ app.get('/api/payments/:userId', async (req, res) => {
     }
 });
 
-// ==================== DASHBOARD & ANALYTICS ====================
+// ============================================================
+// 10. DASHBOARD & ANALYTICS
+// ============================================================
 app.get('/api/dashboard/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -1217,7 +894,9 @@ app.get('/api/analytics/:userId', async (req, res) => {
     }
 });
 
-// ==================== USAGE CHECK ====================
+// ============================================================
+// 11. USAGE CHECK
+// ============================================================
 app.get('/api/usage/:userId/:type', async (req, res) => {
     try {
         const { userId, type } = req.params;
@@ -1258,7 +937,9 @@ app.get('/api/usage/:userId/:type', async (req, res) => {
     }
 });
 
-// ==================== ADMIN ENDPOINTS ====================
+// ============================================================
+// 12. ADMIN ROUTES
+// ============================================================
 app.get('/api/admin/users', async (req, res) => {
     try {
         const usersSnapshot = await db.collection('users').get();
@@ -1481,6 +1162,9 @@ app.post('/api/admin/subscriptions/:uid/upgrade', async (req, res) => {
     }
 });
 
+// ============================================================
+// 13. SEED DATA (Test Users)
+// ============================================================
 app.post('/api/seed/data', async (req, res) => {
     try {
         const testUsers = [
@@ -1572,87 +1256,10 @@ app.post('/api/seed/data', async (req, res) => {
     }
 });
 
-// ==================== ALERT ENDPOINTS ====================
-
-// ✅ Send Email Alert for single user
-app.post('/api/send-email-alert', async (req, res) => {
-    try {
-        const { userId, userEmail } = req.body;
-
-        if (!userId || !userEmail) {
-            return res.status(400).json({ error: 'userId and userEmail required' });
-        }
-
-        const result = await checkAndSendAlerts(userId, userEmail, null);
-        res.json(result);
-    } catch (error) {
-        console.error('Email alert error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ✅ Send SMS Alert for single user
-app.post('/api/send-sms', async (req, res) => {
-    try {
-        const { userId, phoneNumber, alertType } = req.body;
-
-        if (!userId || !phoneNumber) {
-            return res.status(400).json({ error: 'userId and phoneNumber required' });
-        }
-
-        const invDoc = await db.collection('inventory').doc(userId).get();
-        const items = invDoc.exists ? invDoc.data().items || [] : [];
-
-        if (items.length === 0) {
-            return res.json({ success: true, message: 'No products in inventory' });
-        }
-
-        let products = [];
-        if (alertType === 'low_stock') {
-            products = items.filter(i => i.stock <= i.lowStockThreshold && i.stock > 0);
-        } else if (alertType === 'near_expiry') {
-            products = items.filter(i => i.daysLeft <= 7 && i.daysLeft > 0);
-        } else {
-            products = items.filter(i =>
-                (i.stock <= i.lowStockThreshold && i.stock > 0) ||
-                (i.daysLeft <= 7 && i.daysLeft > 0)
-            );
-        }
-
-        if (products.length === 0) {
-            return res.json({ success: true, message: 'No alerts to send' });
-        }
-
-        const message = generateSmsAlertMessage(products, alertType || 'both');
-        const result = await sendTwilioSms(phoneNumber, message);
-
-        res.json({
-            success: result.success,
-            result,
-            productCount: products.length,
-            message: result.success ? 'SMS sent successfully' : result.error
-        });
-    } catch (error) {
-        console.error('SMS error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ✅ Run full alert check for all users (Email + SMS)
-app.post('/api/run-alert-check', async (req, res) => {
-    const result = await checkAllUsers();
-    res.json(result);
-});
-
-// ==================== START SERVER ====================
-
+// ============================================================
+// 14. START SERVER
+// ============================================================
 const PORT = process.env.PORT || 5000;
-
-// ✅ Run auto-check every 12 hours (UNCOMMENT TO ENABLE)
-// setInterval(checkAllUsers, 12 * 60 * 60 * 1000);
-
-// ✅ Run once on server start (after 10 seconds)
-setTimeout(checkAllUsers, 10000);
 
 app.listen(PORT, () => {
     console.log("=".repeat(50));
@@ -1661,9 +1268,9 @@ app.listen(PORT, () => {
     console.log(`📡 Firestore: Connected`);
     console.log(`🔐 Firebase Auth: Ready`);
     console.log(`👑 Admin Routes: Enabled`);
-    console.log(`📧 Email Alerts: ${process.env.EMAIL_USER ? 'Configured ✅' : 'Not Configured ⚠️'}`);
-    console.log(`📱 SMS Alerts: ${process.env.TWILIO_ACCOUNT_SID ? 'Configured ✅' : 'Not Configured ⚠️'}`);
-    console.log(`📱 Twilio Number: ${TWILIO_PHONE_NUMBER}`);
+    console.log(`📧 Email Alerts: DISABLED (Removed)`);
+    console.log(`📱 SMS Alerts: DISABLED (Removed)`);
+    console.log(`✅ No .env file required!`);
     console.log("=".repeat(50));
 });
 
