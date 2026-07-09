@@ -37,37 +37,37 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
     }
   }, [location]);
 
-  // ✅ Load suppliers from backend
+  // ✅ Load suppliers from BACKEND (NOT localStorage first)
   const loadSuppliers = async () => {
     if (!user?.uid) {
       setLoading(false);
       return;
     }
-    
+
     try {
       setLoading(true);
       setError(null);
       console.log('🔄 Loading suppliers from backend...');
-      
+
       const data = await api.getSuppliers(user.uid);
       console.log('✅ Suppliers loaded:', data);
-      
+
       const list = data.list || [];
       setSuppliers(list);
-      
-      // Save to localStorage as backup
+
+      // ✅ localStorage is just backup
       localStorage.setItem(`shelflife_suppliers_${user.uid}`, JSON.stringify(list));
     } catch (error) {
       console.error('❌ Load suppliers error:', error);
       setError(error.message || 'Failed to load suppliers');
-      
-      // Try localStorage as fallback
+
+      // ⚠️ ONLY use localStorage if backend fails
       try {
         const localData = localStorage.getItem(`shelflife_suppliers_${user.uid}`);
         if (localData) {
           const list = JSON.parse(localData);
           setSuppliers(list);
-          console.log(`📦 Loaded ${list.length} suppliers from localStorage`);
+          console.log(`📦 Loaded ${list.length} suppliers from localStorage fallback`);
         }
       } catch (e) {
         console.error('LocalStorage fallback error:', e);
@@ -198,9 +198,11 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
 
   if (loading) {
     return (
-      <div className="loading-screen">
-        <div className="loading-spinner"></div>
-        <p>Loading suppliers...</p>
+      <div className="page-container">
+        <div className="loading-screen">
+          <div className="loading-spinner"></div>
+          <p>Loading suppliers...</p>
+        </div>
       </div>
     );
   }

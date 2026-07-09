@@ -29,12 +29,13 @@ function Inventory({
   const [preSelectedSupplier, setPreSelectedSupplier] = useState('')
   const [subscription, setSubscription] = useState(null)
 
-  // Load suppliers from backend
+  // ✅ Load suppliers from BACKEND (NOT localStorage first)
   useEffect(() => {
     const loadSuppliers = async () => {
       if (!user?.uid) return;
       try {
-        const response = await fetch(`http://localhost:5000/api/suppliers/${user.uid}`);
+        const response = await fetch(`https://accustom-alias-altitude.grork-free.dev/api/suppliers/${user.uid}`);
+        // const response = await fetch(`http://localhost:5000/api/suppliers/${user.uid}`);
         const data = await response.json();
         if (data && data.list) {
           setSuppliers(data.list);
@@ -42,6 +43,7 @@ function Inventory({
         }
       } catch (error) {
         console.error('Failed to load suppliers:', error);
+        // Fallback to localStorage
         try {
           const localData = localStorage.getItem(`shelflife_suppliers_${user.uid}`);
           if (localData) {
@@ -53,12 +55,13 @@ function Inventory({
     loadSuppliers();
   }, [user]);
 
-  // Load subscription from backend
+  // ✅ Load subscription from backend
   useEffect(() => {
     const loadSubscription = async () => {
       if (!user?.uid) return;
       try {
-        const response = await fetch(`http://localhost:5000/api/subscription/${user.uid}`);
+        const response = await fetch(`https://accustom-alias-altitude.grork-free.dev/api/subscription/${user.uid}`);
+        // const response = await fetch(`http://localhost:5000/api/subscription/${user.uid}`);
         const data = await response.json();
         if (data && data.limits) {
           setSubscription(data);
@@ -81,12 +84,17 @@ function Inventory({
     }
   }, [location]);
 
-  // Refresh inventory from backend
+  // ✅ Refresh inventory from backend (NOT localStorage)
   const refreshData = async () => {
     if (refreshInventory) {
       setLoading(true);
-      await refreshInventory();
-      setLoading(false);
+      try {
+        await refreshInventory(); // This calls loadUserInventory from App.jsx
+      } catch (error) {
+        console.error('Refresh error:', error);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -440,6 +448,7 @@ function Inventory({
         </button>
       </div>
 
+      {/* Stats Cards */}
       <div className="stats-grid-inline">
         <div className="stat-card-mini">
           <div className="stat-icon"><i className="fas fa-box"></i></div>
@@ -471,6 +480,7 @@ function Inventory({
         </div>
       </div>
 
+      {/* Scanner Selection */}
       {showScanner && !scanType && (
         <div className="scanner-section">
           <div className="scanner-tabs">
@@ -536,6 +546,7 @@ function Inventory({
         </div>
       )}
 
+      {/* Search and Filter */}
       <div className="search-filter-bar">
         <div className="search-box">
           <i className="fas fa-search"></i>
@@ -573,6 +584,7 @@ function Inventory({
         </div>
       )}
 
+      {/* Inventory Table */}
       <div className="inventory-table-container">
         <table className="inventory-table">
           <thead>
@@ -642,6 +654,7 @@ function Inventory({
         )}
       </div>
 
+      {/* Edit Modal */}
       {showEditModal && selectedProduct && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
