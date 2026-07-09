@@ -1,9 +1,13 @@
-// server.cjs - Complete backend with all working endpoints + Admin routes
+// server.cjs - Complete backend with dotenv, Email + Twilio SMS Alerts
+require('dotenv').config(); // ✅ Load .env file
+
 const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
 const crypto = require('crypto');
 const path = require('path');
+const nodemailer = require('nodemailer');
+const twilio = require('twilio');
 
 // Initialize express
 const app = express();
@@ -28,13 +32,346 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 const auth = admin.auth();
 
-// ==================== HELPER FUNCTIONS ====================
+// ==================== ENV CHECK ====================
+console.log('📧 Email User:', process.env.EMAIL_USER ? '✅ Set' : '❌ Missing');
+console.log('📱 Twilio SID:', process.env.TWILIO_ACCOUNT_SID ? '✅ Set' : '❌ Missing');
+console.log('📱 Twilio Number:', process.env.TWILIO_PHONE_NUMBER || 'Not set');
 
+// ==================== TWILIO SMS SETUP ====================
+const twilioClient = twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN
+);
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '+15077087757';
+
+// ==================== EMAIL ALERTS SYSTEM ====================
+const emailTransporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
+// ==================== EMAIL FUNCTIONS ====================
+async function sendEmailAlert(to, subject, htmlContent) {
+    try {
+        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+            console.log('⚠️ Email not configured. Skipping...');
+            return { success: false, error: 'Email not configured' };
+        }
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: to,
+            subject: subject,
+            html: htmlContent
+        };
+
+        const info = await emailTransporter.sendMail(mailOptions);
+        console.log('✅ Email sent:', info.messageId);
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        console.error('❌ Email error:', error.message);
+        return { success: false, error: error.message };
+    }
+}
+
+function generateAlertEmail(products, alertType) {
+    const isLowStock = alertType === 'low_stock';
+    const title = isLowStock ? '⚠️ Low Stock Alert' : '⏰ Near Expiry Alert';
+    const emoji = isLowStock ? '⚠️' : '⏰';
+    const description = isLowStock
+        ? 'The following products are running low on stock. Please reorder immediately!'
+        : 'The following products are approaching their expiry date. Take action now!';
+
+    const productRows = products.map(p => `
+    <tr>
+      <td style="padding: 10px; border-bottom: 1px solid #2a402a; color: #e8f0e8;">
+        <strong>${p.name}</strong>
+      </td>
+      <td style="padding: 10px; border-bottom: 1px solid #2a402a; color: #9bbf9b;">
+        ${p.supplier || 'N/A'}
+      </td>
+      <td style="padding: 10px; border-bottom: 1px solid #2a402a; color: #9bbf9b;">
+        ${isLowStock ? `${p.stock} units` : `${p.daysLeft} days`}
+      </td>
+      <td style="padding: 10px; border-bottom: 1px solid #2a402a; 
+        ${p.daysLeft && p.daysLeft <= 3 ? 'color: #ef4444; font-weight: bold;' : 
+          p.daysLeft && p.daysLeft <= 7 ? 'color: #f59e0b;' : 
+          isLowStock && p.stock <= 5 ? 'color: #ef4444; font-weight: bold;' : 'color: #22c55e;'}">
+        ${isLowStock ? 
+          (p.stock <= 5 ? '🔴 CRITICAL' : p.stock <= p.lowStockThreshold ? '🟡 LOW' : '✅ OK') : 
+          (p.daysLeft <= 0 ? '🔴 EXPIRED' : 
+           p.daysLeft <= 3 ? '🔴 CRITICAL' : 
+           p.daysLeft <= 7 ? '🟡 WARNING' : '✅ GOOD')}
+      </td>
+    </tr>
+  `).join('');
+
+    return `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title}</title>
+  </head>
+  <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background: #030a03;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #0c190c, #071007); border: 1px solid #1a2c1a; border-radius: 16px; padding: 30px; margin-bottom: 20px;">
+        <div style="text-align: center; border-bottom: 1px solid #1a2c1a; padding-bottom: 20px; margin-bottom: 20px;">
+          <div style="display: inline-flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <span style="font-size: 28px;">🌿</span>
+            <span style="font-size: 24px; font-weight: 700; color: #39e75f;">ShelfLife AI</span>
+          </div>
+          <h2 style="color: ${isLowStock ? '#f59e0b' : '#f97316'}; margin: 10px 0 5px; font-size: 22px;">
+            ${emoji} ${title}
+          </h2>
+          <p style="color: #9bbf9b; font-size: 14px; margin: 0;">${description}</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;">
+          <div style="background: #0f1a0f; border: 1px solid #1a2c1a; border-radius: 10px; padding: 12px; text-align: center;">
+            <div style="font-size: 20px; font-weight: 700; color: #39e75f;">${products.length}</div>
+            <div style="font-size: 10px; color: #5f8b5f; text-transform: uppercase;">Products</div>
+          </div>
+          <div style="background: #0f1a0f; border: 1px solid #1a2c1a; border-radius: 10px; padding: 12px; text-align: center;">
+            <div style="font-size: 20px; font-weight: 700; color: ${isLowStock ? '#f59e0b' : '#f97316'};">${isLowStock ? '⚠️' : '⏰'}</div>
+            <div style="font-size: 10px; color: #5f8b5f; text-transform: uppercase;">${isLowStock ? 'Low Stock' : 'Near Expiry'}</div>
+          </div>
+          <div style="background: #0f1a0f; border: 1px solid #1a2c1a; border-radius: 10px; padding: 12px; text-align: center;">
+            <div style="font-size: 20px; font-weight: 700; color: #ef4444;">
+              ${isLowStock ? 
+                products.filter(p => p.stock <= 5).length : 
+                products.filter(p => p.daysLeft <= 3).length}
+            </div>
+            <div style="font-size: 10px; color: #5f8b5f; text-transform: uppercase;">Critical</div>
+          </div>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+          <thead>
+            <tr style="background: #1a2c1a;">
+              <th style="padding: 10px; text-align: left; color: #9bbf9b; font-size: 12px; text-transform: uppercase;">Product</th>
+              <th style="padding: 10px; text-align: left; color: #9bbf9b; font-size: 12px; text-transform: uppercase;">Supplier</th>
+              <th style="padding: 10px; text-align: left; color: #9bbf9b; font-size: 12px; text-transform: uppercase;">${isLowStock ? 'Stock' : 'Days Left'}</th>
+              <th style="padding: 10px; text-align: left; color: #9bbf9b; font-size: 12px; text-transform: uppercase;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${productRows}
+          </tbody>
+        </table>
+
+        <div style="text-align: center; padding: 20px 0 10px; border-top: 1px solid #1a2c1a;">
+          <a href="${process.env.FRONTEND_URL || 'https://shelflife-ai.vercel.app'}/inventory" 
+             style="display: inline-block; background: linear-gradient(135deg, #16a34a, #39e75f); color: #030a03; padding: 12px 30px; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 14px;">
+            📦 View Inventory
+          </a>
+          <p style="color: #5f8b5f; font-size: 12px; margin-top: 15px;">
+            This is an automated alert from ShelfLife AI.
+            <br>© ${new Date().getFullYear()} ShelfLife AI – Eliminating expiry losses
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+  </html>
+  `;
+}
+
+// ==================== SMS FUNCTIONS ====================
+async function sendTwilioSms(to, message) {
+    try {
+        if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+            console.log('⚠️ Twilio not configured. Skipping SMS...');
+            return { success: false, error: 'Twilio not configured' };
+        }
+        let formattedTo = to.trim();
+        if (!formattedTo.startsWith('+')) {
+            if (formattedTo.startsWith('0')) {
+                formattedTo = formattedTo.substring(1);
+            }
+            formattedTo = `+94${formattedTo}`;
+        }
+        
+        console.log(`📱 Sending SMS to: ${formattedTo}`);
+        console.log(`📝 Message: ${message.substring(0, 50)}...`);
+
+        const result = await twilioClient.messages.create({
+            body: message,
+            from: TWILIO_PHONE_NUMBER,
+            to: formattedTo
+        });
+
+        console.log(`✅ SMS sent! SID: ${result.sid}`);
+        return { success: true, sid: result.sid, status: result.status };
+    } catch (error) {
+        console.error('❌ Twilio SMS Error:', error.message);
+        if (error.code === 21211) {
+            return { success: false, error: 'Invalid phone number format' };
+        }
+        if (error.code === 21608) {
+            return { success: false, error: 'Unverified phone number (Trial account)' };
+        }
+        return { success: false, error: error.message };
+    }
+}
+
+function generateSmsAlertMessage(products, alertType) {
+    const emoji = alertType === 'low_stock' ? '⚠️' : '⏰';
+    const title = alertType === 'low_stock' ? 'LOW STOCK' : 'NEAR EXPIRY';
+    
+    let message = `${emoji} ${title} - ShelfLife AI\n`;
+    message += `📦 ${products.length} products need attention:\n\n`;
+    
+    const sortedItems = [...products].sort((a, b) => {
+        const aCritical = alertType === 'low_stock' ? (a.stock <= 3) : (a.daysLeft <= 3);
+        const bCritical = alertType === 'low_stock' ? (b.stock <= 3) : (b.daysLeft <= 3);
+        return bCritical - aCritical;
+    });
+    
+    sortedItems.slice(0, 5).forEach((p, i) => {
+        const status = alertType === 'low_stock' 
+            ? `Stock: ${p.stock}`
+            : `${p.daysLeft}d left`;
+        const critical = alertType === 'low_stock' 
+            ? (p.stock <= 3 ? ' 🔴' : '')
+            : (p.daysLeft <= 3 ? ' 🔴' : '');
+        message += `${i+1}. ${p.name}${critical}\n`;
+        message += `   ${status} | ${p.supplier || 'N/A'}\n`;
+    });
+    
+    if (products.length > 5) {
+        message += `\n+ ${products.length - 5} more items...`;
+    }
+    
+    message += `\n\n🔗 ${process.env.FRONTEND_URL || 'https://shelflife-ai.vercel.app'}/inventory`;
+    message += `\n🕐 ${new Date().toLocaleString()}`;
+    
+    return message;
+}
+
+// ==================== ALERT CHECK FUNCTIONS ====================
+async function checkAndSendAlerts(userId, userEmail, userPhone) {
+    try {
+        const invDoc = await db.collection('inventory').doc(userId).get();
+        const items = invDoc.exists ? invDoc.data().items || [] : [];
+
+        if (items.length === 0) {
+            return { success: true, message: 'No products in inventory' };
+        }
+
+        const lowStockItems = items.filter(i => i.stock <= i.lowStockThreshold && i.stock > 0);
+        const nearExpiryItems = items.filter(i => i.daysLeft <= 7 && i.daysLeft > 0);
+        const criticalItems = items.filter(i => i.daysLeft <= 3 && i.daysLeft > 0);
+
+        let alerts = { email: 0, sms: 0 };
+
+        // Send Email Alerts
+        if (userEmail) {
+            if (lowStockItems.length > 0) {
+                const html = generateAlertEmail(lowStockItems, 'low_stock');
+                const result = await sendEmailAlert(
+                    userEmail,
+                    `⚠️ Low Stock Alert: ${lowStockItems.length} items need reordering`,
+                    html
+                );
+                if (result.success) alerts.email++;
+            }
+
+            if (nearExpiryItems.length > 0) {
+                const lowStockIds = new Set(lowStockItems.map(p => p.id));
+                const newExpiryItems = nearExpiryItems.filter(p => !lowStockIds.has(p.id));
+
+                if (newExpiryItems.length > 0 || lowStockItems.length === 0) {
+                    const allItems = [...lowStockItems, ...nearExpiryItems];
+                    const uniqueItems = allItems.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+
+                    const html = generateAlertEmail(
+                        lowStockItems.length > 0 ? uniqueItems : nearExpiryItems,
+                        lowStockItems.length > 0 ? 'low_stock' : 'near_expiry'
+                    );
+                    const subject = lowStockItems.length > 0
+                        ? `⚠️ ${uniqueItems.length} products need attention!`
+                        : `⏰ ${nearExpiryItems.length} products expiring soon!`;
+
+                    const result = await sendEmailAlert(userEmail, subject, html);
+                    if (result.success) alerts.email++;
+                }
+            }
+        }
+
+        // Send SMS Alerts (Only for critical items first)
+        if (userPhone) {
+            if (criticalItems.length > 0) {
+                const message = generateSmsAlertMessage(criticalItems, 'near_expiry');
+                const result = await sendTwilioSms(userPhone, message);
+                if (result.success) alerts.sms++;
+            } else if (lowStockItems.length > 0) {
+                const message = generateSmsAlertMessage(lowStockItems, 'low_stock');
+                const result = await sendTwilioSms(userPhone, message);
+                if (result.success) alerts.sms++;
+            } else if (nearExpiryItems.length > 0) {
+                const message = generateSmsAlertMessage(nearExpiryItems, 'near_expiry');
+                const result = await sendTwilioSms(userPhone, message);
+                if (result.success) alerts.sms++;
+            }
+        }
+
+        return {
+            success: true,
+            alerts,
+            summary: {
+                lowStock: lowStockItems.length,
+                nearExpiry: nearExpiryItems.length,
+                critical: criticalItems.length
+            }
+        };
+    } catch (error) {
+        console.error('Alert check error:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+async function checkAllUsers() {
+    try {
+        console.log('🔄 Running scheduled alert check...');
+
+        const usersSnapshot = await db.collection('users').get();
+        let totalEmails = 0;
+        let totalSms = 0;
+
+        for (const doc of usersSnapshot.docs) {
+            const userData = doc.data();
+            const userId = doc.id;
+            const userEmail = userData.email;
+            const userPhone = userData.phone;
+
+            if (!userEmail && !userPhone) continue;
+
+            const result = await checkAndSendAlerts(userId, userEmail, userPhone);
+            if (result.success) {
+                totalEmails += result.alerts?.email || 0;
+                totalSms += result.alerts?.sms || 0;
+                if (result.alerts?.email > 0 || result.alerts?.sms > 0) {
+                    console.log(`📧📱 Sent ${result.alerts.email} email(s) and ${result.alerts.sms} SMS to ${userEmail || userPhone}`);
+                }
+            }
+        }
+
+        console.log(`✅ Alert check complete. Emails: ${totalEmails}, SMS: ${totalSms}`);
+        return { success: true, totalEmails, totalSms };
+    } catch (error) {
+        console.error('Auto-check error:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// ==================== HELPER FUNCTIONS ====================
 async function getUserSuppliers(userId) {
     const doc = await db.collection('suppliers').doc(userId).get();
-    if (!doc.exists) {
-        return [];
-    }
+    if (!doc.exists) return [];
     return doc.data().suppliers || [];
 }
 
@@ -47,9 +384,8 @@ async function saveUserSuppliers(userId, suppliers) {
 }
 
 // ==================== ROOT ROUTE ====================
-
 app.get('/', (req, res) => {
-    res.json({ 
+    res.json({
         message: 'ShelfLife AI Backend is running!',
         status: 'Online',
         timestamp: new Date().toISOString(),
@@ -62,6 +398,11 @@ app.get('/', (req, res) => {
             payments: { process: 'POST /api/payments/process', history: 'GET /api/payments/:userId' },
             dashboard: { get: 'GET /api/dashboard/:userId' },
             analytics: { get: 'GET /api/analytics/:userId' },
+            alerts: {
+                email: 'POST /api/send-email-alert',
+                sms: 'POST /api/send-sms',
+                check: 'POST /api/run-alert-check'
+            },
             admin: {
                 users: 'GET /api/admin/users',
                 subscriptions: 'GET /api/admin/subscriptions',
@@ -79,32 +420,27 @@ app.get('/', (req, res) => {
 });
 
 // ==================== AUTHENTICATION ====================
-
-// Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Signup - Creates Auth user, Profile, Subscription and Inventory
 app.post('/api/signup', async (req, res) => {
     console.log("=".repeat(50));
     console.log(`[SIGNUP REQUEST] Email: ${req.body.email}`);
-    
+
     let createdUid = null;
 
     try {
-        const { email, password, name, businessName, businessType } = req.body;
-        
-        // Validation
+        const { email, password, name, phone, businessName, businessType } = req.body;
+
         if (!email || !password || !name) {
             return res.status(400).json({ error: 'Email, password, and name are required' });
         }
-        
+
         if (password.length < 6) {
             return res.status(400).json({ error: 'Password must be at least 6 characters' });
         }
-        
-        // 1. Create User in Firebase Authentication
+
         console.log("1. Creating user in Firebase Auth...");
         const userRecord = await auth.createUser({
             email,
@@ -114,13 +450,12 @@ app.post('/api/signup', async (req, res) => {
         createdUid = userRecord.uid;
         console.log(`✅ Auth User Created! UID: ${createdUid}`);
 
-        // 2. Save to Firestore
         console.log("2. Saving data to Firestore...");
-        
-        // Create user document
+
         await db.collection('users').doc(createdUid).set({
             name,
             email,
+            phone: phone || '',
             businessName: businessName || `${name}'s Store`,
             businessType: businessType || 'retail',
             role: 'user',
@@ -128,7 +463,6 @@ app.post('/api/signup', async (req, res) => {
             updatedAt: new Date().toISOString()
         });
 
-        // Create default subscription (14-day Free Trial)
         const trialEnd = new Date();
         trialEnd.setDate(trialEnd.getDate() + 14);
         await db.collection('subscriptions').doc(createdUid).set({
@@ -139,7 +473,7 @@ app.post('/api/signup', async (req, res) => {
             trialEnd: trialEnd.toISOString(),
             features: {
                 canBasicScan: true,
-                canOCRScan: true,  // Enable for trial
+                canOCRScan: true,
                 canBarcodeScan: true,
                 canFlashSale: true,
                 canSupplierReturn: false,
@@ -166,14 +500,12 @@ app.post('/api/signup', async (req, res) => {
             updatedAt: new Date().toISOString()
         });
 
-        // Create empty inventory
         await db.collection('inventory').doc(createdUid).set({
             items: [],
             lastUpdated: new Date().toISOString(),
             itemCount: 0
         });
 
-        // Create empty suppliers collection
         await db.collection('suppliers').doc(createdUid).set({
             suppliers: [],
             lastUpdated: new Date().toISOString(),
@@ -181,18 +513,17 @@ app.post('/api/signup', async (req, res) => {
         });
 
         console.log("✅ Firestore data saved!");
-        
-        res.status(201).json({ 
+
+        res.status(201).json({
             success: true,
-            message: 'User registered successfully!', 
+            message: 'User registered successfully!',
             uid: createdUid,
             trial: { days: 14, end: trialEnd.toISOString() }
         });
 
     } catch (error) {
         console.error("❌ Signup Error:", error.message);
-        
-        // Rollback: Delete Auth user if Firestore failed
+
         if (createdUid) {
             try {
                 await auth.deleteUser(createdUid);
@@ -201,36 +532,34 @@ app.post('/api/signup', async (req, res) => {
                 console.error("Rollback failed:", e.message);
             }
         }
-        
+
         if (error.code === 'auth/email-already-exists') {
             return res.status(400).json({ error: 'This email is already registered. Please login instead.' });
         }
-        
+
         res.status(400).json({ error: error.message });
     }
 });
 
-// Login Verification
 app.post('/api/login', async (req, res) => {
     console.log("[LOGIN REQUEST]");
     try {
         const { idToken } = req.body;
-        
+
         if (!idToken) {
             return res.status(400).json({ error: 'ID token required' });
         }
-        
+
         const decodedToken = await auth.verifyIdToken(idToken);
         const userId = decodedToken.uid;
-        
+
         const userDoc = await db.collection('users').doc(userId).get();
         const subDoc = await db.collection('subscriptions').doc(userId).get();
-        
+
         if (!userDoc.exists) {
             return res.status(404).json({ error: 'User profile not found' });
         }
 
-        // Check if trial expired
         let subscription = subDoc.exists ? subDoc.data() : null;
         if (subscription && subscription.status === 'trial_active') {
             const trialEnd = new Date(subscription.trialEnd);
@@ -244,9 +573,9 @@ app.post('/api/login', async (req, res) => {
             }
         }
 
-        res.status(200).json({ 
+        res.status(200).json({
             success: true,
-            message: 'Login successful!', 
+            message: 'Login successful!',
             user: userDoc.data(),
             subscription: subscription
         });
@@ -256,35 +585,32 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// Social login handler
 app.post('/api/social-login', async (req, res) => {
     console.log("[SOCIAL LOGIN REQUEST]");
     try {
         const { idToken, email, name, provider } = req.body;
-        
+
         let userRecord;
         try {
             userRecord = await auth.getUserByEmail(email);
         } catch {
-            // Create new user
             userRecord = await auth.createUser({
                 email,
                 displayName: name,
                 emailVerified: true
             });
-            
-            // Create Firestore profile
+
             await db.collection('users').doc(userRecord.uid).set({
                 name: name,
                 email: email,
+                phone: '',
                 businessName: `${name}'s Store`,
                 businessType: 'retail',
                 role: 'user',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             });
-            
-            // Create subscription
+
             const trialEnd = new Date();
             trialEnd.setDate(trialEnd.getDate() + 14);
             await db.collection('subscriptions').doc(userRecord.uid).set({
@@ -312,7 +638,7 @@ app.post('/api/social-login', async (req, res) => {
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             });
-            
+
             await db.collection('inventory').doc(userRecord.uid).set({
                 items: [],
                 lastUpdated: new Date().toISOString(),
@@ -325,9 +651,9 @@ app.post('/api/social-login', async (req, res) => {
                 count: 0
             });
         }
-        
+
         const userDoc = await db.collection('users').doc(userRecord.uid).get();
-        
+
         res.json({
             success: true,
             user: userDoc.data(),
@@ -340,15 +666,12 @@ app.post('/api/social-login', async (req, res) => {
 });
 
 // ==================== INVENTORY MANAGEMENT ====================
-
-// Get all inventory items
 app.get('/api/inventory/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
         const invDoc = await db.collection('inventory').doc(userId).get();
-        
+
         if (!invDoc.exists) {
-            // Create empty inventory
             await db.collection('inventory').doc(userId).set({
                 items: [],
                 lastUpdated: new Date().toISOString(),
@@ -356,7 +679,7 @@ app.get('/api/inventory/:userId', async (req, res) => {
             });
             return res.json({ items: [], itemCount: 0 });
         }
-        
+
         const data = invDoc.data();
         res.json(data);
     } catch (error) {
@@ -365,50 +688,45 @@ app.get('/api/inventory/:userId', async (req, res) => {
     }
 });
 
-// Add a single product to inventory
 app.post('/api/inventory/:userId/add', async (req, res) => {
     try {
         const { userId } = req.params;
         const { product } = req.body;
-        
+
         if (!product || !product.name) {
             return res.status(400).json({ error: 'Product name is required' });
         }
-        
-        // Get current inventory
+
         const invDoc = await db.collection('inventory').doc(userId).get();
         let items = invDoc.exists ? invDoc.data().items || [] : [];
-        
-        // Check product limits from subscription
+
         const subDoc = await db.collection('subscriptions').doc(userId).get();
         const maxProducts = subDoc.exists ? subDoc.data().limits?.maxProducts || 50 : 50;
-        
+
         if (items.length >= maxProducts) {
-            return res.status(403).json({ 
-                error: 'Product limit reached', 
+            return res.status(403).json({
+                error: 'Product limit reached',
                 limit: maxProducts,
                 current: items.length
             });
         }
-        
-        // Generate new ID
+
         const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
-        
+
         const newProduct = {
             id: newId,
             ...product,
             addedAt: new Date().toISOString()
         };
-        
+
         items.push(newProduct);
-        
+
         await db.collection('inventory').doc(userId).set({
             items: items,
             lastUpdated: new Date().toISOString(),
             itemCount: items.length
         });
 
-        // Update usage count
         await db.collection('subscriptions').doc(userId).update({
             'usage.productsCount': items.length,
             updatedAt: new Date().toISOString()
@@ -421,28 +739,26 @@ app.post('/api/inventory/:userId/add', async (req, res) => {
     }
 });
 
-// Update inventory item
 app.put('/api/inventory/:userId/update', async (req, res) => {
     try {
         const { userId } = req.params;
         const { itemId, updates } = req.body;
-        
+
         const invDoc = await db.collection('inventory').doc(userId).get();
         let items = invDoc.exists ? invDoc.data().items || [] : [];
-        
+
         const itemIndex = items.findIndex(i => i.id === itemId);
         if (itemIndex === -1) {
             return res.status(404).json({ error: 'Item not found' });
         }
-        
-        // Calculate days left if expiry date changed
+
         if (updates.expiryDate) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             const expiry = new Date(updates.expiryDate);
             expiry.setHours(0, 0, 0, 0);
             updates.daysLeft = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-            
+
             if (updates.daysLeft <= 0) {
                 updates.status = 'expired';
                 updates.suggestion = 'DISPOSE / Return to supplier';
@@ -457,15 +773,15 @@ app.put('/api/inventory/:userId/update', async (req, res) => {
                 updates.suggestion = 'Monitor regularly';
             }
         }
-        
+
         items[itemIndex] = { ...items[itemIndex], ...updates, updatedAt: new Date().toISOString() };
-        
+
         await db.collection('inventory').doc(userId).set({
             items: items,
             lastUpdated: new Date().toISOString(),
             itemCount: items.length
         });
-        
+
         res.json({ success: true, item: items[itemIndex] });
     } catch (error) {
         console.error("Update product error:", error);
@@ -473,28 +789,27 @@ app.put('/api/inventory/:userId/update', async (req, res) => {
     }
 });
 
-// Delete inventory item
 app.delete('/api/inventory/:userId/delete/:itemId', async (req, res) => {
     try {
         const { userId, itemId } = req.params;
-        
+
         const invDoc = await db.collection('inventory').doc(userId).get();
         let items = invDoc.exists ? invDoc.data().items || [] : [];
-        
+
         const itemIdNum = parseInt(itemId);
         items = items.filter(i => i.id !== itemIdNum);
-        
+
         await db.collection('inventory').doc(userId).set({
             items: items,
             lastUpdated: new Date().toISOString(),
             itemCount: items.length
         });
-        
+
         await db.collection('subscriptions').doc(userId).update({
             'usage.productsCount': items.length,
             updatedAt: new Date().toISOString()
         });
-        
+
         res.json({ success: true, total: items.length });
     } catch (error) {
         console.error("Delete product error:", error);
@@ -503,8 +818,6 @@ app.delete('/api/inventory/:userId/delete/:itemId', async (req, res) => {
 });
 
 // ==================== SUPPLIER MANAGEMENT ====================
-
-// Get all suppliers for a user
 app.get('/api/suppliers/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -516,7 +829,6 @@ app.get('/api/suppliers/:userId', async (req, res) => {
     }
 });
 
-// Add a new supplier
 app.post('/api/suppliers/:userId/add', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -526,7 +838,6 @@ app.post('/api/suppliers/:userId/add', async (req, res) => {
             return res.status(400).json({ error: 'Supplier name is required' });
         }
 
-        // Check subscription limit
         const subDoc = await db.collection('subscriptions').doc(userId).get();
         const maxSuppliers = subDoc.exists ? subDoc.data().limits?.maxSuppliers || 10 : 10;
         const currentSuppliers = await getUserSuppliers(userId);
@@ -539,7 +850,6 @@ app.post('/api/suppliers/:userId/add', async (req, res) => {
             });
         }
 
-        // Generate new ID
         const newId = currentSuppliers.length > 0
             ? Math.max(...currentSuppliers.map(s => s.id)) + 1
             : 1;
@@ -554,7 +864,6 @@ app.post('/api/suppliers/:userId/add', async (req, res) => {
         currentSuppliers.push(newSupplier);
         await saveUserSuppliers(userId, currentSuppliers);
 
-        // Update usage count
         await db.collection('subscriptions').doc(userId).update({
             'usage.suppliersCount': currentSuppliers.length,
             updatedAt: new Date().toISOString()
@@ -567,7 +876,6 @@ app.post('/api/suppliers/:userId/add', async (req, res) => {
     }
 });
 
-// Update a supplier
 app.put('/api/suppliers/:userId/update', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -593,7 +901,6 @@ app.put('/api/suppliers/:userId/update', async (req, res) => {
     }
 });
 
-// Delete a supplier
 app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
     try {
         const { userId, supplierId } = req.params;
@@ -604,7 +911,6 @@ app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
 
         await saveUserSuppliers(userId, suppliers);
 
-        // Update usage count
         await db.collection('subscriptions').doc(userId).update({
             'usage.suppliersCount': suppliers.length,
             updatedAt: new Date().toISOString()
@@ -618,15 +924,12 @@ app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
 });
 
 // ==================== SUBSCRIPTION MANAGEMENT ====================
-
-// Get subscription status
 app.get('/api/subscription/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
         let subDoc = await db.collection('subscriptions').doc(userId).get();
-        
+
         if (!subDoc.exists) {
-            // Create default trial subscription
             const trialEnd = new Date();
             trialEnd.setDate(trialEnd.getDate() + 14);
             const subscription = {
@@ -667,8 +970,7 @@ app.get('/api/subscription/:userId', async (req, res) => {
             res.json(subscription);
         } else {
             let subscription = subDoc.data();
-            
-            // Check if trial expired
+
             if (subscription.status === 'trial_active') {
                 const trialEnd = new Date(subscription.trialEnd);
                 const now = new Date();
@@ -680,7 +982,7 @@ app.get('/api/subscription/:userId', async (req, res) => {
                     });
                 }
             }
-            
+
             res.json(subscription);
         }
     } catch (error) {
@@ -689,11 +991,10 @@ app.get('/api/subscription/:userId', async (req, res) => {
     }
 });
 
-// Upgrade subscription
 app.post('/api/subscription/upgrade', async (req, res) => {
     try {
         const { userId, planId } = req.body;
-        
+
         let limits = { maxProducts: 50, maxSuppliers: 10, maxScansPerMonth: 100 };
         let features = {
             canBasicScan: true,
@@ -709,7 +1010,7 @@ app.post('/api/subscription/upgrade', async (req, res) => {
             canExportData: false,
             canCustomReports: false
         };
-        
+
         if (planId === 'BASIC') {
             limits = { maxProducts: 200, maxSuppliers: 25, maxScansPerMonth: 500 };
             features.canSupplierReturn = true;
@@ -732,7 +1033,7 @@ app.post('/api/subscription/upgrade', async (req, res) => {
             features.canExportData = true;
             features.canCustomReports = true;
         }
-        
+
         await db.collection('subscriptions').doc(userId).update({
             planId: planId,
             status: 'active',
@@ -740,7 +1041,7 @@ app.post('/api/subscription/upgrade', async (req, res) => {
             features: features,
             updatedAt: new Date().toISOString()
         });
-        
+
         res.json({ success: true, message: `Upgraded to ${planId} successfully!` });
     } catch (error) {
         console.error("Upgrade error:", error);
@@ -749,8 +1050,6 @@ app.post('/api/subscription/upgrade', async (req, res) => {
 });
 
 // ==================== SCANS MANAGEMENT ====================
-
-// Log a scan
 app.post('/api/scans/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -765,8 +1064,7 @@ app.post('/api/scans/:userId', async (req, res) => {
         };
 
         const docRef = await db.collection('scans').add(scanData);
-        
-        // Update usage count
+
         const subDoc = await db.collection('subscriptions').doc(userId).get();
         if (subDoc.exists) {
             const currentScans = subDoc.data().usage?.scansThisMonth || 0;
@@ -783,7 +1081,6 @@ app.post('/api/scans/:userId', async (req, res) => {
     }
 });
 
-// Get scan history
 app.get('/api/scans/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -792,7 +1089,7 @@ app.get('/api/scans/:userId', async (req, res) => {
             .orderBy('createdAt', 'desc')
             .limit(50)
             .get();
-        
+
         const scans = [];
         snapshot.forEach(doc => scans.push({ id: doc.id, ...doc.data() }));
         res.json(scans);
@@ -803,17 +1100,14 @@ app.get('/api/scans/:userId', async (req, res) => {
 });
 
 // ==================== PAYMENTS ====================
-
-// Process payment and upgrade
 app.post('/api/payments/process', async (req, res) => {
     try {
         const { userId, amount, planId, paymentId } = req.body;
-        
+
         if (!userId || !amount || !planId) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        // Save payment record
         const paymentData = {
             userId,
             amount: Number(amount),
@@ -822,10 +1116,9 @@ app.post('/api/payments/process', async (req, res) => {
             paymentId: paymentId || `pay_${Date.now()}`,
             createdAt: new Date().toISOString()
         };
-        
+
         await db.collection('payments').add(paymentData);
 
-        // Update subscription
         let limits = { maxProducts: 50, maxScansPerMonth: 100 };
         if (planId === 'BASIC') {
             limits = { maxProducts: 200, maxScansPerMonth: 500 };
@@ -834,7 +1127,7 @@ app.post('/api/payments/process', async (req, res) => {
         } else if (planId === 'ENTERPRISE') {
             limits = { maxProducts: Infinity, maxScansPerMonth: Infinity };
         }
-        
+
         await db.collection('subscriptions').doc(userId).update({
             planId: planId,
             status: 'active',
@@ -849,7 +1142,6 @@ app.post('/api/payments/process', async (req, res) => {
     }
 });
 
-// Get payment history
 app.get('/api/payments/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -858,7 +1150,7 @@ app.get('/api/payments/:userId', async (req, res) => {
             .orderBy('createdAt', 'desc')
             .limit(20)
             .get();
-        
+
         const payments = [];
         snapshot.forEach(doc => payments.push({ id: doc.id, ...doc.data() }));
         res.json(payments);
@@ -869,24 +1161,22 @@ app.get('/api/payments/:userId', async (req, res) => {
 });
 
 // ==================== DASHBOARD & ANALYTICS ====================
-
-// Get dashboard data
 app.get('/api/dashboard/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
-        
+
         const invDoc = await db.collection('inventory').doc(userId).get();
         const subDoc = await db.collection('subscriptions').doc(userId).get();
-        
+
         const items = invDoc.exists ? invDoc.data().items || [] : [];
-        
+
         const expiringCount = items.filter(i => i.daysLeft <= 7 && i.daysLeft > 0).length;
         const criticalCount = items.filter(i => i.daysLeft <= 3 && i.daysLeft > 0).length;
         const expiredCount = items.filter(i => i.daysLeft <= 0).length;
         const totalValue = items.reduce((sum, i) => sum + ((i.sellingPrice || 0) * (i.stock || 0)), 0);
-        
+
         const lowStockCount = items.filter(i => i.stock <= (i.lowStockThreshold || 10)).length;
-        
+
         res.json({
             totalItems: items.length,
             totalValue,
@@ -903,25 +1193,24 @@ app.get('/api/dashboard/:userId', async (req, res) => {
     }
 });
 
-// Get analytics data
 app.get('/api/analytics/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
         const invDoc = await db.collection('inventory').doc(userId).get();
         const items = invDoc.exists ? invDoc.data().items || [] : [];
-        
+
         const expiringItems = items.filter(i => i.daysLeft <= 7 && i.daysLeft > 0);
         const expiredItems = items.filter(i => i.daysLeft <= 0);
-        
+
         const expiringValue = expiringItems.reduce((sum, i) => sum + ((i.sellingPrice || 0) * (i.stock || 0)), 0);
         const wasteValue = expiredItems.reduce((sum, i) => sum + ((i.costPrice || 0) * (i.stock || 0)), 0);
-        
+
         const totalSales = items.reduce((sum, i) => sum + ((i.sellingPrice || 0) * (i.stock || 0)), 0);
         const totalCost = items.reduce((sum, i) => sum + ((i.costPrice || 0) * (i.stock || 0)), 0);
         const avgMargin = totalSales > 0 ? ((totalSales - totalCost) / totalSales) * 100 : 0;
-        
+
         const monthlyTrend = [3200, 4100, 3800, 5200, 4800, 6100, 5800, 7200, 6900, 8400, 7900, expiringValue * 0.7];
-        
+
         res.json({
             totalSaved: expiringValue * 0.7,
             wasteReduction: wasteValue,
@@ -942,21 +1231,19 @@ app.get('/api/analytics/:userId', async (req, res) => {
 });
 
 // ==================== USAGE CHECK ====================
-
-// Check usage limits
 app.get('/api/usage/:userId/:type', async (req, res) => {
     try {
         const { userId, type } = req.params;
         const subDoc = await db.collection('subscriptions').doc(userId).get();
-        
+
         if (!subDoc.exists) {
             return res.json({ current: 0, limit: 50, remaining: 50, percentageUsed: 0 });
         }
-        
+
         const subscription = subDoc.data();
         let current = 0;
         let limit = 50;
-        
+
         switch (type) {
             case 'products':
                 current = subscription.usage?.productsCount || 0;
@@ -973,10 +1260,10 @@ app.get('/api/usage/:userId/:type', async (req, res) => {
             default:
                 return res.json({ current: 0, limit: 0, remaining: 0, percentageUsed: 0 });
         }
-        
+
         const remaining = Math.max(0, limit - current);
         const percentageUsed = limit > 0 ? (current / limit) * 100 : 0;
-        
+
         res.json({ current, limit, remaining, percentageUsed });
     } catch (error) {
         console.error("Usage check error:", error);
@@ -985,8 +1272,6 @@ app.get('/api/usage/:userId/:type', async (req, res) => {
 });
 
 // ==================== ADMIN ENDPOINTS ====================
-
-// GET all users (Admin only)
 app.get('/api/admin/users', async (req, res) => {
     try {
         const usersSnapshot = await db.collection('users').get();
@@ -1001,7 +1286,6 @@ app.get('/api/admin/users', async (req, res) => {
     }
 });
 
-// GET all subscriptions (Admin only)
 app.get('/api/admin/subscriptions', async (req, res) => {
     try {
         const subsSnapshot = await db.collection('subscriptions').get();
@@ -1016,13 +1300,12 @@ app.get('/api/admin/subscriptions', async (req, res) => {
     }
 });
 
-// GET admin dashboard stats
 app.get('/api/admin/stats', async (req, res) => {
     try {
         const usersSnapshot = await db.collection('users').get();
         const users = [];
         usersSnapshot.forEach(doc => users.push({ uid: doc.id, ...doc.data() }));
-        
+
         const subsSnapshot = await db.collection('subscriptions').get();
         let activeSubscriptions = 0, trialUsers = 0, expiredTrials = 0, totalRevenue = 0;
         subsSnapshot.forEach(doc => {
@@ -1031,21 +1314,19 @@ app.get('/api/admin/stats', async (req, res) => {
             else if (data.status === 'trial_active') trialUsers++;
             else if (data.status === 'trial_expired') expiredTrials++;
         });
-        
-        // Get total products across all users
+
         const invSnapshot = await db.collection('inventory').get();
         let totalProducts = 0, totalScans = 0;
         invSnapshot.forEach(doc => {
             const items = doc.data().items || [];
             totalProducts += items.length;
         });
-        
+
         const scansSnapshot = await db.collection('scans').get();
         totalScans = scansSnapshot.size;
-        
-        // Recent users (last 5)
+
         const recentUsers = users.slice(-5).reverse();
-        
+
         res.json({
             totalUsers: users.length,
             totalProducts,
@@ -1062,17 +1343,16 @@ app.get('/api/admin/stats', async (req, res) => {
     }
 });
 
-// GET inventory grouped by shop (Admin only)
 app.get('/api/admin/inventory/by-shop', async (req, res) => {
     try {
         const usersSnapshot = await db.collection('users').get();
         const result = [];
-        
+
         for (const userDoc of usersSnapshot.docs) {
             const userData = userDoc.data();
             const invDoc = await db.collection('inventory').doc(userDoc.id).get();
             const products = invDoc.exists ? invDoc.data().items || [] : [];
-            
+
             if (products.length > 0) {
                 result.push({
                     shopId: userDoc.id,
@@ -1093,7 +1373,6 @@ app.get('/api/admin/inventory/by-shop', async (req, res) => {
     }
 });
 
-// GET all suppliers (Admin only)
 app.get('/api/admin/suppliers', async (req, res) => {
     try {
         const suppliersSnapshot = await db.collection('suppliers').get();
@@ -1117,12 +1396,11 @@ app.get('/api/admin/suppliers', async (req, res) => {
     }
 });
 
-// UPDATE user role (Admin only)
 app.put('/api/admin/users/:uid/role', async (req, res) => {
     try {
         const { uid } = req.params;
         const { role } = req.body;
-        
+
         await db.collection('users').doc(uid).update({
             role,
             updatedAt: new Date().toISOString()
@@ -1134,24 +1412,20 @@ app.put('/api/admin/users/:uid/role', async (req, res) => {
     }
 });
 
-// DELETE user (Admin only)
 app.delete('/api/admin/users/:uid', async (req, res) => {
     try {
         const { uid } = req.params;
-        
-        // Delete from Auth
+
         await auth.deleteUser(uid);
-        
-        // Delete from Firestore
+
         await db.collection('users').doc(uid).delete();
         await db.collection('subscriptions').doc(uid).delete();
         await db.collection('inventory').doc(uid).delete();
         await db.collection('suppliers').doc(uid).delete();
-        
-        // Delete scans
+
         const scansSnapshot = await db.collection('scans').where('userId', '==', uid).get();
         scansSnapshot.forEach(doc => doc.ref.delete());
-        
+
         res.json({ success: true, message: 'User deleted successfully' });
     } catch (error) {
         console.error('Delete user error:', error);
@@ -1159,21 +1433,20 @@ app.delete('/api/admin/users/:uid', async (req, res) => {
     }
 });
 
-// EXTEND trial (Admin only)
 app.post('/api/admin/subscriptions/:uid/extend', async (req, res) => {
     try {
         const { uid } = req.params;
         const { days } = req.body;
-        
+
         const subDoc = await db.collection('subscriptions').doc(uid).get();
         if (!subDoc.exists) {
             return res.status(404).json({ error: 'Subscription not found' });
         }
-        
+
         const data = subDoc.data();
         const currentEnd = new Date(data.trialEnd || new Date());
         currentEnd.setDate(currentEnd.getDate() + (days || 7));
-        
+
         await db.collection('subscriptions').doc(uid).update({
             trialEnd: currentEnd.toISOString(),
             status: 'trial_active',
@@ -1186,12 +1459,11 @@ app.post('/api/admin/subscriptions/:uid/extend', async (req, res) => {
     }
 });
 
-// UPGRADE subscription (Admin only)
 app.post('/api/admin/subscriptions/:uid/upgrade', async (req, res) => {
     try {
         const { uid } = req.params;
         const { planId } = req.body;
-        
+
         const limits = { maxProducts: planId === 'BASIC' ? 200 : planId === 'PROFESSIONAL' ? 1000 : Infinity };
         const features = {
             canBasicScan: true,
@@ -1207,7 +1479,7 @@ app.post('/api/admin/subscriptions/:uid/upgrade', async (req, res) => {
             canExportData: planId === 'PROFESSIONAL' || planId === 'ENTERPRISE',
             canCustomReports: planId === 'ENTERPRISE'
         };
-        
+
         await db.collection('subscriptions').doc(uid).update({
             planId,
             status: 'active',
@@ -1222,18 +1494,16 @@ app.post('/api/admin/subscriptions/:uid/upgrade', async (req, res) => {
     }
 });
 
-// SEED test data (for development)
 app.post('/api/seed/data', async (req, res) => {
     try {
-        // Create 3 test users with inventory
         const testUsers = [
             { name: 'Kamal Perera', email: 'kamal@test.lk', businessName: 'Kamal Grocery' },
             { name: 'Nimal Silva', email: 'nimal@test.lk', businessName: 'Nimal Supermarket' },
             { name: 'Sunil Fernando', email: 'sunil@test.lk', businessName: 'Sunil Mart' }
         ];
-        
+
         let createdCount = 0;
-        
+
         for (const user of testUsers) {
             try {
                 const userRecord = await auth.createUser({
@@ -1241,16 +1511,17 @@ app.post('/api/seed/data', async (req, res) => {
                     password: 'Test@123456',
                     displayName: user.name
                 });
-                
+
                 await db.collection('users').doc(userRecord.uid).set({
                     name: user.name,
                     email: user.email,
+                    phone: '',
                     businessName: user.businessName,
                     role: 'user',
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 });
-                
+
                 const trialEnd = new Date();
                 trialEnd.setDate(trialEnd.getDate() + 14);
                 await db.collection('subscriptions').doc(userRecord.uid).set({
@@ -1264,13 +1535,13 @@ app.post('/api/seed/data', async (req, res) => {
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 });
-                
+
                 const products = [
-                    { name: 'Fresh Milk (1L)', batch: 'B001', supplier: 'Dairy Farms', expiryDate: new Date(Date.now() + 8*86400000).toISOString().split('T')[0], stock: 24, costPrice: 280, sellingPrice: 350 },
-                    { name: 'Greek Yogurt', batch: 'B002', supplier: 'Dairy Farms', expiryDate: new Date(Date.now() + 2*86400000).toISOString().split('T')[0], stock: 15, costPrice: 180, sellingPrice: 220 },
-                    { name: 'Wheat Bread', batch: 'B003', supplier: 'Bakery Hub', expiryDate: new Date(Date.now() - 1*86400000).toISOString().split('T')[0], stock: 5, costPrice: 120, sellingPrice: 150 }
+                    { name: 'Fresh Milk (1L)', batch: 'B001', supplier: 'Dairy Farms', expiryDate: new Date(Date.now() + 8 * 86400000).toISOString().split('T')[0], stock: 24, costPrice: 280, sellingPrice: 350 },
+                    { name: 'Greek Yogurt', batch: 'B002', supplier: 'Dairy Farms', expiryDate: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0], stock: 15, costPrice: 180, sellingPrice: 220 },
+                    { name: 'Wheat Bread', batch: 'B003', supplier: 'Bakery Hub', expiryDate: new Date(Date.now() - 1 * 86400000).toISOString().split('T')[0], stock: 5, costPrice: 120, sellingPrice: 150 }
                 ];
-                
+
                 const items = products.map((p, i) => {
                     const daysLeft = Math.ceil((new Date(p.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
                     return {
@@ -1285,13 +1556,13 @@ app.post('/api/seed/data', async (req, res) => {
                         lowStockThreshold: 10
                     };
                 });
-                
+
                 await db.collection('inventory').doc(userRecord.uid).set({
                     items,
                     lastUpdated: new Date().toISOString(),
                     itemCount: items.length
                 });
-                
+
                 await db.collection('suppliers').doc(userRecord.uid).set({
                     suppliers: [
                         { id: 1, name: 'Dairy Farms', contact: '+94 11 234 5678', email: 'orders@dairyfarms.lk', rating: 4.5 },
@@ -1300,13 +1571,13 @@ app.post('/api/seed/data', async (req, res) => {
                     lastUpdated: new Date().toISOString(),
                     count: 2
                 });
-                
+
                 createdCount++;
             } catch (e) {
                 console.error(`Failed to create test user ${user.email}:`, e.message);
             }
         }
-        
+
         res.json({ success: true, users: createdCount, message: `${createdCount} test users created` });
     } catch (error) {
         console.error('Seed error:', error);
@@ -1314,9 +1585,98 @@ app.post('/api/seed/data', async (req, res) => {
     }
 });
 
+// ==================== ALERT ENDPOINTS ====================
+
+// ✅ Send Email Alert for single user
+app.post('/api/send-email-alert', async (req, res) => {
+    try {
+        const { userId, userEmail } = req.body;
+
+        if (!userId || !userEmail) {
+            return res.status(400).json({ error: 'userId and userEmail required' });
+        }
+
+        const result = await checkAndSendAlerts(userId, userEmail, null);
+        res.json(result);
+    } catch (error) {
+        console.error('Email alert error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ✅ Send SMS Alert for single user
+app.post('/api/send-sms', async (req, res) => {
+    try {
+        const { userId, phoneNumber, alertType } = req.body;
+
+        if (!userId || !phoneNumber) {
+            return res.status(400).json({ error: 'userId and phoneNumber required' });
+        }
+
+        const invDoc = await db.collection('inventory').doc(userId).get();
+        const items = invDoc.exists ? invDoc.data().items || [] : [];
+
+        if (items.length === 0) {
+            return res.json({ success: true, message: 'No products in inventory' });
+        }
+
+        let products = [];
+        if (alertType === 'low_stock') {
+            products = items.filter(i => i.stock <= i.lowStockThreshold && i.stock > 0);
+        } else if (alertType === 'near_expiry') {
+            products = items.filter(i => i.daysLeft <= 7 && i.daysLeft > 0);
+        } else {
+            products = items.filter(i =>
+                (i.stock <= i.lowStockThreshold && i.stock > 0) ||
+                (i.daysLeft <= 7 && i.daysLeft > 0)
+            );
+        }
+
+        if (products.length === 0) {
+            return res.json({ success: true, message: 'No alerts to send' });
+        }
+
+        const message = generateSmsAlertMessage(products, alertType || 'both');
+        const result = await sendTwilioSms(phoneNumber, message);
+
+        res.json({
+            success: result.success,
+            result,
+            productCount: products.length,
+            message: result.success ? 'SMS sent successfully' : result.error
+        });
+    } catch (error) {
+        console.error('SMS error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ✅ Run full alert check for all users (Email + SMS)
+app.post('/api/run-alert-check', async (req, res) => {
+    const result = await checkAllUsers();
+    res.json(result);
+});
+
+// ✅ Test SMS endpoint (debugging)
+app.get('/test-sms', async (req, res) => {
+    try {
+        const result = await sendTwilioSms('0712345678', '🛒 Test SMS from ShelfLife AI!');
+        res.json({ success: result.success, result });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ==================== START SERVER ====================
 
 const PORT = process.env.PORT || 5000;
+
+// ✅ Run auto-check every 12 hours (UNCOMMENT TO ENABLE)
+// setInterval(checkAllUsers, 12 * 60 * 60 * 1000);
+
+// ✅ Run once on server start (after 10 seconds)
+setTimeout(checkAllUsers, 10000);
+
 app.listen(PORT, () => {
     console.log("=".repeat(50));
     console.log(`🚀 ShelfLife AI Backend is running!`);
@@ -1324,6 +1684,9 @@ app.listen(PORT, () => {
     console.log(`📡 Firestore: Connected`);
     console.log(`🔐 Firebase Auth: Ready`);
     console.log(`👑 Admin Routes: Enabled`);
+    console.log(`📧 Email Alerts: ${process.env.EMAIL_USER ? 'Configured ✅' : 'Not Configured ⚠️'}`);
+    console.log(`📱 SMS Alerts: ${process.env.TWILIO_ACCOUNT_SID ? 'Configured ✅' : 'Not Configured ⚠️'}`);
+    console.log(`📱 Twilio Number: ${TWILIO_PHONE_NUMBER}`);
     console.log("=".repeat(50));
 });
 

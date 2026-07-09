@@ -7,8 +7,8 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
   const [profileData, setProfileData] = useState({
     name: '',
     email: '',
-    storeName: '',
     phone: '',
+    storeName: '',
     address: '',
     bio: ''
   });
@@ -24,13 +24,13 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
     expiryAlerts: true,
     lowStockAlerts: true,
     marketingEmails: false,
-    pushNotifications: true
+    pushNotifications: true,
+    smsAlerts: true
   });
   const [isEditing, setIsEditing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
-    // Load saved settings
     const savedTheme = localStorage.getItem('shelflife_theme');
     if (savedTheme) {
       setThemeColors(JSON.parse(savedTheme));
@@ -45,8 +45,8 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
       setProfileData({
         name: user.name || '',
         email: user.email || '',
-        storeName: user.storeName || user.businessName || '',
         phone: user.phone || '',
+        storeName: user.storeName || user.businessName || '',
         address: user.address || '',
         bio: user.bio || ''
       });
@@ -56,6 +56,21 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
   const handleProfileUpdate = () => {
     const updatedUser = { ...user, ...profileData };
     localStorage.setItem('shelflife_user', JSON.stringify(updatedUser));
+    
+    // Update Firestore
+    if (user && user.uid) {
+      import('../firebaseConfig').then(({ db, doc, updateDoc }) => {
+        updateDoc(doc(db, 'users', user.uid), {
+          name: profileData.name,
+          phone: profileData.phone,
+          businessName: profileData.storeName,
+          address: profileData.address,
+          bio: profileData.bio,
+          updatedAt: new Date().toISOString()
+        }).catch(err => console.error('Update error:', err));
+      });
+    }
+    
     if (onUpdateUser) onUpdateUser(updatedUser);
     setIsEditing(false);
     showSuccessMessage('Profile updated successfully!');
@@ -63,7 +78,6 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
 
   const handleThemeUpdate = () => {
     localStorage.setItem('shelflife_theme', JSON.stringify(themeColors));
-    // Apply theme colors to CSS variables
     document.documentElement.style.setProperty('--green-neon', themeColors.primary);
     document.documentElement.style.setProperty('--green-mid', themeColors.secondary);
     document.documentElement.style.setProperty('--bg-base', themeColors.background);
@@ -100,7 +114,6 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
   return (
     <div className="settings-page">
       <div className="container">
-        {/* Header */}
         <div className="settings-header">
           <h1>
             <i className="fas fa-cog"></i>
@@ -109,7 +122,6 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
           <p>Manage your profile, customize appearance, and configure notifications</p>
         </div>
 
-        {/* Success Toast */}
         {showSuccess && (
           <div className="success-toast">
             <i className="fas fa-check-circle"></i>
@@ -117,7 +129,6 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
           </div>
         )}
 
-        {/* Tabs */}
         <div className="settings-tabs">
           <button 
             className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
@@ -203,6 +214,27 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
                 </div>
               </div>
 
+              {/* ✅ Phone Number Field */}
+              <div className="form-group">
+                <label><i className="fas fa-phone"></i> Phone Number <small style={{ color: 'var(--text-muted)' }}>(for SMS alerts)</small></label>
+                {isEditing ? (
+                  <input 
+                    type="tel" 
+                    value={profileData.phone} 
+                    onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                    placeholder="0712345678"
+                  />
+                ) : (
+                  <p className="field-value">
+                    {profileData.phone || 'Not set'}
+                    {profileData.phone && <span style={{ color: 'var(--green-neon)', marginLeft: '10px', fontSize: '0.7rem' }}>✅ SMS alerts active</span>}
+                  </p>
+                )}
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.65rem', display: 'block', marginTop: '4px' }}>
+                  {profileData.phone ? 'SMS alerts will be sent to this number' : 'Add phone number to receive SMS alerts'}
+                </small>
+              </div>
+
               <div className="form-row">
                 <div className="form-group">
                   <label><i className="fas fa-store"></i> Store Name</label>
@@ -215,19 +247,6 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
                     />
                   ) : (
                     <p className="field-value">{profileData.storeName || 'Not set'}</p>
-                  )}
-                </div>
-                <div className="form-group">
-                  <label><i className="fas fa-phone"></i> Phone Number</label>
-                  {isEditing ? (
-                    <input 
-                      type="tel" 
-                      value={profileData.phone} 
-                      onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
-                      placeholder="Enter your phone number"
-                    />
-                  ) : (
-                    <p className="field-value">{profileData.phone || 'Not set'}</p>
                   )}
                 </div>
               </div>
@@ -261,7 +280,6 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
               </div>
             </div>
 
-            {/* Stats Cards */}
             <div className="profile-stats">
               <div className="stat-item">
                 <i className="fas fa-box"></i>
@@ -288,7 +306,7 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
           </div>
         )}
 
-        {/* Appearance Tab */}
+        {/* Appearance Tab (same as before) */}
         {activeTab === 'appearance' && (
           <div className="settings-card">
             <div className="card-header">
@@ -298,7 +316,6 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
               </button>
             </div>
 
-            {/* Preset Themes */}
             <div className="theme-section">
               <h3>Preset Themes</h3>
               <div className="preset-themes">
@@ -319,7 +336,6 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
               </div>
             </div>
 
-            {/* Custom Colors */}
             <div className="theme-section">
               <h3>Custom Colors</h3>
               <div className="color-grid">
@@ -371,7 +387,6 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
               </div>
             </div>
 
-            {/* Live Preview */}
             <div className="theme-section">
               <h3>Live Preview</h3>
               <div className="live-preview" style={{ 
@@ -425,6 +440,25 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
                     type="checkbox" 
                     checked={notifications.emailAlerts}
                     onChange={(e) => setNotifications({...notifications, emailAlerts: e.target.checked})}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </div>
+
+              {/* ✅ SMS Alerts Toggle */}
+              <div className="notification-item">
+                <div className="notification-info">
+                  <i className="fas fa-sms"></i>
+                  <div>
+                    <h4>SMS Alerts</h4>
+                    <p>Get alerts via SMS for low stock and near expiry</p>
+                  </div>
+                </div>
+                <label className="toggle-switch">
+                  <input 
+                    type="checkbox" 
+                    checked={notifications.smsAlerts}
+                    onChange={(e) => setNotifications({...notifications, smsAlerts: e.target.checked})}
                   />
                   <span className="toggle-slider"></span>
                 </label>
@@ -505,13 +539,12 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
           </div>
         )}
 
-        {/* Security Tab */}
+        {/* Security Tab - same as before */}
         {activeTab === 'security' && (
           <div className="settings-card">
             <div className="card-header">
               <h2><i className="fas fa-shield-alt"></i> Security Settings</h2>
             </div>
-
             <div className="security-section">
               <div className="security-item">
                 <div className="security-info">
@@ -523,7 +556,6 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
                 </div>
                 <button className="btn-secondary">Change Password</button>
               </div>
-
               <div className="security-item">
                 <div className="security-info">
                   <i className="fas fa-mobile-alt"></i>
@@ -534,7 +566,6 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
                 </div>
                 <button className="btn-secondary">Enable 2FA</button>
               </div>
-
               <div className="security-item">
                 <div className="security-info">
                   <i className="fas fa-history"></i>
@@ -545,7 +576,6 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
                 </div>
                 <button className="btn-secondary">View Sessions</button>
               </div>
-
               <div className="security-item">
                 <div className="security-info">
                   <i className="fas fa-download"></i>
@@ -556,7 +586,6 @@ function Settings({ user, onUpdateUser, onUpdateTheme }) {
                 </div>
                 <button className="btn-secondary">Export Data</button>
               </div>
-
               <div className="security-item danger">
                 <div className="security-info">
                   <i className="fas fa-trash-alt"></i>

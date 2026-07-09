@@ -109,20 +109,18 @@ function Inventory({
 
   const uniqueSuppliers = [...new Set(inventory.map(item => item.supplier))].filter(Boolean);
 
-  // ✅ NEW: Save supplier to backend if not exists
+  // ✅ Save supplier if not exists
   const saveSupplierIfNotExists = async (supplierName) => {
     if (!supplierName || supplierName === 'Manual Entry' || supplierName === 'OCR Scanned') {
       return;
     }
     
-    // Check if supplier already exists
     const existingSupplier = suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase());
     if (existingSupplier) {
-      return existingSupplier; // Already exists
+      return existingSupplier;
     }
     
     try {
-      // Create new supplier
       const newSupplier = {
         name: supplierName,
         contact: '',
@@ -135,9 +133,7 @@ function Inventory({
       const result = await api.addSupplier(user.uid, newSupplier);
       if (result.success) {
         console.log(`✅ Supplier "${supplierName}" auto-created from inventory`);
-        // Update local suppliers list
         setSuppliers(prev => [...prev, result.supplier]);
-        // Update localStorage
         const updatedSuppliers = [...suppliers, result.supplier];
         localStorage.setItem(`shelflife_suppliers_${user.uid}`, JSON.stringify(updatedSuppliers));
         return result.supplier;
@@ -170,7 +166,6 @@ function Inventory({
       return;
     }
 
-    // ✅ Save supplier to backend if it's a new supplier
     const supplierName = productData.supplier || 'Manual Entry';
     if (supplierName !== 'Manual Entry' && supplierName !== 'OCR Scanned') {
       await saveSupplierIfNotExists(supplierName);
@@ -336,7 +331,6 @@ function Inventory({
   // Handle Edit Product
   const handleEditProduct = async (updatedProduct) => {
     try {
-      // ✅ Save supplier if it's new
       if (updatedProduct.supplier && updatedProduct.supplier !== 'Manual Entry' && updatedProduct.supplier !== 'OCR Scanned') {
         await saveSupplierIfNotExists(updatedProduct.supplier);
       }
@@ -446,7 +440,6 @@ function Inventory({
         </button>
       </div>
 
-      {/* Stats Cards */}
       <div className="stats-grid-inline">
         <div className="stat-card-mini">
           <div className="stat-icon"><i className="fas fa-box"></i></div>
@@ -478,7 +471,6 @@ function Inventory({
         </div>
       </div>
 
-      {/* Scanner Selection */}
       {showScanner && !scanType && (
         <div className="scanner-section">
           <div className="scanner-tabs">
@@ -544,7 +536,6 @@ function Inventory({
         </div>
       )}
 
-      {/* Search and Filter */}
       <div className="search-filter-bar">
         <div className="search-box">
           <i className="fas fa-search"></i>
@@ -582,7 +573,6 @@ function Inventory({
         </div>
       )}
 
-      {/* Inventory Table */}
       <div className="inventory-table-container">
         <table className="inventory-table">
           <thead>
@@ -652,7 +642,6 @@ function Inventory({
         )}
       </div>
 
-      {/* Edit Modal */}
       {showEditModal && selectedProduct && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>

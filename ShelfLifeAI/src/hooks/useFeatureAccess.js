@@ -57,8 +57,6 @@ export function useFeatureAccess() {
       const isActive = sub?.status === 'active';
       const planId = sub?.planId;
       
-      // ENABLE OCR FOR TESTING DURING TRIAL
-      // Set to false for production
       const ENABLE_OCR_FOR_TESTING = true;
       
       let featureMap = {
