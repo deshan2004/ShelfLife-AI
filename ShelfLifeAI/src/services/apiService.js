@@ -1,5 +1,5 @@
 // src/services/apiService.js
-const API_URL = import.meta.env?.VITE_API_URL || 'https://accustom-alias-altitude.ngrok-free.dev';
+const API_URL = import.meta.env?.VITE_API_URL || 'https://accustom-alias-altitude.grork-free.dev';
 
 export const api = {
     // ===== HEALTH =====

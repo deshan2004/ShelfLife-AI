@@ -41,20 +41,26 @@ function App() {
   const [inventory, setInventory] = useState([])
   const [toastMsg, setToastMsg] = useState(null)
 
-  // ✅ Load inventory from Firebase via API
+  // ✅ Load inventory from BACKEND (NOT localStorage)
   const loadUserInventory = async (userId, forceRefresh = false) => {
     if (!userId) return;
-    
+
     try {
       console.log('🔄 Loading inventory from backend for user:', userId);
       const data = await api.getInventory(userId);
       const items = data.items || [];
       console.log(`✅ Loaded ${items.length} products from backend`);
+      
+      // ✅ ALWAYS use backend data first
       setInventory(items);
+      
+      // ✅ localStorage is just backup
       localStorage.setItem(`shelflife_inventory_${userId}`, JSON.stringify(items));
       return items;
     } catch (error) {
       console.error('❌ Error loading inventory from server:', error);
+      
+      // ⚠️ ONLY use localStorage if backend fails
       const savedInventory = localStorage.getItem(`shelflife_inventory_${userId}`);
       if (savedInventory) {
         try {
@@ -66,7 +72,33 @@ function App() {
           console.error('❌ Error parsing localStorage:', e);
         }
       }
+      
+      // If nothing works, try to seed initial data
+      await seedInitialInventory(userId);
       return [];
+    }
+  };
+
+  // ✅ Seed initial inventory if empty
+  const seedInitialInventory = async (userId) => {
+    try {
+      const { initialInventory } = await import('./data/inventoryData');
+      console.log('🌱 Seeding initial inventory...');
+      
+      let addedCount = 0;
+      for (const product of initialInventory) {
+        try {
+          const result = await api.addProduct(userId, product);
+          if (result.success) addedCount++;
+        } catch (e) {
+          console.error('Error seeding product:', e);
+        }
+      }
+      
+      console.log(`✅ Seeded ${addedCount} products`);
+      await loadUserInventory(userId, true);
+    } catch (error) {
+      console.error('❌ Seed error:', error);
     }
   };
 
