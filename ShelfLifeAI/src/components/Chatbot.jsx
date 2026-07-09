@@ -45,6 +45,31 @@ function Chatbot() {
     return () => clearTimeout(timer);
   }, [isOpen]);
 
+  // ✅ Listen for flash sale events from outside
+  useEffect(() => {
+    const handleFlashSaleMessage = (event) => {
+      const { productName, discount, newPrice, saleType } = event.detail;
+      
+      // Add message to chat
+      const botMessage = {
+        id: Date.now(),
+        text: `🔥 **${saleType || 'Flash Sale'} Applied!**\n\n✅ **${productName}**\n💰 Discount: **${discount}**\n🆕 New Price: **LKR ${newPrice}**\n\n💡 This product is now on sale! Don't miss out!`,
+        sender: 'bot',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      
+      setMessages(prev => [...prev, botMessage]);
+      
+      // Also show a toast notification
+      if (window.showToast) {
+        window.showToast(`🔥 ${discount} applied to ${productName}!`);
+      }
+    };
+
+    window.addEventListener('flashSaleApplied', handleFlashSaleMessage);
+    return () => window.removeEventListener('flashSaleApplied', handleFlashSaleMessage);
+  }, []);
+
   // Bot responses based on user input
   const getBotResponse = (userMessage) => {
     const msg = userMessage.toLowerCase();
@@ -58,7 +83,7 @@ function Chatbot() {
     }
     
     if (msg.includes('flash') || msg.includes('sale') || msg.includes('discount')) {
-      return "🔥 **Flash Sale Discounts:**\n\n• 50% OFF for items expiring in 24h\n• 40% OFF for items expiring in 48h\n• 30% OFF for items expiring in 7 days\n\n💡 Click 'Flash Sale' on any near-expiry product in your inventory!";
+      return "🔥 **Flash Sale Discounts:**\n\n• 50% OFF for items expiring in 24h\n• 40% OFF for items expiring in 48h\n• 30% OFF for items expiring in 7 days\n\n💡 Click 'Flash Sale' on any near-expiry product in your inventory!\n\n🛒 When you apply a flash sale, I'll notify you here!";
     }
     
     if (msg.includes('inventory') || msg.includes('stock') || msg.includes('product')) {
@@ -87,6 +112,10 @@ function Chatbot() {
     
     if (msg.includes('thank')) {
       return "🙏 **You're very welcome!**\n\nI'm glad I could help. Is there anything else you'd like to know about ShelfLife AI?\n\n💡 Tip: Check out our video tutorials in the Help section!";
+    }
+    
+    if (msg.includes('discount') || msg.includes('sale')) {
+      return "🔥 **Current Discounts in Your Inventory**\n\nI'll notify you when you apply flash sales to products!\n\n💡 To apply a discount:\n1. Go to Inventory\n2. Find a product expiring soon\n3. Click the 'Flash' button\n4. I'll confirm the discount here!";
     }
     
     return "🤔 **I'm not sure I understand.**\n\nCould you please rephrase your question? I can help with:\n\n📷 Product scanning (barcode/OCR)\n📦 Inventory management\n🔥 Flash sales\n🚚 Supplier returns\n📊 Analytics\n💰 Pricing & plans\n\nOr click **'Connect with Human Support'** below to talk to a real person!";
