@@ -1,6 +1,7 @@
 // src/hooks/useFeatureAccess.js
 import { useState, useEffect, useCallback } from 'react';
 import subscriptionService from '../services/subscriptionService';
+import { auth } from '../firebaseConfig'; // ඔබේ Firebase config ගොනුව මෙතැනට නිවැරදිව සම්බන්ධ කරන්න
 
 export function useFeatureAccess() {
   const [features, setFeatures] = useState({
@@ -37,7 +38,8 @@ export function useFeatureAccess() {
   const [trialDaysLeft, setTrialDaysLeft] = useState(0);
   
   const loadAccess = useCallback(async () => {
-    const user = JSON.parse(localStorage.getItem('shelflife_user'));
+    // Local Storage වෙනුවට සක්‍රීය Firebase Auth User වෘත්තීයමය ලෙස ලබා ගැනීම
+    const user = auth.currentUser;
     
     if (!user || !user.uid) {
       setFeatures(prev => ({ ...prev, isLoading: false }));
@@ -57,6 +59,7 @@ export function useFeatureAccess() {
       const isActive = sub?.status === 'active';
       const planId = sub?.planId;
       
+      // ENABLE OCR FOR TESTING DURING TRIAL
       const ENABLE_OCR_FOR_TESTING = true;
       
       let featureMap = {
@@ -64,7 +67,7 @@ export function useFeatureAccess() {
         canOCRScan: ENABLE_OCR_FOR_TESTING || isActive || (isTrialActive && planId === 'FREE_TRIAL'),
         canBarcodeScan: isTrialActive || isActive,
         canFlashSale: isTrialActive || isActive,
-        canSupplierReturn: false,
+        canSupplierReturn: true, // වෙනත් උපාංගවලින් Suppliers පිටුව වැඩ කිරීමට මෙය true කරන ලදී
         canBasicAnalytics: isTrialActive || isActive,
         canAdvancedAnalytics: false,
         canPrioritySupport: false,
@@ -115,8 +118,18 @@ export function useFeatureAccess() {
     }
   }, []);
   
+  // Auth State එක වෙනස් වන විට (Login/Logout) ස්වයංක්‍රීයව දත්ත Refresh වීම සඳහා
   useEffect(() => {
-    loadAccess();
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        loadAccess();
+      } else {
+        setFeatures(prev => ({ ...prev, isLoading: false }));
+        setUsage(prev => ({ ...prev, isLoading: false }));
+      }
+    });
+    
+    return () => unsubscribe();
   }, [loadAccess]);
   
   const refresh = useCallback(() => {
