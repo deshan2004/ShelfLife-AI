@@ -3,8 +3,18 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import './Navbar.css';
 import UserMenu from './UserMenu';
+import AlertDropdown from './AlertDropdown';
 
-export default function Navbar({ onLoginClick, user, onLogout, isAdmin }) {
+function Navbar({ 
+  onLoginClick, 
+  user, 
+  onLogout, 
+  isAdmin,
+  inventory = [],
+  onFlashSale = null,
+  onOrderNow = null,
+  actionLoading = null
+}) {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -45,6 +55,12 @@ export default function Navbar({ onLoginClick, user, onLogout, isAdmin }) {
   };
 
   const mobileNavLinks = getMobileNavLinks();
+
+  // Calculate alert count for mobile
+  const criticalItems = inventory.filter(item => item.daysLeft <= 3 && item.daysLeft > 0);
+  const expiringItems = inventory.filter(item => item.daysLeft > 3 && item.daysLeft <= 7);
+  const lowStockItems = inventory.filter(item => item.stock <= item.lowStockThreshold && item.stock > 0);
+  const totalAlerts = criticalItems.length + expiringItems.length + lowStockItems.length;
 
   return (
     <nav className="navbar">
@@ -102,6 +118,17 @@ export default function Navbar({ onLoginClick, user, onLogout, isAdmin }) {
                   </Link>
                 </>
               )}
+
+              {/* ✅ Alert Dropdown */}
+              {inventory.length > 0 && totalAlerts > 0 && (
+                <AlertDropdown 
+                  inventory={inventory}
+                  onFlashSale={onFlashSale}
+                  onOrderNow={onOrderNow}
+                  actionLoading={actionLoading}
+                />
+              )}
+
               <UserMenu user={user} onLogout={onLogout} isAdmin={isAdmin} />
             </>
           ) : (
@@ -142,6 +169,18 @@ export default function Navbar({ onLoginClick, user, onLogout, isAdmin }) {
                 </div>
               </div>
             )}
+
+            {/* ✅ Mobile Alert Summary */}
+            {inventory.length > 0 && totalAlerts > 0 && (
+              <div className="mobile-alert-summary" onClick={() => {
+                setMobileMenuOpen(false);
+                window.location.href = '/inventory';
+              }}>
+                <i className="fas fa-bell"></i>
+                <span>Inventory Alerts</span>
+                <span className="mobile-alert-count">{totalAlerts}</span>
+              </div>
+            )}
             
             {/* Navigation Links */}
             <div className="mobile-nav-links">
@@ -169,3 +208,5 @@ export default function Navbar({ onLoginClick, user, onLogout, isAdmin }) {
     </nav>
   );
 }
+
+export default Navbar;
