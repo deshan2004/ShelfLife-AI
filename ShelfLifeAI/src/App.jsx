@@ -40,8 +40,9 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [inventory, setInventory] = useState([])
   const [toastMsg, setToastMsg] = useState(null)
+  const [actionLoading, setActionLoading] = useState(null) // ✅ For Navbar Alert actions
 
-  // ✅ Load inventory from BACKEND (NOT localStorage)
+  // ✅ Load inventory from BACKEND
   const loadUserInventory = async (userId, forceRefresh = false) => {
     if (!userId) return;
 
@@ -51,16 +52,12 @@ function App() {
       const items = data.items || [];
       console.log(`✅ Loaded ${items.length} products from backend`);
       
-      // ✅ ALWAYS use backend data first
       setInventory(items);
-      
-      // ✅ localStorage is just backup
       localStorage.setItem(`shelflife_inventory_${userId}`, JSON.stringify(items));
       return items;
     } catch (error) {
       console.error('❌ Error loading inventory from server:', error);
       
-      // ⚠️ ONLY use localStorage if backend fails
       const savedInventory = localStorage.getItem(`shelflife_inventory_${userId}`);
       if (savedInventory) {
         try {
@@ -73,7 +70,6 @@ function App() {
         }
       }
       
-      // If nothing works, try to seed initial data
       await seedInitialInventory(userId);
       return [];
     }
@@ -101,6 +97,114 @@ function App() {
       console.error('❌ Seed error:', error);
     }
   };
+
+  // ============================================================
+  // ✅ SMART ACTIONS (for Navbar Alerts)
+  // ============================================================
+
+  // 🔥 Flash Sale
+  const handleFlashSale = async (productId) => {
+    const product = inventory.find(p => p.id === productId);
+    if (!product) return;
+
+    let discount = '30% OFF';
+    let saleType = 'Flash Sale';
+    let discountMultiplier = 0.7;
+    
+    if (product.daysLeft <= 1) {
+      discount = '50% OFF';
+      saleType = 'Buy 1 Get 1 Free';
+      discountMultiplier = 0.5;
+    } else if (product.daysLeft <= 2) {
+      discount = '40% OFF';
+      saleType = 'Flash Sale';
+      discountMultiplier = 0.6;
+    } else if (product.daysLeft <= 7) {
+      discount = '30% OFF';
+      saleType = 'Flash Sale';
+      discountMultiplier = 0.7;
+    }
+    
+    if (!window.confirm(`Apply ${discount} ${saleType} to "${product.name}"?`)) return;
+    
+    setActionLoading(productId);
+    
+    try {
+      const newPrice = Math.round(product.sellingPrice * discountMultiplier);
+      const updates = {
+        sellingPrice: newPrice,
+        suggestion: `🔥 ${saleType} ACTIVE - ${discount}`,
+        flashSaleActive: true,
+        flashSaleDiscount: discount,
+        flashSaleAppliedAt: new Date().toISOString()
+      };
+      
+      const result = await api.updateProduct(user.uid, productId, updates);
+      
+      if (result.success) {
+        showToast(`🔥 ${saleType} applied to ${product.name}! New price: LKR ${newPrice}`);
+        await loadUserInventory(user.uid, true);
+      } else {
+        showToast(`❌ Failed to apply flash sale: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Flash sale error:', error);
+      showToast(`❌ ${error.message || 'Failed to apply flash sale'}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // 📦 Order Now (Low Stock)
+  const handleOrderNow = async (productId) => {
+    const product = inventory.find(p => p.id === productId);
+    if (!product) return;
+    
+    const orderQuantity = window.prompt(
+      `📦 Order more stock for "${product.name}"\nCurrent stock: ${product.stock}\nLow stock threshold: ${product.lowStockThreshold}\n\nEnter quantity to order:`,
+      product.lowStockThreshold + 10
+    );
+    
+    if (orderQuantity === null) return;
+    
+    const qty = parseInt(orderQuantity);
+    if (isNaN(qty) || qty <= 0) {
+      showToast('❌ Invalid quantity');
+      return;
+    }
+    
+    if (!window.confirm(`📦 Place order for ${qty} units of "${product.name}" from ${product.supplier}?`)) return;
+    
+    setActionLoading(productId);
+    
+    try {
+      const newStock = product.stock + qty;
+      const updates = {
+        stock: newStock,
+        suggestion: `📦 Order placed on ${new Date().toLocaleDateString()} (${qty} units)`,
+        lastOrderDate: new Date().toISOString(),
+        lastOrderQuantity: qty
+      };
+      
+      const result = await api.updateProduct(user.uid, productId, updates);
+      
+      if (result.success) {
+        showToast(`📦 Order placed for ${qty} units of ${product.name}! New stock: ${newStock}`);
+        await loadUserInventory(user.uid, true);
+      } else {
+        showToast(`❌ Failed to place order: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Order error:', error);
+      showToast(`❌ ${error.message || 'Failed to place order'}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // ============================================================
+  // END OF SMART ACTIONS
+  // ============================================================
 
   // ✅ Auth state listener
   useEffect(() => {
@@ -209,11 +313,16 @@ function App() {
   return (
     <Router>
       <div className="app-wrapper">
+        {/* ✅ Navbar with AlertDropdown props */}
         <Navbar
           onLoginClick={() => setShowLogin(true)}
           user={user}
           onLogout={handleLogout}
           isAdmin={isAdmin}
+          inventory={inventory}
+          onFlashSale={handleFlashSale}
+          onOrderNow={handleOrderNow}
+          actionLoading={actionLoading}
         />
 
         <main className="main-content">

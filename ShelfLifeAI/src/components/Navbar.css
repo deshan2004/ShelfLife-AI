@@ -638,4 +638,41 @@
 .menu-item i {
   width: 20px;
   font-size: 0.9rem;
+}/* Mobile Alert Summary - Add to Navbar.css */
+.mobile-alert-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: var(--r-md);
+  margin: 0 0 12px 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.mobile-alert-summary i {
+  color: #ef4444;
+  font-size: 1rem;
+}
+
+.mobile-alert-summary span {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.mobile-alert-count {
+  margin-left: auto;
+  background: #ef4444;
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 1px 10px;
+  border-radius: 20px;
+}
+
+.mobile-alert-summary:hover {
+  background: rgba(239, 68, 68, 0.15);
 }

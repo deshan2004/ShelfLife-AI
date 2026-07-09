@@ -14,6 +14,11 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedSupplier, setSelectedSupplier] = useState(null)
+  const [actionLoading, setActionLoading] = useState(null)
+  const [highlightSupplier, setHighlightSupplier] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [expandedSuppliers, setExpandedSuppliers] = useState({})
+  
   const [formData, setFormData] = useState({
     name: '',
     contact: '',
@@ -22,12 +27,12 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
     rating: 0,
     notes: ''
   })
-  const [highlightSupplier, setHighlightSupplier] = useState(null)
 
   // ✅ Highlight supplier from navigation state
   useEffect(() => {
     if (location.state?.supplier) {
       setHighlightSupplier(location.state.supplier);
+      setExpandedSuppliers({ [location.state.supplier]: true });
       setTimeout(() => {
         const element = document.getElementById(`supplier-${location.state.supplier}`);
         if (element) {
@@ -37,7 +42,7 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
     }
   }, [location]);
 
-  // ✅ Load suppliers from BACKEND (NOT localStorage first)
+  // ✅ Load suppliers from BACKEND
   const loadSuppliers = async () => {
     if (!user?.uid) {
       setLoading(false);
@@ -55,13 +60,16 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
       const list = data.list || [];
       setSuppliers(list);
 
-      // ✅ localStorage is just backup
+      // Auto-expand first supplier if any
+      if (list.length > 0 && Object.keys(expandedSuppliers).length === 0) {
+        setExpandedSuppliers({ [list[0].name]: true });
+      }
+
       localStorage.setItem(`shelflife_suppliers_${user.uid}`, JSON.stringify(list));
     } catch (error) {
       console.error('❌ Load suppliers error:', error);
       setError(error.message || 'Failed to load suppliers');
 
-      // ⚠️ ONLY use localStorage if backend fails
       try {
         const localData = localStorage.getItem(`shelflife_suppliers_${user.uid}`);
         if (localData) {
@@ -89,6 +97,14 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
     }
   };
 
+  // ✅ Refresh data
+  const refreshData = async () => {
+    if (refreshInventory) {
+      await refreshInventory();
+    }
+    await loadSuppliers();
+  };
+
   // ✅ Add Supplier
   const handleAddSupplier = async (e) => {
     e.preventDefault();
@@ -98,9 +114,10 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
     }
 
     try {
+      setActionLoading('add');
       const result = await api.addSupplier(user.uid, formData);
       if (result.success) {
-        await loadSuppliers(); // Refresh from backend
+        await loadSuppliers();
         showToast(`✅ ${result.supplier.name} added successfully!`);
         setShowAddModal(false);
         resetForm();
@@ -108,6 +125,8 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
     } catch (error) {
       console.error('Add supplier error:', error);
       showToast(`❌ ${error.message || 'Failed to add supplier'}`);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -120,9 +139,10 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
     }
 
     try {
+      setActionLoading('edit');
       const result = await api.updateSupplier(user.uid, selectedSupplier.id, formData);
       if (result.success) {
-        await loadSuppliers(); // Refresh from backend
+        await loadSuppliers();
         showToast(`✅ ${result.supplier.name} updated successfully!`);
         setShowEditModal(false);
         resetForm();
@@ -130,6 +150,8 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
     } catch (error) {
       console.error('Update supplier error:', error);
       showToast(`❌ ${error.message || 'Failed to update supplier'}`);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -138,20 +160,43 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
     if (!window.confirm(`Are you sure you want to delete "${supplier.name}"?`)) return;
 
     try {
+      setActionLoading(supplier.id);
       const result = await api.deleteSupplier(user.uid, supplier.id);
       if (result.success) {
-        await loadSuppliers(); // Refresh from backend
+        await loadSuppliers();
         showToast(`🗑️ ${supplier.name} removed successfully!`);
       }
     } catch (error) {
       console.error('Delete supplier error:', error);
       showToast(`❌ ${error.message || 'Failed to delete supplier'}`);
+    } finally {
+      setActionLoading(null);
     }
   };
 
   // ✅ Add Product for this supplier
   const handleAddProductForSupplier = (supplierName) => {
     navigate('/inventory', { state: { supplier: supplierName } });
+  };
+
+  // ✅ View Products for supplier
+  const handleViewProducts = (supplierName) => {
+    const filtered = inventory.filter(p => p.supplier === supplierName);
+    if (filtered.length > 0) {
+      showToast(`📦 ${filtered.length} products from ${supplierName}`);
+      navigate('/inventory');
+      localStorage.setItem('shelflife_filter_supplier', supplierName);
+    } else {
+      showToast(`📦 No products yet from ${supplierName}. Click "Add Product" to add one.`);
+    }
+  };
+
+  // ✅ Toggle supplier expansion
+  const toggleSupplier = (supplierName) => {
+    setExpandedSuppliers(prev => ({
+      ...prev,
+      [supplierName]: !prev[supplierName]
+    }));
   };
 
   const resetForm = () => {
@@ -187,13 +232,35 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
             key={star}
             className={`star ${star <= rating ? 'filled' : ''}`}
             onClick={() => editable && onChange && onChange(star)}
-            style={{ cursor: editable ? 'pointer' : 'default', fontSize: editable ? '1.5rem' : '1.1rem' }}
+            style={{ 
+              cursor: editable ? 'pointer' : 'default', 
+              fontSize: editable ? '1.8rem' : '1.1rem',
+              transition: 'all 0.15s ease'
+            }}
           >
             ★
           </span>
         ))}
       </div>
     );
+  };
+
+  // Filter suppliers
+  const filteredSuppliers = suppliers.filter(supplier => {
+    const search = searchTerm.toLowerCase();
+    return supplier.name?.toLowerCase().includes(search) ||
+           supplier.contact?.toLowerCase().includes(search) ||
+           supplier.email?.toLowerCase().includes(search) ||
+           supplier.address?.toLowerCase().includes(search);
+  });
+
+  // Stats
+  const stats = {
+    total: suppliers.length,
+    avgRating: suppliers.length > 0 
+      ? (suppliers.reduce((sum, s) => sum + (s.rating || 0), 0) / suppliers.length).toFixed(1)
+      : '—',
+    totalProducts: inventory?.length || 0
   };
 
   if (loading) {
@@ -229,54 +296,84 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
 
   return (
     <div className="page-container">
+      {/* Page Header */}
       <div className="page-header">
         <div>
-          <h1 className="page-title"><i className="fas fa-truck"></i> Supplier Management</h1>
+          <h1 className="page-title">
+            <i className="fas fa-truck"></i> Supplier Management
+          </h1>
           <p className="page-description">Manage your suppliers, track performance, and handle returns</p>
         </div>
-        <button className="btn-primary-lg" onClick={() => setShowAddModal(true)}>
-          <i className="fas fa-plus"></i> Add Supplier
+        <button className="btn-primary-lg" onClick={() => setShowAddModal(true)} disabled={actionLoading === 'add'}>
+          {actionLoading === 'add' ? (
+            <><i className="fas fa-spinner fa-pulse"></i> Adding...</>
+          ) : (
+            <><i className="fas fa-plus"></i> Add Supplier</>
+          )}
         </button>
       </div>
 
+      {/* Stats Cards */}
       <div className="stats-grid-inline">
         <div className="stat-card-mini">
           <div className="stat-icon"><i className="fas fa-building"></i></div>
           <div className="stat-info">
-            <span className="stat-number">{suppliers.length}</span>
+            <span className="stat-number">{stats.total}</span>
             <span className="stat-label">Total Suppliers</span>
           </div>
         </div>
         <div className="stat-card-mini">
           <div className="stat-icon"><i className="fas fa-star"></i></div>
           <div className="stat-info">
-            <span className="stat-number">
-              {suppliers.length > 0 ? (suppliers.reduce((sum, s) => sum + (s.rating || 0), 0) / suppliers.length).toFixed(1) : '—'}
-            </span>
+            <span className="stat-number">{stats.avgRating}</span>
             <span className="stat-label">Avg Rating</span>
           </div>
         </div>
         <div className="stat-card-mini">
           <div className="stat-icon"><i className="fas fa-box"></i></div>
           <div className="stat-info">
-            <span className="stat-number">{inventory?.length || 0}</span>
+            <span className="stat-number">{stats.totalProducts}</span>
             <span className="stat-label">Total Products</span>
           </div>
         </div>
       </div>
 
-      {suppliers.length === 0 ? (
+      {/* Search Bar */}
+      <div className="search-filter-bar">
+        <div className="search-box">
+          <i className="fas fa-search"></i>
+          <input 
+            type="text" 
+            placeholder="Search by name, contact, email, or address..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Suppliers Grid */}
+      {filteredSuppliers.length === 0 ? (
         <div className="empty-state">
           <i className="fas fa-truck"></i>
-          <p>No suppliers added yet</p>
-          <button className="btn-primary" onClick={() => setShowAddModal(true)}>Add Your First Supplier</button>
+          <p>{searchTerm ? 'No suppliers match your search' : 'No suppliers added yet'}</p>
+          {!searchTerm && (
+            <button className="btn-primary" onClick={() => setShowAddModal(true)}>
+              Add Your First Supplier
+            </button>
+          )}
         </div>
       ) : (
         <div className="suppliers-grid">
-          {suppliers.map((supplier) => {
-            const supplierProducts = (inventory || []).filter(p => p.supplier === supplier.name);
+          {filteredSuppliers.map((supplier) => {
+            const supplierProducts = inventory.filter(p => p.supplier === supplier.name);
             const isHighlighted = highlightSupplier === supplier.name;
+            const isExpanded = expandedSuppliers[supplier.name];
             
+            // Count expiring products
+            const expiringCount = supplierProducts.filter(p => p.daysLeft <= 7 && p.daysLeft > 0).length;
+            const expiredCount = supplierProducts.filter(p => p.daysLeft <= 0).length;
+            const lowStockCount = supplierProducts.filter(p => p.stock <= p.lowStockThreshold).length;
+
             return (
               <div 
                 key={supplier.id} 
@@ -288,9 +385,12 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
                   transition: 'all 0.5s ease'
                 } : {}}
               >
-                <div className="supplier-card-header">
+                {/* Supplier Header */}
+                <div className="supplier-card-header" onClick={() => toggleSupplier(supplier.name)}>
                   <div className="supplier-info">
-                    <i className="fas fa-building"></i>
+                    <div className="supplier-avatar">
+                      {supplier.name?.charAt(0) || 'S'}
+                    </div>
                     <div>
                       <h3>{supplier.name}</h3>
                       <div className="supplier-rating">
@@ -299,74 +399,124 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
                       </div>
                     </div>
                   </div>
-                  <div className="supplier-actions">
-                    <button className="btn-edit" onClick={() => openEditModal(supplier)} title="Edit Supplier">
-                      <i className="fas fa-edit"></i>
-                    </button>
-                    <button className="btn-delete" onClick={() => handleDeleteSupplier(supplier)} title="Delete Supplier">
-                      <i className="fas fa-trash"></i>
+                  
+                  <div className="supplier-stats">
+                    <span className="supplier-badge">
+                      <i className="fas fa-box"></i> {supplierProducts.length}
+                    </span>
+                    {expiringCount > 0 && (
+                      <span className="supplier-badge warning">
+                        ⚠️ {expiringCount}
+                      </span>
+                    )}
+                    {expiredCount > 0 && (
+                      <span className="supplier-badge expired">
+                        ❌ {expiredCount}
+                      </span>
+                    )}
+                    <button 
+                      className="supplier-toggle-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSupplier(supplier.name);
+                      }}
+                    >
+                      <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i>
                     </button>
                   </div>
                 </div>
 
+                {/* Supplier Details */}
                 <div className="supplier-details">
-                  {supplier.contact && <span><i className="fas fa-phone"></i> {supplier.contact}</span>}
-                  {supplier.email && <span><i className="fas fa-envelope"></i> {supplier.email}</span>}
-                  {supplier.address && <span><i className="fas fa-map-marker-alt"></i> {supplier.address}</span>}
-                  {supplier.notes && <span className="supplier-notes"><i className="fas fa-info-circle"></i> {supplier.notes}</span>}
-                </div>
-
-                <div className="supplier-products">
-                  <div className="supplier-products-header">
-                    <span>📦 {supplierProducts.length} Products</span>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                        className="btn-add-product-supplier"
-                        onClick={() => handleAddProductForSupplier(supplier.name)}
-                        style={{
-                          background: 'linear-gradient(135deg, var(--green-deep), var(--green-neon))',
-                          border: 'none',
-                          borderRadius: '20px',
-                          padding: '4px 12px',
-                          color: '#030a03',
-                          fontWeight: '600',
-                          fontSize: '0.7rem',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <i className="fas fa-plus"></i> Add Product
-                      </button>
-                      <button 
-                        className="btn-view-products" 
-                        onClick={() => {
-                          const filtered = (inventory || []).filter(p => p.supplier === supplier.name);
-                          if (filtered.length > 0) {
-                            showToast(`📦 ${filtered.length} products from ${supplier.name}`);
-                            navigate('/inventory');
-                            localStorage.setItem('shelflife_filter_supplier', supplier.name);
-                          } else {
-                            showToast(`📦 No products yet from ${supplier.name}. Click "Add Product" to add one.`);
-                          }
-                        }}
-                      >
-                        View All
-                      </button>
-                    </div>
-                  </div>
-                  {supplierProducts.length > 0 ? (
-                    <div className="product-tags">
-                      {supplierProducts.slice(0, 5).map(p => (
-                        <span key={p.id} className="product-tag">{p.name}</span>
-                      ))}
-                      {supplierProducts.length > 5 && <span className="product-tag more">+{supplierProducts.length - 5} more</span>}
-                    </div>
-                  ) : (
-                    <p className="no-products">No products from this supplier yet</p>
+                  {supplier.contact && (
+                    <span><i className="fas fa-phone"></i> {supplier.contact}</span>
+                  )}
+                  {supplier.email && (
+                    <span><i className="fas fa-envelope"></i> {supplier.email}</span>
+                  )}
+                  {supplier.address && (
+                    <span><i className="fas fa-map-marker-alt"></i> {supplier.address}</span>
+                  )}
+                  {supplier.notes && (
+                    <span className="supplier-notes"><i className="fas fa-info-circle"></i> {supplier.notes}</span>
                   )}
                 </div>
+
+                {/* Supplier Actions */}
+                <div className="supplier-actions-bar">
+                  <button 
+                    className="supplier-action-btn add-product"
+                    onClick={() => handleAddProductForSupplier(supplier.name)}
+                  >
+                    <i className="fas fa-plus"></i> Add Product
+                  </button>
+                  <button 
+                    className="supplier-action-btn view-products"
+                    onClick={() => handleViewProducts(supplier.name)}
+                  >
+                    <i className="fas fa-eye"></i> View Products
+                  </button>
+                  <button 
+                    className="supplier-action-btn edit"
+                    onClick={() => openEditModal(supplier)}
+                  >
+                    <i className="fas fa-edit"></i> Edit
+                  </button>
+                  <button 
+                    className="supplier-action-btn delete"
+                    onClick={() => handleDeleteSupplier(supplier)}
+                    disabled={actionLoading === supplier.id}
+                  >
+                    {actionLoading === supplier.id ? (
+                      <i className="fas fa-spinner fa-pulse"></i>
+                    ) : (
+                      <i className="fas fa-trash"></i>
+                    )}
+                  </button>
+                </div>
+
+                {/* Products List (Expanded) */}
+                {isExpanded && (
+                  <div className="supplier-products-expanded">
+                    <div className="products-header">
+                      <span>📦 Products ({supplierProducts.length})</span>
+                      {expiringCount > 0 && (
+                        <span className="expiring-count">⚠️ {expiringCount} expiring soon</span>
+                      )}
+                      {lowStockCount > 0 && (
+                        <span className="low-stock-count">📉 {lowStockCount} low stock</span>
+                      )}
+                    </div>
+                    
+                    {supplierProducts.length > 0 ? (
+                      <div className="products-list">
+                        {supplierProducts.map(product => (
+                          <div key={product.id} className="product-item">
+                            <span className="product-name">{product.name}</span>
+                            <span className="product-stock">{product.stock} units</span>
+                            <span className={`product-expiry ${product.daysLeft <= 0 ? 'expired' : product.daysLeft <= 3 ? 'critical' : product.daysLeft <= 7 ? 'warning' : ''}`}>
+                              {product.daysLeft <= 0 ? 'Expired' : `${product.daysLeft} days`}
+                            </span>
+                            {product.flashSaleActive && product.flashSaleDiscount && (
+                              <span className="discount-badge">🔥 {product.flashSaleDiscount}</span>
+                            )}
+                            <button 
+                              className="product-action-btn"
+                              onClick={() => {
+                                navigate('/inventory');
+                                localStorage.setItem('shelflife_filter_supplier', supplier.name);
+                              }}
+                            >
+                              <i className="fas fa-arrow-right"></i>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="no-products">No products from this supplier yet</p>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -384,21 +534,42 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
             <form className="modal-form" onSubmit={handleAddSupplier}>
               <div className="form-group">
                 <label>Supplier Name *</label>
-                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Enter supplier name" required />
+                <input 
+                  type="text" 
+                  value={formData.name} 
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                  placeholder="Enter supplier name" 
+                  required 
+                />
               </div>
               <div className="form-row">
                 <div className="form-group">
                   <label>Contact Number</label>
-                  <input type="text" value={formData.contact} onChange={(e) => setFormData({ ...formData, contact: e.target.value })} placeholder="+94 77 123 4567" />
+                  <input 
+                    type="text" 
+                    value={formData.contact} 
+                    onChange={(e) => setFormData({ ...formData, contact: e.target.value })} 
+                    placeholder="+94 77 123 4567" 
+                  />
                 </div>
                 <div className="form-group">
                   <label>Email</label>
-                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="supplier@example.com" />
+                  <input 
+                    type="email" 
+                    value={formData.email} 
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
+                    placeholder="supplier@example.com" 
+                  />
                 </div>
               </div>
               <div className="form-group">
                 <label>Address</label>
-                <input type="text" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} placeholder="Supplier address" />
+                <input 
+                  type="text" 
+                  value={formData.address} 
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })} 
+                  placeholder="Supplier address" 
+                />
               </div>
               <div className="form-group">
                 <label>Rating</label>
@@ -409,11 +580,22 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
               </div>
               <div className="form-group">
                 <label>Notes</label>
-                <textarea rows="2" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} placeholder="Additional notes about this supplier" />
+                <textarea 
+                  rows="2" 
+                  value={formData.notes} 
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })} 
+                  placeholder="Additional notes about this supplier" 
+                />
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn-cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
-                <button type="submit" className="btn-save">Add Supplier</button>
+                <button type="submit" className="btn-save" disabled={actionLoading === 'add'}>
+                  {actionLoading === 'add' ? (
+                    <><i className="fas fa-spinner fa-pulse"></i> Adding...</>
+                  ) : (
+                    'Add Supplier'
+                  )}
+                </button>
               </div>
             </form>
           </div>
@@ -431,21 +613,42 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
             <form className="modal-form" onSubmit={handleUpdateSupplier}>
               <div className="form-group">
                 <label>Supplier Name *</label>
-                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Enter supplier name" required />
+                <input 
+                  type="text" 
+                  value={formData.name} 
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                  placeholder="Enter supplier name" 
+                  required 
+                />
               </div>
               <div className="form-row">
                 <div className="form-group">
                   <label>Contact Number</label>
-                  <input type="text" value={formData.contact} onChange={(e) => setFormData({ ...formData, contact: e.target.value })} placeholder="+94 77 123 4567" />
+                  <input 
+                    type="text" 
+                    value={formData.contact} 
+                    onChange={(e) => setFormData({ ...formData, contact: e.target.value })} 
+                    placeholder="+94 77 123 4567" 
+                  />
                 </div>
                 <div className="form-group">
                   <label>Email</label>
-                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="supplier@example.com" />
+                  <input 
+                    type="email" 
+                    value={formData.email} 
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
+                    placeholder="supplier@example.com" 
+                  />
                 </div>
               </div>
               <div className="form-group">
                 <label>Address</label>
-                <input type="text" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} placeholder="Supplier address" />
+                <input 
+                  type="text" 
+                  value={formData.address} 
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })} 
+                  placeholder="Supplier address" 
+                />
               </div>
               <div className="form-group">
                 <label>Rating</label>
@@ -456,11 +659,22 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
               </div>
               <div className="form-group">
                 <label>Notes</label>
-                <textarea rows="2" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} placeholder="Additional notes about this supplier" />
+                <textarea 
+                  rows="2" 
+                  value={formData.notes} 
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })} 
+                  placeholder="Additional notes about this supplier" 
+                />
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
-                <button type="submit" className="btn-save">Update Supplier</button>
+                <button type="submit" className="btn-save" disabled={actionLoading === 'edit'}>
+                  {actionLoading === 'edit' ? (
+                    <><i className="fas fa-spinner fa-pulse"></i> Updating...</>
+                  ) : (
+                    'Update Supplier'
+                  )}
+                </button>
               </div>
             </form>
           </div>

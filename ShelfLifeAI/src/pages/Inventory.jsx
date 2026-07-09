@@ -5,6 +5,7 @@ import BarcodeScanner from '../components/AdvancedBarcodeScanner'
 import OCRScanner from '../components/AdvancedOCRScanner'
 import ProductNameModal from '../components/ProductNameModal'
 import SupplierPromptModal from '../components/SupplierPromptModal'
+import AlertBar from '../components/AlertDropdown'
 import { api } from '../services/apiService'
 import './Pages.css'
 
@@ -704,6 +705,7 @@ function Inventory({
 
   return (
     <div className="page-container">
+      {/* Page Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">
@@ -771,6 +773,14 @@ function Inventory({
           </div>
         </div>
       </div>
+
+      {/* ✅ ALERT BAR - Low Stock & Near Expiry Items */}
+      <AlertBar 
+        inventory={inventory}
+        onFlashSale={handleFlashSale}
+        onOrderNow={handleOrderNow}
+        actionLoading={actionLoading}
+      />
 
       {/* Scanner Selection */}
       {showScanner && !scanType && (
