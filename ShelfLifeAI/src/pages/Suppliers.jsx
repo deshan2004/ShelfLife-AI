@@ -1,4 +1,4 @@
-// src/pages/Suppliers.jsx - With Better Error Handling
+// src/pages/Suppliers.jsx
 import { useState, useEffect } from 'react'
 import { api } from '../services/apiService'
 import './Pages.css'
@@ -35,16 +35,16 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user }) {
         try {
             setLoading(true)
             setError(null)
-            console.log('🔄 Loading suppliers for user:', user.uid)
+            console.log('Loading suppliers for user:', user.uid)
             
             const data = await api.getSuppliers(user.uid)
-            console.log('✅ Suppliers loaded:', data)
+            console.log('Suppliers loaded:', data)
             
             setSuppliers(data.list || [])
         } catch (error) {
-            console.error('❌ Load suppliers error:', error)
+            console.error('Load suppliers error:', error)
             setError(error.message || 'Failed to load suppliers')
-            showToast('❌ ' + (error.message || 'Failed to load suppliers'))
+            showToast('❌ Failed to load suppliers')
             
             // Fallback: Try localStorage
             try {
@@ -201,7 +201,7 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user }) {
         )
     }
 
-    // Error State - With Retry Button
+    // Error State
     if (error) {
         return (
             <div className="page-container">
@@ -214,27 +214,9 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user }) {
                 <div className="empty-state" style={{ borderColor: 'var(--red-border)' }}>
                     <i className="fas fa-exclamation-triangle" style={{ color: 'var(--red)' }}></i>
                     <p style={{ color: 'var(--red)' }}>{error}</p>
-                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <button className="btn-primary" onClick={() => { setError(null); setLoading(true); loadSuppliers(); }}>
-                            <i className="fas fa-redo"></i> Retry
-                        </button>
-                        <button className="btn-secondary" onClick={() => {
-                            try {
-                                const localData = localStorage.getItem(`shelflife_suppliers_${user?.uid}`)
-                                if (localData) {
-                                    setSuppliers(JSON.parse(localData))
-                                    setError(null)
-                                    showToast('📦 Loaded suppliers from local cache')
-                                } else {
-                                    showToast('No cached data available')
-                                }
-                            } catch (e) {
-                                showToast('Error loading cached data')
-                            }
-                        }}>
-                            <i className="fas fa-database"></i> Load from Cache
-                        </button>
-                    </div>
+                    <button className="btn-primary" onClick={() => { setError(null); setLoading(true); loadSuppliers(); }}>
+                        <i className="fas fa-redo"></i> Retry
+                    </button>
                 </div>
             </div>
         )
