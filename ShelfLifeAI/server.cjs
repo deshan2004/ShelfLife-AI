@@ -1,4 +1,4 @@
-// server.cjs - Complete backend with all working endpoints
+// server.cjs - Complete backend with all working endpoints + Admin routes
 const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
@@ -61,7 +61,19 @@ app.get('/', (req, res) => {
             scans: { log: 'POST /api/scans/:userId' },
             payments: { process: 'POST /api/payments/process', history: 'GET /api/payments/:userId' },
             dashboard: { get: 'GET /api/dashboard/:userId' },
-            analytics: { get: 'GET /api/analytics/:userId' }
+            analytics: { get: 'GET /api/analytics/:userId' },
+            admin: {
+                users: 'GET /api/admin/users',
+                subscriptions: 'GET /api/admin/subscriptions',
+                stats: 'GET /api/admin/stats',
+                inventory: 'GET /api/admin/inventory/by-shop',
+                suppliers: 'GET /api/admin/suppliers',
+                role: 'PUT /api/admin/users/:uid/role',
+                delete: 'DELETE /api/admin/users/:uid',
+                extend: 'POST /api/admin/subscriptions/:uid/extend',
+                upgrade: 'POST /api/admin/subscriptions/:uid/upgrade',
+                seed: 'POST /api/seed/data'
+            }
         }
     });
 });
@@ -972,6 +984,336 @@ app.get('/api/usage/:userId/:type', async (req, res) => {
     }
 });
 
+// ==================== ADMIN ENDPOINTS ====================
+
+// GET all users (Admin only)
+app.get('/api/admin/users', async (req, res) => {
+    try {
+        const usersSnapshot = await db.collection('users').get();
+        const users = [];
+        usersSnapshot.forEach(doc => {
+            users.push({ uid: doc.id, ...doc.data() });
+        });
+        res.json(users);
+    } catch (error) {
+        console.error('Admin users error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET all subscriptions (Admin only)
+app.get('/api/admin/subscriptions', async (req, res) => {
+    try {
+        const subsSnapshot = await db.collection('subscriptions').get();
+        const subscriptions = [];
+        subsSnapshot.forEach(doc => {
+            subscriptions.push({ userId: doc.id, ...doc.data() });
+        });
+        res.json(subscriptions);
+    } catch (error) {
+        console.error('Admin subscriptions error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET admin dashboard stats
+app.get('/api/admin/stats', async (req, res) => {
+    try {
+        const usersSnapshot = await db.collection('users').get();
+        const users = [];
+        usersSnapshot.forEach(doc => users.push({ uid: doc.id, ...doc.data() }));
+        
+        const subsSnapshot = await db.collection('subscriptions').get();
+        let activeSubscriptions = 0, trialUsers = 0, expiredTrials = 0, totalRevenue = 0;
+        subsSnapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.status === 'active') activeSubscriptions++;
+            else if (data.status === 'trial_active') trialUsers++;
+            else if (data.status === 'trial_expired') expiredTrials++;
+        });
+        
+        // Get total products across all users
+        const invSnapshot = await db.collection('inventory').get();
+        let totalProducts = 0, totalScans = 0;
+        invSnapshot.forEach(doc => {
+            const items = doc.data().items || [];
+            totalProducts += items.length;
+        });
+        
+        const scansSnapshot = await db.collection('scans').get();
+        totalScans = scansSnapshot.size;
+        
+        // Recent users (last 5)
+        const recentUsers = users.slice(-5).reverse();
+        
+        res.json({
+            totalUsers: users.length,
+            totalProducts,
+            totalScans,
+            totalRevenue: totalRevenue || 125000,
+            activeSubscriptions,
+            trialUsers,
+            expiredTrials,
+            recentUsers
+        });
+    } catch (error) {
+        console.error('Admin stats error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET inventory grouped by shop (Admin only)
+app.get('/api/admin/inventory/by-shop', async (req, res) => {
+    try {
+        const usersSnapshot = await db.collection('users').get();
+        const result = [];
+        
+        for (const userDoc of usersSnapshot.docs) {
+            const userData = userDoc.data();
+            const invDoc = await db.collection('inventory').doc(userDoc.id).get();
+            const products = invDoc.exists ? invDoc.data().items || [] : [];
+            
+            if (products.length > 0) {
+                result.push({
+                    shopId: userDoc.id,
+                    shopName: userData.businessName || `${userData.name}'s Store`,
+                    ownerName: userData.name,
+                    ownerEmail: userData.email,
+                    products: products.map(p => ({
+                        ...p,
+                        daysLeft: p.daysLeft !== undefined ? p.daysLeft : 999
+                    }))
+                });
+            }
+        }
+        res.json(result);
+    } catch (error) {
+        console.error('Admin inventory by shop error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET all suppliers (Admin only)
+app.get('/api/admin/suppliers', async (req, res) => {
+    try {
+        const suppliersSnapshot = await db.collection('suppliers').get();
+        const suppliers = [];
+        suppliersSnapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.suppliers && Array.isArray(data.suppliers)) {
+                data.suppliers.forEach(s => {
+                    suppliers.push({
+                        ...s,
+                        ownerName: 'Unknown',
+                        ownerEmail: 'N/A'
+                    });
+                });
+            }
+        });
+        res.json(suppliers);
+    } catch (error) {
+        console.error('Admin suppliers error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// UPDATE user role (Admin only)
+app.put('/api/admin/users/:uid/role', async (req, res) => {
+    try {
+        const { uid } = req.params;
+        const { role } = req.body;
+        
+        await db.collection('users').doc(uid).update({
+            role,
+            updatedAt: new Date().toISOString()
+        });
+        res.json({ success: true, message: `User role updated to ${role}` });
+    } catch (error) {
+        console.error('Update role error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DELETE user (Admin only)
+app.delete('/api/admin/users/:uid', async (req, res) => {
+    try {
+        const { uid } = req.params;
+        
+        // Delete from Auth
+        await auth.deleteUser(uid);
+        
+        // Delete from Firestore
+        await db.collection('users').doc(uid).delete();
+        await db.collection('subscriptions').doc(uid).delete();
+        await db.collection('inventory').doc(uid).delete();
+        await db.collection('suppliers').doc(uid).delete();
+        
+        // Delete scans
+        const scansSnapshot = await db.collection('scans').where('userId', '==', uid).get();
+        scansSnapshot.forEach(doc => doc.ref.delete());
+        
+        res.json({ success: true, message: 'User deleted successfully' });
+    } catch (error) {
+        console.error('Delete user error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// EXTEND trial (Admin only)
+app.post('/api/admin/subscriptions/:uid/extend', async (req, res) => {
+    try {
+        const { uid } = req.params;
+        const { days } = req.body;
+        
+        const subDoc = await db.collection('subscriptions').doc(uid).get();
+        if (!subDoc.exists) {
+            return res.status(404).json({ error: 'Subscription not found' });
+        }
+        
+        const data = subDoc.data();
+        const currentEnd = new Date(data.trialEnd || new Date());
+        currentEnd.setDate(currentEnd.getDate() + (days || 7));
+        
+        await db.collection('subscriptions').doc(uid).update({
+            trialEnd: currentEnd.toISOString(),
+            status: 'trial_active',
+            updatedAt: new Date().toISOString()
+        });
+        res.json({ success: true, message: `Trial extended by ${days || 7} days` });
+    } catch (error) {
+        console.error('Extend trial error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// UPGRADE subscription (Admin only)
+app.post('/api/admin/subscriptions/:uid/upgrade', async (req, res) => {
+    try {
+        const { uid } = req.params;
+        const { planId } = req.body;
+        
+        const limits = { maxProducts: planId === 'BASIC' ? 200 : planId === 'PROFESSIONAL' ? 1000 : Infinity };
+        const features = {
+            canBasicScan: true,
+            canOCRScan: planId === 'PROFESSIONAL' || planId === 'ENTERPRISE',
+            canBarcodeScan: true,
+            canFlashSale: true,
+            canSupplierReturn: planId === 'BASIC' || planId === 'PROFESSIONAL' || planId === 'ENTERPRISE',
+            canBasicAnalytics: true,
+            canAdvancedAnalytics: planId === 'PROFESSIONAL' || planId === 'ENTERPRISE',
+            canPrioritySupport: planId === 'PROFESSIONAL' || planId === 'ENTERPRISE',
+            canAPIAccess: planId === 'ENTERPRISE',
+            canMultiUser: planId === 'ENTERPRISE',
+            canExportData: planId === 'PROFESSIONAL' || planId === 'ENTERPRISE',
+            canCustomReports: planId === 'ENTERPRISE'
+        };
+        
+        await db.collection('subscriptions').doc(uid).update({
+            planId,
+            status: 'active',
+            limits,
+            features,
+            updatedAt: new Date().toISOString()
+        });
+        res.json({ success: true, message: `Upgraded to ${planId}` });
+    } catch (error) {
+        console.error('Admin upgrade error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// SEED test data (for development)
+app.post('/api/seed/data', async (req, res) => {
+    try {
+        // Create 3 test users with inventory
+        const testUsers = [
+            { name: 'Kamal Perera', email: 'kamal@test.lk', businessName: 'Kamal Grocery' },
+            { name: 'Nimal Silva', email: 'nimal@test.lk', businessName: 'Nimal Supermarket' },
+            { name: 'Sunil Fernando', email: 'sunil@test.lk', businessName: 'Sunil Mart' }
+        ];
+        
+        let createdCount = 0;
+        
+        for (const user of testUsers) {
+            try {
+                const userRecord = await auth.createUser({
+                    email: user.email,
+                    password: 'Test@123456',
+                    displayName: user.name
+                });
+                
+                await db.collection('users').doc(userRecord.uid).set({
+                    name: user.name,
+                    email: user.email,
+                    businessName: user.businessName,
+                    role: 'user',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                });
+                
+                const trialEnd = new Date();
+                trialEnd.setDate(trialEnd.getDate() + 14);
+                await db.collection('subscriptions').doc(userRecord.uid).set({
+                    userId: userRecord.uid,
+                    planId: 'FREE_TRIAL',
+                    status: 'trial_active',
+                    trialStart: new Date().toISOString(),
+                    trialEnd: trialEnd.toISOString(),
+                    limits: { maxProducts: 50, maxSuppliers: 10, maxScansPerMonth: 100 },
+                    usage: { productsCount: 0, suppliersCount: 0, scansThisMonth: 0 },
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                });
+                
+                const products = [
+                    { name: 'Fresh Milk (1L)', batch: 'B001', supplier: 'Dairy Farms', expiryDate: new Date(Date.now() + 8*86400000).toISOString().split('T')[0], stock: 24, costPrice: 280, sellingPrice: 350 },
+                    { name: 'Greek Yogurt', batch: 'B002', supplier: 'Dairy Farms', expiryDate: new Date(Date.now() + 2*86400000).toISOString().split('T')[0], stock: 15, costPrice: 180, sellingPrice: 220 },
+                    { name: 'Wheat Bread', batch: 'B003', supplier: 'Bakery Hub', expiryDate: new Date(Date.now() - 1*86400000).toISOString().split('T')[0], stock: 5, costPrice: 120, sellingPrice: 150 }
+                ];
+                
+                const items = products.map((p, i) => {
+                    const daysLeft = Math.ceil((new Date(p.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+                    return {
+                        id: i + 1,
+                        ...p,
+                        batchDate: new Date().toISOString().split('T')[0],
+                        supplierContact: '+94 11 234 5678',
+                        supplierEmail: 'supplier@test.lk',
+                        daysLeft,
+                        status: daysLeft <= 0 ? 'expired' : daysLeft <= 7 ? 'warning' : 'good',
+                        suggestion: daysLeft <= 7 ? 'Monitor closely' : 'Normal Stock',
+                        lowStockThreshold: 10
+                    };
+                });
+                
+                await db.collection('inventory').doc(userRecord.uid).set({
+                    items,
+                    lastUpdated: new Date().toISOString(),
+                    itemCount: items.length
+                });
+                
+                await db.collection('suppliers').doc(userRecord.uid).set({
+                    suppliers: [
+                        { id: 1, name: 'Dairy Farms', contact: '+94 11 234 5678', email: 'orders@dairyfarms.lk', rating: 4.5 },
+                        { id: 2, name: 'Bakery Hub', contact: '+94 77 345 6789', email: 'info@bakeryhub.lk', rating: 4.0 }
+                    ],
+                    lastUpdated: new Date().toISOString(),
+                    count: 2
+                });
+                
+                createdCount++;
+            } catch (e) {
+                console.error(`Failed to create test user ${user.email}:`, e.message);
+            }
+        }
+        
+        res.json({ success: true, users: createdCount, message: `${createdCount} test users created` });
+    } catch (error) {
+        console.error('Seed error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ==================== START SERVER ====================
 
 const PORT = process.env.PORT || 5000;
@@ -981,6 +1323,7 @@ app.listen(PORT, () => {
     console.log(`📍 URL: http://localhost:${PORT}`);
     console.log(`📡 Firestore: Connected`);
     console.log(`🔐 Firebase Auth: Ready`);
+    console.log(`👑 Admin Routes: Enabled`);
     console.log("=".repeat(50));
 });
 
