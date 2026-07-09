@@ -2121,4 +2121,431 @@
   .modal-actions .btn-save {
     width: 100%;
   }
+}/* ============================================================
+   INVENTORY TABLE - IMPROVED STYLES
+   ============================================================ */
+
+.inventory-table-container {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  margin: 1.5rem 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.inventory-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  min-width: 900px;
+}
+
+/* --- Table Header --- */
+.inventory-table thead {
+  background: var(--bg-raised);
+  border-bottom: 2px solid var(--border-accent);
+}
+
+.inventory-table thead th {
+  padding: 14px 16px;
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.inventory-table thead th:last-child {
+  text-align: center;
+  min-width: 200px;
+}
+
+/* --- Table Body --- */
+.inventory-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s ease;
+}
+
+.inventory-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.inventory-table tbody tr:hover {
+  background: rgba(57, 231, 95, 0.04);
+}
+
+.inventory-table tbody td {
+  padding: 12px 16px;
+  vertical-align: middle;
+  color: var(--text-secondary);
+}
+
+/* --- Row Status Colors --- */
+.inventory-table tbody tr.row-expired {
+  background: rgba(239, 68, 68, 0.06);
+  border-left: 3px solid #ef4444;
+}
+
+.inventory-table tbody tr.row-critical {
+  background: rgba(239, 68, 68, 0.04);
+  border-left: 3px solid #ef4444;
+}
+
+.inventory-table tbody tr.row-warning {
+  background: rgba(245, 158, 11, 0.04);
+  border-left: 3px solid #f59e0b;
+}
+
+.inventory-table tbody tr.row-good {
+  border-left: 3px solid transparent;
+}
+
+/* --- Product Name --- */
+.inventory-table .product-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+/* --- Batch Code --- */
+.inventory-table .batch-code {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  background: var(--bg-raised);
+  padding: 2px 8px;
+  border-radius: var(--r-sm);
+  color: var(--text-secondary);
+}
+
+/* --- Supplier Link --- */
+.inventory-table .supplier-link {
+  color: var(--green-neon);
+  text-decoration: none;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px dashed rgba(57, 231, 95, 0.2);
+}
+
+.inventory-table .supplier-link:hover {
+  color: var(--green-bright);
+  border-bottom-color: var(--green-neon);
+}
+
+/* --- Stock Badge --- */
+.inventory-table .stock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.inventory-table .stock-badge.low {
+  color: #f59e0b;
+}
+
+.inventory-table .stock-badge.low::after {
+  content: '⚠️';
+  font-size: 0.8rem;
+}
+
+.inventory-table .stock-badge.out {
+  color: #ef4444;
+}
+
+.inventory-table .stock-badge.out::after {
+  content: '❌';
+  font-size: 0.8rem;
+}
+
+/* --- Status Badge --- */
+.inventory-table .status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--r-pill);
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.inventory-table .status-badge.good {
+  background: rgba(57, 231, 95, 0.12);
+  color: #4ade80;
+}
+
+.inventory-table .status-badge.warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+}
+
+.inventory-table .status-badge.critical {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  animation: pulseCritical 1.5s ease-in-out infinite;
+}
+
+.inventory-table .status-badge.expired {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  text-decoration: line-through;
+}
+
+@keyframes pulseCritical {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* --- Days Left --- */
+.inventory-table .days-left {
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.inventory-table .days-left.good { color: #4ade80; }
+.inventory-table .days-left.warning { color: #fbbf24; }
+.inventory-table .days-left.critical { color: #f87171; }
+.inventory-table .days-left.expired { color: #f87171; text-decoration: line-through; }
+
+/* ============================================================
+   ACTION BUTTONS - SMART & CLEAN
+   ============================================================ */
+
+.inventory-table .action-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+
+.inventory-table .action-btn {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  min-height: 28px;
+}
+
+.inventory-table .action-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.inventory-table .action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Flash Sale */
+.inventory-table .action-btn.flash {
+  background: linear-gradient(135deg, #16a34a, #39e75f);
+  color: #030a03;
+}
+
+.inventory-table .action-btn.flash:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(57, 231, 95, 0.35);
+}
+
+/* Order Now */
+.inventory-table .action-btn.order {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #f59e0b;
+}
+
+.inventory-table .action-btn.order:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.25);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+}
+
+/* Return */
+.inventory-table .action-btn.return {
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: #8b5cf6;
+}
+
+.inventory-table .action-btn.return:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.25);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+}
+
+/* Edit */
+.inventory-table .action-btn.edit {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.inventory-table .action-btn.edit:hover {
+  background: rgba(59, 130, 246, 0.2);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+/* Delete */
+.inventory-table .action-btn.delete {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.inventory-table .action-btn.delete:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+/* Action Button Icons */
+.inventory-table .action-btn i {
+  font-size: 0.6rem;
+}
+
+.inventory-table .action-btn .fa-spinner {
+  font-size: 0.7rem;
+}
+
+/* ============================================================
+   TABLE RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 1024px) {
+  .inventory-table {
+    font-size: 0.75rem;
+    min-width: 800px;
+  }
+  
+  .inventory-table thead th,
+  .inventory-table tbody td {
+    padding: 10px 12px;
+  }
+  
+  .inventory-table .action-btn {
+    font-size: 0.6rem;
+    padding: 3px 8px;
+    min-height: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .inventory-table-container {
+    border-radius: var(--r-lg);
+    margin: 1rem 0;
+  }
+  
+  .inventory-table {
+    font-size: 0.7rem;
+    min-width: 700px;
+  }
+  
+  .inventory-table thead th,
+  .inventory-table tbody td {
+    padding: 8px 10px;
+  }
+  
+  .inventory-table .action-buttons {
+    gap: 3px;
+  }
+  
+  .inventory-table .action-btn {
+    font-size: 0.55rem;
+    padding: 2px 6px;
+    min-height: 22px;
+    border-radius: 14px;
+  }
+  
+  .inventory-table .action-btn i {
+    font-size: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .inventory-table {
+    min-width: 600px;
+    font-size: 0.65rem;
+  }
+  
+  .inventory-table thead th,
+  .inventory-table tbody td {
+    padding: 6px 8px;
+  }
+  
+  .inventory-table .batch-code {
+    font-size: 0.6rem;
+  }
+  
+  .inventory-table .status-badge {
+    font-size: 0.6rem;
+    padding: 2px 8px;
+  }
+}/* ============================================================
+   DISCOUNT BADGE - FLASH SALE
+   ============================================================ */
+
+.discount-badge {
+  display: inline-block;
+  margin-left: 8px;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #ffffff;
+  font-size: 0.6rem;
+  font-weight: 800;
+  padding: 2px 10px;
+  border-radius: 20px;
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  animation: pulseDiscount 1.8s ease-in-out infinite;
+  white-space: nowrap;
+}
+
+@keyframes pulseDiscount {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 2px 10px rgba(239, 68, 68, 0.4);
+  }
+  50% { 
+    transform: scale(1.05);
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.6);
+  }
+}
+
+/* Different discount colors */
+.discount-badge[data-discount="50% OFF"] {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  animation-duration: 1s;
+}
+
+.discount-badge[data-discount="40% OFF"] {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.discount-badge[data-discount="30% OFF"] {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+/* Low Stock Badge */
+.low-stock-badge {
+  display: inline-block;
+  margin-left: 8px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+  font-size: 0.55rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
 }

@@ -30,6 +30,7 @@ function Inventory({
   const [suppliers, setSuppliers] = useState([])
   const [preSelectedSupplier, setPreSelectedSupplier] = useState('')
   const [subscription, setSubscription] = useState(null)
+  const [actionLoading, setActionLoading] = useState(null)
 
   // ✅ Product Name Modal States
   const [showNamePrompt, setShowNamePrompt] = useState(false);
@@ -225,6 +226,198 @@ function Inventory({
     return null;
   };
 
+  // ============================================================
+  // ✅ SMART ACTIONS - DATABASE SAVE + AUTO REFRESH
+  // ============================================================
+
+  // 🔥 Flash Sale
+  const handleFlashSale = async (productId) => {
+    const product = inventory.find(p => p.id === productId);
+    if (!product) return;
+
+    let discount = '30% OFF';
+    let saleType = 'Flash Sale';
+    let discountMultiplier = 0.7;
+    
+    if (product.daysLeft <= 1) {
+      discount = '50% OFF';
+      saleType = 'Buy 1 Get 1 Free';
+      discountMultiplier = 0.5;
+    } else if (product.daysLeft <= 2) {
+      discount = '40% OFF';
+      saleType = 'Flash Sale';
+      discountMultiplier = 0.6;
+    } else if (product.daysLeft <= 7) {
+      discount = '30% OFF';
+      saleType = 'Flash Sale';
+      discountMultiplier = 0.7;
+    }
+    
+    if (!window.confirm(`Apply ${discount} ${saleType} to "${product.name}"?`)) return;
+    
+    setActionLoading(productId);
+    
+    try {
+      const newPrice = Math.round(product.sellingPrice * discountMultiplier);
+      const updates = {
+        sellingPrice: newPrice,
+        suggestion: `🔥 ${saleType} ACTIVE - ${discount}`,
+        flashSaleActive: true,
+        flashSaleDiscount: discount,
+        flashSaleAppliedAt: new Date().toISOString()
+      };
+      
+      const result = await api.updateProduct(user.uid, productId, updates);
+      
+      if (result.success) {
+        showToast(`🔥 ${saleType} applied to ${product.name}! New price: LKR ${newPrice}`);
+        await refreshData();
+      } else {
+        showToast(`❌ Failed to apply flash sale: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Flash sale error:', error);
+      showToast(`❌ ${error.message || 'Failed to apply flash sale'}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // 📦 Order Now (Low Stock)
+  const handleOrderNow = async (productId) => {
+    const product = inventory.find(p => p.id === productId);
+    if (!product) return;
+    
+    const orderQuantity = window.prompt(
+      `📦 Order more stock for "${product.name}"\nCurrent stock: ${product.stock}\nLow stock threshold: ${product.lowStockThreshold}\n\nEnter quantity to order:`,
+      product.lowStockThreshold + 10
+    );
+    
+    if (orderQuantity === null) return;
+    
+    const qty = parseInt(orderQuantity);
+    if (isNaN(qty) || qty <= 0) {
+      showToast('❌ Invalid quantity');
+      return;
+    }
+    
+    if (!window.confirm(`📦 Place order for ${qty} units of "${product.name}" from ${product.supplier}?`)) return;
+    
+    setActionLoading(productId);
+    
+    try {
+      const newStock = product.stock + qty;
+      const updates = {
+        stock: newStock,
+        suggestion: `📦 Order placed on ${new Date().toLocaleDateString()} (${qty} units)`,
+        lastOrderDate: new Date().toISOString(),
+        lastOrderQuantity: qty
+      };
+      
+      const result = await api.updateProduct(user.uid, productId, updates);
+      
+      if (result.success) {
+        showToast(`📦 Order placed for ${qty} units of ${product.name}! New stock: ${newStock}`);
+        await refreshData();
+      } else {
+        showToast(`❌ Failed to place order: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Order error:', error);
+      showToast(`❌ ${error.message || 'Failed to place order'}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // 🚚 Return to Supplier
+  const handleReturnToSupplier = async (productId) => {
+    const product = inventory.find(p => p.id === productId);
+    if (!product) return;
+    
+    const returnQty = window.prompt(
+      `🚚 Return "${product.name}" to ${product.supplier}\nCurrent stock: ${product.stock}\n\nEnter quantity to return (or 0 to cancel):`,
+      product.stock
+    );
+    
+    if (returnQty === null) return;
+    
+    const qty = parseInt(returnQty);
+    if (isNaN(qty) || qty < 0) {
+      showToast('❌ Invalid quantity');
+      return;
+    }
+    
+    if (qty === 0) {
+      showToast('Return cancelled');
+      return;
+    }
+    
+    if (qty > product.stock) {
+      showToast(`❌ Cannot return more than available stock (${product.stock})`);
+      return;
+    }
+    
+    const reason = window.prompt('Reason for return:', 'Near Expiry');
+    if (reason === null) return;
+    
+    if (!window.confirm(`🚚 Return ${qty} units of "${product.name}" to ${product.supplier}?\nReason: ${reason || 'Not specified'}`)) return;
+    
+    setActionLoading(productId);
+    
+    try {
+      const newStock = product.stock - qty;
+      
+      const updates = {
+        stock: newStock,
+        suggestion: `🚚 Returned ${qty} units to supplier on ${new Date().toLocaleDateString()} (${reason || 'No reason'})`,
+        lastReturnDate: new Date().toISOString(),
+        lastReturnQuantity: qty,
+        lastReturnReason: reason || 'Not specified'
+      };
+      
+      if (newStock === 0) {
+        updates.status = 'out_of_stock';
+        updates.suggestion = `🚚 All units returned to supplier. Reason: ${reason || 'Near expiry'}`;
+      }
+      
+      const result = await api.updateProduct(user.uid, productId, updates);
+      
+      if (result.success) {
+        showToast(`🚚 ${qty} units of ${product.name} returned to ${product.supplier}! Remaining stock: ${newStock}`);
+        await refreshData();
+      } else {
+        showToast(`❌ Failed to return: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Return error:', error);
+      showToast(`❌ ${error.message || 'Failed to return product'}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // 🗑️ Quick Delete
+  const handleDeleteProduct = async (productId) => {
+    const product = inventory.find(p => p.id === productId);
+    if (product && window.confirm(`Delete ${product.name} from inventory?`)) {
+      try {
+        const result = await api.deleteProduct(user.uid, productId);
+        if (result.success) {
+          await refreshData();
+          showToast(`🗑️ ${product.name} removed from inventory`);
+        }
+      } catch (error) {
+        console.error('Delete error:', error);
+        showToast('❌ Failed to delete product');
+      }
+    }
+  };
+
+  // ============================================================
+  // END OF SMART ACTIONS
+  // ============================================================
+
   // Handle Add Product
   const handleAddProduct = async (productData) => {
     let productName = productData.name;
@@ -255,7 +448,6 @@ function Inventory({
 
     let supplierName = productData.supplier || 'Manual Entry';
     
-    // ✅ Use custom prompt for supplier if not pre-selected
     if (!preSelectedSupplier && supplierName !== 'Manual Entry' && supplierName !== 'OCR Scanned') {
       const supplierList = suppliers.map(s => s.name);
       const selected = await showSupplierPromptFn(
@@ -268,7 +460,6 @@ function Inventory({
       if (selected && selected.trim()) {
         supplierName = selected.trim();
       } else {
-        // User cancelled - use default
         supplierName = 'Manual Entry';
       }
     } else if (preSelectedSupplier) {
@@ -295,7 +486,8 @@ function Inventory({
       stock: productData.stock || 1,
       lowStockThreshold: 10,
       costPrice: productData.costPrice || 100,
-      sellingPrice: productData.sellingPrice || 150
+      sellingPrice: productData.sellingPrice || 150,
+      flashSaleActive: false
     };
 
     try {
@@ -339,7 +531,6 @@ function Inventory({
       
       const defaultName = scanData.productInfo?.name || `Product ${scanData.value.slice(-4)}`;
       
-      // ✅ Use custom prompt for product name
       const productName = await showProductNamePrompt(
         'Add Product',
         'Enter a name for this product',
@@ -355,7 +546,6 @@ function Inventory({
       
       let supplierName = preSelectedSupplier || 'Manual Entry';
       
-      // ✅ Use custom prompt for supplier
       if (!preSelectedSupplier) {
         const supplierList = suppliers.map(s => s.name);
         const selected = await showSupplierPromptFn(
@@ -368,7 +558,6 @@ function Inventory({
         if (selected && selected.trim()) {
           supplierName = selected.trim();
         } else {
-          // User cancelled - use default
           supplierName = 'Manual Entry';
         }
       }
@@ -414,7 +603,6 @@ function Inventory({
           }
         }
       } else {
-        // ✅ Use custom prompt for product name (OCR)
         const productName = await showProductNamePrompt(
           'Add Product (OCR)',
           'We detected an expiry date. Please enter the product name.',
@@ -429,8 +617,6 @@ function Inventory({
         }
         
         let supplierName = 'OCR Scanned';
-        
-        // ✅ Use custom prompt for supplier (OCR)
         const supplierList = suppliers.map(s => s.name);
         const selected = await showSupplierPromptFn(
           'Select or Add Supplier (OCR)',
@@ -478,23 +664,6 @@ function Inventory({
     } catch (error) {
       console.error('Update error:', error);
       showToast('❌ Failed to update product');
-    }
-  };
-
-  // Handle Delete Product
-  const handleDeleteProduct = async (productId) => {
-    const product = inventory.find(p => p.id === productId);
-    if (product && window.confirm(`Delete ${product.name} from inventory?`)) {
-      try {
-        const result = await api.deleteProduct(user.uid, productId);
-        if (result.success) {
-          await refreshData();
-          showToast(`🗑️ ${product.name} removed from inventory`);
-        }
-      } catch (error) {
-        console.error('Delete error:', error);
-        showToast('❌ Failed to delete product');
-      }
     }
   };
 
@@ -707,7 +876,9 @@ function Inventory({
         </div>
       )}
 
-      {/* Inventory Table */}
+      {/* ============================================================
+          INVENTORY TABLE - IMPROVED DESIGN
+          ============================================================ */}
       <div className="inventory-table-container">
         <table className="inventory-table">
           <thead>
@@ -716,52 +887,187 @@ function Inventory({
               <th>Batch</th>
               <th>Supplier</th>
               <th>Stock</th>
-              <th>Expiry Date</th>
+              <th>Expiry</th>
               <th>Status</th>
-              <th>Actions</th>
+              <th style={{ textAlign: 'center', minWidth: '240px' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredInventory.map(item => (
-              <tr key={item.id} className={item.daysLeft <= 0 ? 'row-expired' : item.daysLeft <= 3 ? 'row-critical' : item.daysLeft <= 7 ? 'row-warning' : ''}>
-                <td><strong>{item.name}</strong></td>
-                <td><code>{item.batch}</code></td>
-                <td>
-                  <span 
-                    style={{ 
-                      cursor: 'pointer', 
-                      color: 'var(--green-neon)',
-                      textDecoration: 'underline',
-                      textDecorationColor: 'rgba(57,231,95,0.3)'
-                    }}
-                    onClick={() => handleSupplierClick(item.supplier)}
-                    title="Click to view supplier details"
-                  >
-                    {item.supplier}
-                  </span>
-                </td>
-                <td>{item.stock} units</td>
-                <td>{item.expiryDate}</td>
-                <td>
-                  <span className={`status-badge ${item.daysLeft <= 0 ? 'expired' : item.daysLeft <= 3 ? 'critical' : item.daysLeft <= 7 ? 'warning' : 'good'}`}>
-                    {item.daysLeft <= 0 ? 'Expired' : `${item.daysLeft} days left`}
-                  </span>
-                </td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-edit" onClick={() => {
-                      setSelectedProduct(item);
-                      setShowEditModal(true);
-                    }}>
-                      <i className="fas fa-edit"></i>
-                    </button>
-                    <button className="btn-delete" onClick={() => handleDeleteProduct(item.id)}>
-                      <i className="fas fa-trash"></i>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {filteredInventory.map(item => {
+              // Determine row class
+              let rowClass = 'row-good';
+              if (item.daysLeft <= 0) rowClass = 'row-expired';
+              else if (item.daysLeft <= 3) rowClass = 'row-critical';
+              else if (item.daysLeft <= 7) rowClass = 'row-warning';
+
+              // Stock badge
+              let stockClass = '';
+              let stockDisplay = `${item.stock} units`;
+              if (item.stock <= 0) {
+                stockClass = 'out';
+                stockDisplay = 'Out of Stock';
+              } else if (item.stock <= item.lowStockThreshold) {
+                stockClass = 'low';
+              }
+
+              // Days left display
+              let daysClass = 'good';
+              let daysDisplay = `${item.daysLeft} days`;
+              if (item.daysLeft <= 0) {
+                daysClass = 'expired';
+                daysDisplay = 'Expired';
+              } else if (item.daysLeft <= 3) {
+                daysClass = 'critical';
+              } else if (item.daysLeft <= 7) {
+                daysClass = 'warning';
+              }
+
+              // Status badge
+              let statusClass = 'good';
+              let statusText = 'Healthy';
+              if (item.daysLeft <= 0) {
+                statusClass = 'expired';
+                statusText = 'Expired';
+              } else if (item.daysLeft <= 3) {
+                statusClass = 'critical';
+                statusText = '⚠️ Critical';
+              } else if (item.daysLeft <= 7) {
+                statusClass = 'warning';
+                statusText = '⚠️ Near Expiry';
+              }
+
+              return (
+                <tr key={item.id} className={rowClass}>
+                  <td>
+                    <span className="product-name">{item.name}</span>
+                    
+                    {/* 🔥 Flash Sale Discount Badge */}
+                    {item.flashSaleActive && item.flashSaleDiscount && (
+                      <span 
+                        className="discount-badge"
+                        data-discount={item.flashSaleDiscount}
+                      >
+                        🔥 {item.flashSaleDiscount}
+                      </span>
+                    )}
+                    
+                    {/* ⚠️ Low Stock Badge */}
+                    {item.stock <= item.lowStockThreshold && item.stock > 0 && (
+                      <span className="low-stock-badge">
+                        ⚠️ Low Stock
+                      </span>
+                    )}
+                  </td>
+                  
+                  <td>
+                    <code className="batch-code">{item.batch}</code>
+                  </td>
+                  <td>
+                    <span 
+                      className="supplier-link"
+                      onClick={() => handleSupplierClick(item.supplier)}
+                    >
+                      {item.supplier}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`stock-badge ${stockClass}`}>
+                      {stockDisplay}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`days-left ${daysClass}`}>
+                      {daysDisplay}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`status-badge ${statusClass}`}>
+                      {statusText}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="action-buttons">
+                      {/* 🔥 Flash Sale - Only for near expiry (1-7 days) */}
+                      {item.daysLeft > 0 && item.daysLeft <= 7 && (
+                        <button 
+                          className="action-btn flash" 
+                          onClick={() => handleFlashSale(item.id)}
+                          disabled={actionLoading === item.id}
+                          title="Apply flash sale discount"
+                        >
+                          {actionLoading === item.id ? (
+                            <i className="fas fa-spinner fa-pulse"></i>
+                          ) : (
+                            <i className="fas fa-tags"></i>
+                          )}
+                          Flash
+                        </button>
+                      )}
+
+                      {/* 📦 Order Now - Only for low stock */}
+                      {item.stock <= item.lowStockThreshold && item.stock > 0 && (
+                        <button 
+                          className="action-btn order" 
+                          onClick={() => handleOrderNow(item.id)}
+                          disabled={actionLoading === item.id}
+                          title="Order more stock"
+                        >
+                          {actionLoading === item.id ? (
+                            <i className="fas fa-spinner fa-pulse"></i>
+                          ) : (
+                            <i className="fas fa-shopping-cart"></i>
+                          )}
+                          Order
+                        </button>
+                      )}
+
+                      {/* 🚚 Return - For near expiry or expired */}
+                      {item.daysLeft <= 7 && (
+                        <button 
+                          className="action-btn return" 
+                          onClick={() => handleReturnToSupplier(item.id)}
+                          disabled={actionLoading === item.id}
+                          title="Return to supplier"
+                        >
+                          {actionLoading === item.id ? (
+                            <i className="fas fa-spinner fa-pulse"></i>
+                          ) : (
+                            <i className="fas fa-undo-alt"></i>
+                          )}
+                          Return
+                        </button>
+                      )}
+
+                      {/* ✏️ Edit - Always visible */}
+                      <button 
+                        className="action-btn edit" 
+                        onClick={() => {
+                          setSelectedProduct(item);
+                          setShowEditModal(true);
+                        }}
+                        title="Edit product"
+                      >
+                        <i className="fas fa-edit"></i>
+                      </button>
+
+                      {/* 🗑️ Delete - Always visible */}
+                      <button 
+                        className="action-btn delete" 
+                        onClick={() => handleDeleteProduct(item.id)}
+                        disabled={actionLoading === item.id}
+                        title="Delete product"
+                      >
+                        {actionLoading === item.id ? (
+                          <i className="fas fa-spinner fa-pulse"></i>
+                        ) : (
+                          <i className="fas fa-trash"></i>
+                        )}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {filteredInventory.length === 0 && (
@@ -769,9 +1075,13 @@ function Inventory({
             <i className="fas fa-box-open"></i>
             <p>No products found</p>
             {canAdd ? (
-              <button className="btn-primary" onClick={() => setShowScanner(true)}>Add your first product</button>
+              <button className="btn-primary" onClick={() => setShowScanner(true)}>
+                Add your first product
+              </button>
             ) : (
-              <button className="btn-primary" onClick={() => window.location.href = '/billing'}>Upgrade to Add Products</button>
+              <button className="btn-primary" onClick={() => window.location.href = '/billing'}>
+                Upgrade to Add Products
+              </button>
             )}
           </div>
         )}
@@ -834,7 +1144,7 @@ function Inventory({
         </div>
       )}
 
-      {/* ✅ Product Name Modal */}
+      {/* Product Name Modal */}
       <ProductNameModal
         isOpen={showNamePrompt}
         title={namePromptConfig.title}
@@ -844,7 +1154,7 @@ function Inventory({
         onCancel={handleNameCancel}
       />
 
-      {/* ✅ Supplier Prompt Modal */}
+      {/* Supplier Prompt Modal */}
       <SupplierPromptModal
         isOpen={showSupplierPrompt}
         title={supplierPromptConfig.title}
