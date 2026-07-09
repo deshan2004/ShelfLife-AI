@@ -24,6 +24,7 @@ function Inventory({
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterSupplier, setFilterSupplier] = useState('all')
+  const [filterSlow, setFilterSlow] = useState(false) // ✅ Slow moving filter
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [addingProduct, setAddingProduct] = useState(false)
@@ -32,6 +33,10 @@ function Inventory({
   const [preSelectedSupplier, setPreSelectedSupplier] = useState('')
   const [subscription, setSubscription] = useState(null)
   const [actionLoading, setActionLoading] = useState(null)
+
+  // ✅ Bulk Actions States
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [selectAll, setSelectAll] = useState(false);
 
   // ✅ Product Name Modal States
   const [showNamePrompt, setShowNamePrompt] = useState(false);
@@ -103,6 +108,44 @@ function Inventory({
       setShowScanner(true);
     }
   }, [location]);
+
+  // ✅ Apply filter from localStorage (set by Analytics page)
+  useEffect(() => {
+    const filterType = localStorage.getItem('shelflife_filter_type');
+    const filterValue = localStorage.getItem('shelflife_filter_value');
+    
+    if (filterType && filterValue) {
+      // Reset filters first
+      setFilterStatus('all');
+      setFilterSupplier('all');
+      setFilterSlow(false);
+      setSearchTerm('');
+      
+      switch (filterType) {
+        case 'critical':
+          setFilterStatus('critical');
+          showToast(`🔍 Showing items expiring in ${filterValue} days or less`);
+          break;
+        case 'expiring':
+          setFilterStatus('expiring');
+          showToast(`🔍 Showing items expiring within ${filterValue} days`);
+          break;
+        case 'top':
+          setFilterSupplier(filterValue);
+          showToast(`🔍 Showing products from supplier: ${filterValue}`);
+          break;
+        case 'slow':
+          setFilterSlow(true);
+          showToast(`🔍 Showing slow moving items (review ordering)`);
+          break;
+        default:
+          break;
+      }
+      // Clear localStorage so it doesn't reapply on refresh
+      localStorage.removeItem('shelflife_filter_type');
+      localStorage.removeItem('shelflife_filter_value');
+    }
+  }, []);
 
   // ✅ Refresh inventory from backend
   const refreshData = async () => {
@@ -228,7 +271,7 @@ function Inventory({
   };
 
   // ============================================================
-  // ✅ SMART ACTIONS - DATABASE SAVE + AUTO REFRESH
+  // ✅ SMART ACTIONS - DATABASE SAVE + AUTO REFRESH + CHATBOT NOTIFICATION
   // ============================================================
 
   // 🔥 Flash Sale
@@ -272,7 +315,22 @@ function Inventory({
       
       if (result.success) {
         showToast(`🔥 ${saleType} applied to ${product.name}! New price: LKR ${newPrice}`);
+        
+        // ✅ Send message to Chatbot
+        const event = new CustomEvent('flashSaleApplied', {
+          detail: {
+            productName: product.name,
+            discount: discount,
+            newPrice: newPrice,
+            saleType: saleType
+          }
+        });
+        window.dispatchEvent(event);
+        
         await refreshData();
+        // Clear selection after action
+        setSelectedItems([]);
+        setSelectAll(false);
       } else {
         showToast(`❌ Failed to apply flash sale: ${result.error}`);
       }
@@ -407,6 +465,8 @@ function Inventory({
         if (result.success) {
           await refreshData();
           showToast(`🗑️ ${product.name} removed from inventory`);
+          setSelectedItems([]);
+          setSelectAll(false);
         }
       } catch (error) {
         console.error('Delete error:', error);
@@ -416,7 +476,86 @@ function Inventory({
   };
 
   // ============================================================
-  // END OF SMART ACTIONS
+  // ✅ BULK ACTIONS
+  // ============================================================
+
+  // Toggle item selection
+  const toggleItemSelection = (itemId) => {
+    setSelectedItems(prev => 
+      prev.includes(itemId) 
+        ? prev.filter(id => id !== itemId)
+        : [...prev, itemId]
+    );
+  };
+
+  // Toggle select all
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedItems([]);
+    } else {
+      setSelectedItems(filteredInventory.map(item => item.id));
+    }
+    setSelectAll(!selectAll);
+  };
+
+  // Bulk Flash Sale
+  const handleBulkFlashSale = async () => {
+    const products = inventory.filter(item => selectedItems.includes(item.id));
+    const expiringProducts = products.filter(item => item.daysLeft > 0 && item.daysLeft <= 7);
+    
+    if (expiringProducts.length === 0) {
+      showToast('⚠️ No expiring products selected (only 1-7 days left)');
+      return;
+    }
+    
+    if (!window.confirm(`Apply flash sale to ${expiringProducts.length} selected products?`)) return;
+    
+    setActionLoading('bulk');
+    
+    try {
+      for (const product of expiringProducts) {
+        await handleFlashSale(product.id);
+      }
+      showToast(`✅ Bulk flash sale applied to ${expiringProducts.length} products!`);
+      setSelectedItems([]);
+      setSelectAll(false);
+    } catch (error) {
+      console.error('Bulk flash sale error:', error);
+      showToast('❌ Failed to apply bulk flash sale');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Bulk Delete
+  const handleBulkDelete = async () => {
+    if (selectedItems.length === 0) {
+      showToast('⚠️ No items selected');
+      return;
+    }
+    
+    if (!window.confirm(`Delete ${selectedItems.length} selected products?`)) return;
+    
+    setActionLoading('bulk');
+    
+    try {
+      for (const itemId of selectedItems) {
+        await api.deleteProduct(user.uid, itemId);
+      }
+      await refreshData();
+      showToast(`🗑️ ${selectedItems.length} products deleted`);
+      setSelectedItems([]);
+      setSelectAll(false);
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      showToast('❌ Failed to delete products');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // ============================================================
+  // END OF BULK ACTIONS
   // ============================================================
 
   // Handle Add Product
@@ -673,17 +812,33 @@ function Inventory({
     navigate('/suppliers', { state: { supplier: supplierName } });
   };
 
+  // ✅ Filtered Inventory
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           item.batch.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           item.supplier.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesFilter = filterStatus === 'all' || 
-                          (filterStatus === 'expiring' && item.daysLeft <= 7 && item.daysLeft > 0) ||
-                          (filterStatus === 'critical' && item.daysLeft <= 3 && item.daysLeft > 0) ||
-                          (filterStatus === 'expired' && item.daysLeft <= 0) ||
-                          (filterStatus === 'healthy' && item.daysLeft > 7)
-    const matchesSupplier = filterSupplier === 'all' || item.supplier === filterSupplier
-    return matchesSearch && matchesFilter && matchesSupplier
+    
+    let matchesFilter = true;
+    if (filterStatus === 'expiring') {
+      matchesFilter = item.daysLeft <= 7 && item.daysLeft > 0;
+    } else if (filterStatus === 'critical') {
+      matchesFilter = item.daysLeft <= 3 && item.daysLeft > 0;
+    } else if (filterStatus === 'expired') {
+      matchesFilter = item.daysLeft <= 0;
+    } else if (filterStatus === 'healthy') {
+      matchesFilter = item.daysLeft > 7;
+    } // else 'all' -> matchesFilter stays true
+
+    // Supplier filter
+    const matchesSupplier = filterSupplier === 'all' || item.supplier === filterSupplier;
+
+    // ✅ Slow moving filter
+    let matchesSlow = true;
+    if (filterSlow) {
+      matchesSlow = item.daysLeft > 30 && item.stock > 15;
+    }
+
+    return matchesSearch && matchesFilter && matchesSupplier && matchesSlow;
   });
 
   const stats = {
@@ -862,11 +1017,30 @@ function Inventory({
       </div>
 
       <div className="filter-buttons" style={{ marginBottom: '1rem' }}>
-        <button className={`filter-btn ${filterStatus === 'all' ? 'active' : ''}`} onClick={() => setFilterStatus('all')}>All</button>
-        <button className={`filter-btn ${filterStatus === 'expiring' ? 'active' : ''}`} onClick={() => setFilterStatus('expiring')}>Expiring Soon</button>
-        <button className={`filter-btn ${filterStatus === 'critical' ? 'active' : ''}`} onClick={() => setFilterStatus('critical')}>Critical</button>
-        <button className={`filter-btn ${filterStatus === 'expired' ? 'active' : ''}`} onClick={() => setFilterStatus('expired')}>Expired</button>
-        <button className={`filter-btn ${filterStatus === 'healthy' ? 'active' : ''}`} onClick={() => setFilterStatus('healthy')}>Healthy</button>
+        <button className={`filter-btn ${filterStatus === 'all' ? 'active' : ''}`} onClick={() => {
+          setFilterStatus('all');
+          setFilterSlow(false);
+        }}>All</button>
+        <button className={`filter-btn ${filterStatus === 'expiring' ? 'active' : ''}`} onClick={() => {
+          setFilterStatus('expiring');
+          setFilterSlow(false);
+        }}>Expiring Soon</button>
+        <button className={`filter-btn ${filterStatus === 'critical' ? 'active' : ''}`} onClick={() => {
+          setFilterStatus('critical');
+          setFilterSlow(false);
+        }}>Critical</button>
+        <button className={`filter-btn ${filterStatus === 'expired' ? 'active' : ''}`} onClick={() => {
+          setFilterStatus('expired');
+          setFilterSlow(false);
+        }}>Expired</button>
+        <button className={`filter-btn ${filterStatus === 'healthy' ? 'active' : ''}`} onClick={() => {
+          setFilterStatus('healthy');
+          setFilterSlow(false);
+        }}>Healthy</button>
+        <button className={`filter-btn ${filterSlow ? 'active' : ''}`} onClick={() => {
+          setFilterStatus('all');
+          setFilterSlow(!filterSlow);
+        }}>Slow Moving</button>
       </div>
 
       {uniqueSuppliers.length > 1 && (
@@ -886,6 +1060,48 @@ function Inventory({
         </div>
       )}
 
+      {/* ✅ Bulk Actions Bar */}
+      {selectedItems.length > 0 && (
+        <div className="bulk-actions-bar">
+          <span className="bulk-selected">{selectedItems.length} items selected</span>
+          <div className="bulk-actions">
+            <button 
+              className="bulk-btn flash"
+              onClick={handleBulkFlashSale}
+              disabled={actionLoading === 'bulk'}
+            >
+              {actionLoading === 'bulk' ? (
+                <i className="fas fa-spinner fa-pulse"></i>
+              ) : (
+                <i className="fas fa-tags"></i>
+              )}
+              Bulk Flash Sale
+            </button>
+            <button 
+              className="bulk-btn delete"
+              onClick={handleBulkDelete}
+              disabled={actionLoading === 'bulk'}
+            >
+              {actionLoading === 'bulk' ? (
+                <i className="fas fa-spinner fa-pulse"></i>
+              ) : (
+                <i className="fas fa-trash"></i>
+              )}
+              Bulk Delete
+            </button>
+            <button 
+              className="bulk-btn cancel"
+              onClick={() => {
+                setSelectedItems([]);
+                setSelectAll(false);
+              }}
+            >
+              <i className="fas fa-times"></i> Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ============================================================
           INVENTORY TABLE - IMPROVED DESIGN
           ============================================================ */}
@@ -893,6 +1109,19 @@ function Inventory({
         <table className="inventory-table">
           <thead>
             <tr>
+              <th style={{ width: '40px' }}>
+                <input 
+                  type="checkbox" 
+                  checked={selectAll}
+                  onChange={toggleSelectAll}
+                  style={{ 
+                    width: '16px', 
+                    height: '16px', 
+                    accentColor: '#39e75f',
+                    cursor: 'pointer'
+                  }}
+                />
+              </th>
               <th>Product</th>
               <th>Batch</th>
               <th>Supplier</th>
@@ -948,6 +1177,19 @@ function Inventory({
 
               return (
                 <tr key={item.id} className={rowClass}>
+                  <td>
+                    <input 
+                      type="checkbox" 
+                      checked={selectedItems.includes(item.id)}
+                      onChange={() => toggleItemSelection(item.id)}
+                      style={{ 
+                        width: '16px', 
+                        height: '16px', 
+                        accentColor: '#39e75f',
+                        cursor: 'pointer'
+                      }}
+                    />
+                  </td>
                   <td>
                     <span className="product-name">{item.name}</span>
                     

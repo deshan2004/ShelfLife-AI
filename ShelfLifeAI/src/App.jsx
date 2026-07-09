@@ -40,7 +40,21 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [inventory, setInventory] = useState([])
   const [toastMsg, setToastMsg] = useState(null)
-  const [actionLoading, setActionLoading] = useState(null) // ✅ For Navbar Alert actions
+  const [actionLoading, setActionLoading] = useState(null)
+
+  // ✅ Setup global toast for Chatbot
+  useEffect(() => {
+    window.showToast = showToast;
+    
+    // Listen for flash sale events
+    const handleFlashSaleEvent = (event) => {
+      // Toast already shown by Inventory, but we keep this for backup
+      console.log('Flash sale event received:', event.detail);
+    };
+    
+    window.addEventListener('flashSaleApplied', handleFlashSaleEvent);
+    return () => window.removeEventListener('flashSaleApplied', handleFlashSaleEvent);
+  }, []);
 
   // ✅ Load inventory from BACKEND
   const loadUserInventory = async (userId, forceRefresh = false) => {
@@ -99,7 +113,7 @@ function App() {
   };
 
   // ============================================================
-  // ✅ SMART ACTIONS (for Navbar Alerts)
+  // ✅ SMART ACTIONS (for Navbar Alerts & Chatbot)
   // ============================================================
 
   // 🔥 Flash Sale
@@ -143,6 +157,18 @@ function App() {
       
       if (result.success) {
         showToast(`🔥 ${saleType} applied to ${product.name}! New price: LKR ${newPrice}`);
+        
+        // ✅ Send message to Chatbot
+        const event = new CustomEvent('flashSaleApplied', {
+          detail: {
+            productName: product.name,
+            discount: discount,
+            newPrice: newPrice,
+            saleType: saleType
+          }
+        });
+        window.dispatchEvent(event);
+        
         await loadUserInventory(user.uid, true);
       } else {
         showToast(`❌ Failed to apply flash sale: ${result.error}`);
@@ -313,7 +339,7 @@ function App() {
   return (
     <Router>
       <div className="app-wrapper">
-        {/* ✅ Navbar with AlertDropdown props */}
+        {/* Navbar with AlertDropdown props */}
         <Navbar
           onLoginClick={() => setShowLogin(true)}
           user={user}
