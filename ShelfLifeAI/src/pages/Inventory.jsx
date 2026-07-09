@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import BarcodeScanner from '../components/AdvancedBarcodeScanner'
 import OCRScanner from '../components/AdvancedOCRScanner'
+import ProductNameModal from '../components/ProductNameModal'
+import SupplierPromptModal from '../components/SupplierPromptModal'
 import { api } from '../services/apiService'
 import './Pages.css'
 
@@ -29,13 +31,31 @@ function Inventory({
   const [preSelectedSupplier, setPreSelectedSupplier] = useState('')
   const [subscription, setSubscription] = useState(null)
 
-  // ✅ Load suppliers from BACKEND (NOT localStorage first)
+  // ✅ Product Name Modal States
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [namePromptConfig, setNamePromptConfig] = useState({ 
+    title: '', 
+    message: '', 
+    defaultValue: '' 
+  });
+  const [namePromptResolve, setNamePromptResolve] = useState(null);
+
+  // ✅ Supplier Prompt Modal States
+  const [showSupplierPrompt, setShowSupplierPrompt] = useState(false);
+  const [supplierPromptConfig, setSupplierPromptConfig] = useState({
+    title: '',
+    message: '',
+    suppliers: [],
+    defaultSupplier: ''
+  });
+  const [supplierPromptResolve, setSupplierPromptResolve] = useState(null);
+
+  // ✅ Load suppliers from BACKEND
   useEffect(() => {
     const loadSuppliers = async () => {
       if (!user?.uid) return;
       try {
         const response = await fetch(`https://accustom-alias-altitude.grork-free.dev/api/suppliers/${user.uid}`);
-        // const response = await fetch(`http://localhost:5000/api/suppliers/${user.uid}`);
         const data = await response.json();
         if (data && data.list) {
           setSuppliers(data.list);
@@ -43,7 +63,6 @@ function Inventory({
         }
       } catch (error) {
         console.error('Failed to load suppliers:', error);
-        // Fallback to localStorage
         try {
           const localData = localStorage.getItem(`shelflife_suppliers_${user.uid}`);
           if (localData) {
@@ -61,7 +80,6 @@ function Inventory({
       if (!user?.uid) return;
       try {
         const response = await fetch(`https://accustom-alias-altitude.grork-free.dev/api/subscription/${user.uid}`);
-        // const response = await fetch(`http://localhost:5000/api/subscription/${user.uid}`);
         const data = await response.json();
         if (data && data.limits) {
           setSubscription(data);
@@ -84,12 +102,12 @@ function Inventory({
     }
   }, [location]);
 
-  // ✅ Refresh inventory from backend (NOT localStorage)
+  // ✅ Refresh inventory from backend
   const refreshData = async () => {
     if (refreshInventory) {
       setLoading(true);
       try {
-        await refreshInventory(); // This calls loadUserInventory from App.jsx
+        await refreshInventory();
       } catch (error) {
         console.error('Refresh error:', error);
       } finally {
@@ -116,6 +134,61 @@ function Inventory({
   const canAdd = inventory.length < productLimit;
 
   const uniqueSuppliers = [...new Set(inventory.map(item => item.supplier))].filter(Boolean);
+
+  // ✅ Product Name Prompt Function
+  const showProductNamePrompt = (title, message, defaultValue) => {
+    return new Promise((resolve) => {
+      setNamePromptConfig({ title, message, defaultValue: defaultValue || '' });
+      setNamePromptResolve(() => resolve);
+      setShowNamePrompt(true);
+    });
+  };
+
+  const handleNameConfirm = (value) => {
+    setShowNamePrompt(false);
+    if (namePromptResolve) {
+      namePromptResolve(value);
+      setNamePromptResolve(null);
+    }
+  };
+
+  const handleNameCancel = () => {
+    setShowNamePrompt(false);
+    if (namePromptResolve) {
+      namePromptResolve(null);
+      setNamePromptResolve(null);
+    }
+  };
+
+  // ✅ Supplier Prompt Function
+  const showSupplierPromptFn = (title, message, supplierList, defaultSupplier) => {
+    return new Promise((resolve) => {
+      setSupplierPromptConfig({ 
+        title, 
+        message, 
+        suppliers: supplierList || [], 
+        defaultSupplier: defaultSupplier || '' 
+      });
+      setSupplierPromptResolve(() => resolve);
+      setShowSupplierPrompt(true);
+    });
+  };
+
+  const handleSupplierConfirm = (value) => {
+    setShowSupplierPrompt(false);
+    if (supplierPromptResolve) {
+      supplierPromptResolve(value);
+      setSupplierPromptResolve(null);
+    }
+  };
+
+  const handleSupplierCancel = () => {
+    setShowSupplierPrompt(false);
+    if (supplierPromptResolve) {
+      supplierPromptResolve(null);
+      setSupplierPromptResolve(null);
+    }
+  };
 
   // ✅ Save supplier if not exists
   const saveSupplierIfNotExists = async (supplierName) => {
@@ -155,12 +228,18 @@ function Inventory({
   // Handle Add Product
   const handleAddProduct = async (productData) => {
     let productName = productData.name;
-    if (!productName || productName.startsWith('Product ')) {
-      productName = window.prompt('Enter product name:', productData.name || 'New Product');
-      if (!productName) {
-        showToast('❌ Product name is required');
+    if (!productName || productName.startsWith('Product ') || productName === 'OCR Product') {
+      const result = await showProductNamePrompt(
+        'Add Product',
+        'Enter a name for this product',
+        productData.name || 'New Product'
+      );
+      
+      if (!result || result.trim().length < 2) {
+        showToast('❌ Product name is required (min 2 characters)');
         return;
       }
+      productName = result.trim();
     }
 
     if (!productName || productName.trim().length < 2) {
@@ -174,7 +253,28 @@ function Inventory({
       return;
     }
 
-    const supplierName = productData.supplier || 'Manual Entry';
+    let supplierName = productData.supplier || 'Manual Entry';
+    
+    // ✅ Use custom prompt for supplier if not pre-selected
+    if (!preSelectedSupplier && supplierName !== 'Manual Entry' && supplierName !== 'OCR Scanned') {
+      const supplierList = suppliers.map(s => s.name);
+      const selected = await showSupplierPromptFn(
+        'Select or Add Supplier',
+        'Choose an existing supplier or type a new one',
+        supplierList,
+        supplierName
+      );
+      
+      if (selected && selected.trim()) {
+        supplierName = selected.trim();
+      } else {
+        // User cancelled - use default
+        supplierName = 'Manual Entry';
+      }
+    } else if (preSelectedSupplier) {
+      supplierName = preSelectedSupplier;
+    }
+
     if (supplierName !== 'Manual Entry' && supplierName !== 'OCR Scanned') {
       await saveSupplierIfNotExists(supplierName);
     }
@@ -238,9 +338,15 @@ function Inventory({
       }
       
       const defaultName = scanData.productInfo?.name || `Product ${scanData.value.slice(-4)}`;
-      const productName = window.prompt('Enter product name:', defaultName);
       
-      if (!productName) {
+      // ✅ Use custom prompt for product name
+      const productName = await showProductNamePrompt(
+        'Add Product',
+        'Enter a name for this product',
+        defaultName
+      );
+
+      if (!productName || productName.trim().length < 2) {
         showToast('❌ Product name is required');
         setShowScanner(false);
         setScanType(null);
@@ -249,19 +355,21 @@ function Inventory({
       
       let supplierName = preSelectedSupplier || 'Manual Entry';
       
-      if (suppliers.length > 0) {
-        const supplierOptions = suppliers.map(s => s.name).join(', ');
-        const supplierInput = window.prompt(
-          `Enter supplier name (Available: ${supplierOptions})\nOr type new supplier name:`,
+      // ✅ Use custom prompt for supplier
+      if (!preSelectedSupplier) {
+        const supplierList = suppliers.map(s => s.name);
+        const selected = await showSupplierPromptFn(
+          'Select or Add Supplier',
+          'Choose an existing supplier or type a new one',
+          supplierList,
           supplierName
         );
-        if (supplierInput && supplierInput.trim()) {
-          supplierName = supplierInput.trim();
-        }
-      } else {
-        const supplierInput = window.prompt('Enter supplier name (or leave blank for Manual Entry):', 'Manual Entry');
-        if (supplierInput && supplierInput.trim()) {
-          supplierName = supplierInput.trim();
+        
+        if (selected && selected.trim()) {
+          supplierName = selected.trim();
+        } else {
+          // User cancelled - use default
+          supplierName = 'Manual Entry';
         }
       }
       
@@ -306,8 +414,14 @@ function Inventory({
           }
         }
       } else {
-        const productName = window.prompt('Enter product name:', 'OCR Product');
-        if (!productName) {
+        // ✅ Use custom prompt for product name (OCR)
+        const productName = await showProductNamePrompt(
+          'Add Product (OCR)',
+          'We detected an expiry date. Please enter the product name.',
+          'OCR Product'
+        );
+
+        if (!productName || productName.trim().length < 2) {
           showToast('❌ Product name is required');
           setShowScanner(false);
           setScanType(null);
@@ -315,9 +429,18 @@ function Inventory({
         }
         
         let supplierName = 'OCR Scanned';
-        const supplierInput = window.prompt('Enter supplier name (or leave blank):', 'OCR Scanned');
-        if (supplierInput && supplierInput.trim()) {
-          supplierName = supplierInput.trim();
+        
+        // ✅ Use custom prompt for supplier (OCR)
+        const supplierList = suppliers.map(s => s.name);
+        const selected = await showSupplierPromptFn(
+          'Select or Add Supplier (OCR)',
+          'Choose an existing supplier or type a new one',
+          supplierList,
+          'OCR Scanned'
+        );
+        
+        if (selected && selected.trim()) {
+          supplierName = selected.trim();
         }
         
         handleAddProduct({
@@ -710,6 +833,27 @@ function Inventory({
           </div>
         </div>
       )}
+
+      {/* ✅ Product Name Modal */}
+      <ProductNameModal
+        isOpen={showNamePrompt}
+        title={namePromptConfig.title}
+        message={namePromptConfig.message}
+        defaultValue={namePromptConfig.defaultValue}
+        onConfirm={handleNameConfirm}
+        onCancel={handleNameCancel}
+      />
+
+      {/* ✅ Supplier Prompt Modal */}
+      <SupplierPromptModal
+        isOpen={showSupplierPrompt}
+        title={supplierPromptConfig.title}
+        message={supplierPromptConfig.message}
+        suppliers={supplierPromptConfig.suppliers}
+        defaultSupplier={supplierPromptConfig.defaultSupplier}
+        onConfirm={handleSupplierConfirm}
+        onCancel={handleSupplierCancel}
+      />
     </div>
   );
 }
