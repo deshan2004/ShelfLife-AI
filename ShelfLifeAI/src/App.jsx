@@ -51,14 +51,10 @@ function App() {
       const items = data.items || [];
       console.log(`✅ Loaded ${items.length} products from backend`);
       setInventory(items);
-      
-      // Update localStorage as backup
       localStorage.setItem(`shelflife_inventory_${userId}`, JSON.stringify(items));
       return items;
     } catch (error) {
       console.error('❌ Error loading inventory from server:', error);
-      
-      // Try localStorage as fallback
       const savedInventory = localStorage.getItem(`shelflife_inventory_${userId}`);
       if (savedInventory) {
         try {
@@ -70,33 +66,7 @@ function App() {
           console.error('❌ Error parsing localStorage:', e);
         }
       }
-      
-      // If nothing works, try to seed initial data
-      await seedInitialInventory(userId);
       return [];
-    }
-  };
-
-  // ✅ Seed initial inventory if empty
-  const seedInitialInventory = async (userId) => {
-    try {
-      const { initialInventory } = await import('./data/inventoryData');
-      console.log('🌱 Seeding initial inventory...');
-      
-      let addedCount = 0;
-      for (const product of initialInventory) {
-        try {
-          const result = await api.addProduct(userId, product);
-          if (result.success) addedCount++;
-        } catch (e) {
-          console.error('Error seeding product:', e);
-        }
-      }
-      
-      console.log(`✅ Seeded ${addedCount} products`);
-      await loadUserInventory(userId, true);
-    } catch (error) {
-      console.error('❌ Seed error:', error);
     }
   };
 
@@ -117,6 +87,7 @@ function App() {
               uid: firebaseUser.uid,
               name: firebaseUser.displayName || 'User',
               email: firebaseUser.email,
+              phone: '',
               role: 'user',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
@@ -130,6 +101,7 @@ function App() {
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             name: userData.name || firebaseUser.displayName || 'User',
+            phone: userData.phone || '',
             photoURL: firebaseUser.photoURL,
             role: role,
             ...userData
@@ -139,7 +111,6 @@ function App() {
           setUserRole(role);
           localStorage.setItem('shelflife_user', JSON.stringify(fullUserData));
 
-          // ✅ Load inventory from backend
           if (role === 'user' || role === 'admin') {
             await loadUserInventory(firebaseUser.uid);
           }
@@ -168,8 +139,6 @@ function App() {
     setUserRole(userData.role || 'user');
     setShowLogin(false);
     showToast(`Welcome back, ${userData.name}!`);
-    
-    // Load inventory after login
     if (userData.uid) {
       loadUserInventory(userData.uid);
     }

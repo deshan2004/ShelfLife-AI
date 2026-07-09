@@ -25,6 +25,7 @@ function LoginModal({ isOpen, onClose, onLogin }) {
     email: '',
     password: '',
     name: '',
+    phone: '',
     businessName: '',
     confirmPassword: '',
     agreeTerms: false
@@ -40,6 +41,7 @@ function LoginModal({ isOpen, onClose, onLogin }) {
         email: '',
         password: '',
         name: '',
+        phone: '',
         businessName: '',
         confirmPassword: '',
         agreeTerms: false
@@ -81,6 +83,7 @@ function LoginModal({ isOpen, onClose, onLogin }) {
           uid: firebaseUser.uid,
           name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
           email: firebaseUser.email,
+          phone: '',
           role: 'user',
           businessName: `${firebaseUser.displayName?.split('@')[0] || 'User'}'s Store`,
           businessType: 'retail',
@@ -95,6 +98,7 @@ function LoginModal({ isOpen, onClose, onLogin }) {
         name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
         photoURL: firebaseUser.photoURL,
         role: userDoc.exists() ? userDoc.data().role : 'user',
+        phone: userDoc.exists() ? userDoc.data().phone : '',
         lastLogin: new Date().toISOString()
       };
       
@@ -160,6 +164,7 @@ function LoginModal({ isOpen, onClose, onLogin }) {
         uid: firebaseUser.uid,
         email: formData.email,
         name: userDoc.exists() ? userDoc.data().name : formData.email.split('@')[0],
+        phone: userDoc.exists() ? userDoc.data().phone : '',
         role: role,
         lastLogin: new Date().toISOString()
       };
@@ -206,6 +211,7 @@ function LoginModal({ isOpen, onClose, onLogin }) {
         uid: firebaseUser.uid,
         name: formData.name,
         email: formData.email,
+        phone: formData.phone || '',
         role: 'user',
         businessName: formData.businessName || `${formData.name}'s Store`,
         businessType: 'retail',
@@ -213,7 +219,6 @@ function LoginModal({ isOpen, onClose, onLogin }) {
         updatedAt: new Date().toISOString()
       });
       
-      // Create subscription
       const trialEnd = new Date();
       trialEnd.setDate(trialEnd.getDate() + 14);
       
@@ -233,6 +238,7 @@ function LoginModal({ isOpen, onClose, onLogin }) {
         email: '', 
         password: '', 
         name: '', 
+        phone: '',
         businessName: '', 
         confirmPassword: '', 
         agreeTerms: false 
@@ -324,6 +330,7 @@ function LoginModal({ isOpen, onClose, onLogin }) {
       email: '',
       password: '',
       name: '',
+      phone: '',
       businessName: '',
       confirmPassword: '',
       agreeTerms: false
@@ -445,8 +452,23 @@ function LoginModal({ isOpen, onClose, onLogin }) {
                 {errors.name && <span className="error-message">{errors.name}</span>}
               </div>
 
+              {/* ✅ Phone Number Field */}
               <div className="form-group">
-                <label>Business Name (Optional)</label>
+                <label><i className="fas fa-phone"></i> Phone Number <span className="optional">(for SMS alerts)</span></label>
+                <input 
+                  type="tel" 
+                  name="phone" 
+                  value={formData.phone} 
+                  onChange={handleChange}
+                  placeholder="0712345678"
+                />
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.65rem', display: 'block', marginTop: '4px' }}>
+                  We'll send you low stock and expiry alerts via SMS
+                </small>
+              </div>
+
+              <div className="form-group">
+                <label>Business Name <span className="optional">(Optional)</span></label>
                 <input 
                   type="text" 
                   name="businessName" 
