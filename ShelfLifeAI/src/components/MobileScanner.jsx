@@ -1,18 +1,20 @@
 // src/components/MobileScanner.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './MobileScanner.css';
 
-function MobileScanner({ onScan, onClose }) {
+function MobileScanner({ onScan, onClose, pairingCode: propPairingCode }) {
   const [scanType, setScanType] = useState('barcode');
-  const [pairingCode, setPairingCode] = useState(null);
+  const [pairingCode, setPairingCode] = useState(propPairingCode || null);
   const [scanResult, setScanResult] = useState(null);
   const [isPaired, setIsPaired] = useState(false);
   const [mobileUrl, setMobileUrl] = useState('');
   const [ngrokUrl, setNgrokUrl] = useState('');
+  const [scanHistory, setScanHistory] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    // Generate unique pairing code
-    const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+    // Generate unique pairing code if not provided
+    const code = propPairingCode || Math.random().toString(36).substring(2, 10).toUpperCase();
     setPairingCode(code);
     
     // Get ngrok URL from current window location
@@ -25,24 +27,60 @@ function MobileScanner({ onScan, onClose }) {
     
     // Listen for messages from mobile scanner page
     const handleMessage = (event) => {
-      if (event.data && event.data.type === 'scan' && event.data.code === code) {
-        setScanResult({ success: true, value: event.data.scanData.value });
-        onScan(event.data.scanData);
+      if (!event.data) return;
+      
+      // Handle scan result
+      if (event.data.type === 'scan' && event.data.code === code) {
+        const scanData = event.data.scanData;
+        console.log('📥 Scan received from mobile:', scanData);
+        
+        setScanResult({ 
+          success: true, 
+          type: scanData.type,
+          value: scanData.value,
+          productData: scanData.productData || null
+        });
+        
+        // Add to history
+        setScanHistory(prev => [
+          { 
+            type: scanData.type, 
+            value: scanData.value,
+            time: new Date().toLocaleTimeString()
+          },
+          ...prev
+        ].slice(0, 10));
         
         // Play beep sound
-        const audio = new Audio('/beep.mp3');
-        audio.play().catch(e => console.log('Audio not supported'));
+        try {
+          const audio = new Audio('/beep.mp3');
+          audio.volume = 0.3;
+          audio.play().catch(e => console.log('Audio not supported'));
+        } catch (e) {}
         
-        setTimeout(() => setScanResult(null), 3000);
+        // Send to parent component (Inventory)
+        if (onScan) {
+          onScan(scanData);
+        }
+        
+        // Auto-clear result after 5 seconds
+        setTimeout(() => {
+          setScanResult(null);
+        }, 5000);
+      }
+      
+      // Handle ready event
+      if (event.data.type === 'ready' && event.data.code === code) {
+        setIsPaired(true);
       }
     };
     
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onScan, scanType]);
+  }, [onScan, scanType, propPairingCode]);
 
   const openMobileScanner = () => {
-    window.open(mobileUrl, '_blank', 'width=450,height=750,menubar=no,toolbar=no,location=no');
+    window.open(mobileUrl, '_blank', 'width=450,height=800,menubar=no,toolbar=no,location=no');
     setIsPaired(true);
   };
 
@@ -51,7 +89,6 @@ function MobileScanner({ onScan, onClose }) {
     alert('✅ Link copied! Send it to your phone via WhatsApp, Email, or SMS.');
   };
 
-  // Generate QR code
   const generateQRCodeUrl = () => {
     return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=${encodeURIComponent(mobileUrl)}`;
   };
@@ -63,20 +100,34 @@ function MobileScanner({ onScan, onClose }) {
           <i className="fas fa-mobile-alt"></i>
         </div>
         <h3>Mobile Scanner</h3>
-        <p>Scan using your phone camera</p>
+        <p>Scan using your phone camera • {scanType === 'barcode' ? '📷 Barcode' : '📅 OCR'}</p>
         <button className="close-btn" onClick={onClose}>
           <i className="fas fa-times"></i>
         </button>
       </div>
 
-      {/* ngrok Success Message */}
+      {/* Status */}
       <div className="ngrok-success">
-        <i className="fas fa-check-circle"></i>
+        <i className={`fas ${isPaired ? 'fa-check-circle' : 'fa-clock'}`}></i>
         <div>
-          <strong>✓ External Access Enabled!</strong>
-          <p>Your ngrok tunnel is active. Share this link with anyone, anywhere!</p>
+          <strong>{isPaired ? '✓ Connected!' : 'Waiting for connection...'}</strong>
+          <p>{isPaired ? 'Phone is ready to scan' : 'Open the scanner on your phone to connect'}</p>
         </div>
       </div>
+
+      {/* Scan Result */}
+      {scanResult && scanResult.success && (
+        <div className="scan-result-success">
+          <i className="fas fa-check-circle"></i>
+          <div>
+            <strong>✓ {scanResult.type === 'barcode' ? 'Barcode' : 'Expiry Date'} Detected!</strong>
+            <p>{scanResult.value}</p>
+            <small style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+              {scanResult.productData ? 'Product data included' : 'Add product details in inventory'}
+            </small>
+          </div>
+        </div>
+      )}
 
       <div className="pairing-section">
         <div className="pairing-code-container">
@@ -129,7 +180,7 @@ function MobileScanner({ onScan, onClose }) {
         {isPaired && (
           <div className="paired-status">
             <i className="fas fa-check-circle"></i>
-            <span>Ready to scan! Point your phone at the product.</span>
+            <span>✅ Connected! Point your phone at the product to scan.</span>
           </div>
         )}
         
@@ -179,12 +230,18 @@ function MobileScanner({ onScan, onClose }) {
         </div>
       </div>
 
-      {scanResult && scanResult.success && (
-        <div className="scan-result-success">
-          <i className="fas fa-check-circle"></i>
-          <div>
-            <strong>✓ Scan Successful!</strong>
-            <p>{scanResult.value}</p>
+      {/* Scan History */}
+      {scanHistory.length > 0 && (
+        <div className="scan-history-section">
+          <h4>📋 Recent Scans</h4>
+          <div className="scan-history-list">
+            {scanHistory.map((item, index) => (
+              <div key={index} className="scan-history-item">
+                <span className="scan-type">{item.type === 'barcode' ? '📷' : '📅'}</span>
+                <span className="scan-value">{item.value}</span>
+                <span className="scan-time">{item.time}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
