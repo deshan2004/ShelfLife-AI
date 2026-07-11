@@ -1121,4 +1121,49 @@ h4 {
 .chatbot-window,
 .support-modal-overlay {
   z-index: 9999;
+}/* ============================================================
+   MOBILE FIXES - Phone View
+   ============================================================ */
+
+/* Better touch targets on mobile */
+@media (max-width: 480px) {
+  .btn-flash,
+  .btn-delete,
+  .action-btn,
+  .filter-btn,
+  .tab-btn,
+  .scanner-tab,
+  .btn-option {
+    min-height: 36px;
+    padding: 4px 10px;
+  }
+  
+  .action-buttons {
+    gap: 3px;
+  }
+  
+  /* Make status badges smaller */
+  .status-badge {
+    font-size: 0.5rem;
+    padding: 1px 6px;
+  }
+  
+  /* Days badge smaller */
+  .days-badge {
+    font-size: 0.5rem;
+    padding: 1px 4px;
+  }
+}
+
+/* Landscape phone */
+@media (max-width: 768px) and (orientation: landscape) {
+  .inventory-table {
+    font-size: 0.65rem;
+    min-width: 600px;
+  }
+  
+  .inventory-table thead th,
+  .inventory-table tbody td {
+    padding: 6px 8px;
+  }
 }
