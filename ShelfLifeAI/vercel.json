@@ -1,3 +1,11 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "version": 2,
+  "builds": [
+    { "src": "server.cjs", "use": "@vercel/node" },
+    { "src": "package.json", "use": "@vercel/static-build" }
+  ],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/server.cjs" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
