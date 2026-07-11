@@ -1,4 +1,4 @@
-// src/components/Chatbot.jsx
+// src/components/Chatbot/Chatbot.jsx
 import { useState, useRef, useEffect } from 'react';
 import './Chatbot.css';
 
@@ -9,7 +9,7 @@ function Chatbot() {
       id: 1,
       text: "👋 Hi there! 👋\n\nI'm ShelfLife AI Assistant. I can help you with:\n\n📷 Scanning products (barcode/OCR)\n📦 Managing inventory\n🔥 Flash sales\n🚚 Supplier returns\n📊 Analytics\n💰 Pricing & plans\n\nHow can I assist you today?",
       sender: 'bot',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: '09:15 AM'
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
@@ -45,12 +45,11 @@ function Chatbot() {
     return () => clearTimeout(timer);
   }, [isOpen]);
 
-  // ✅ Listen for flash sale events from outside
+  // Listen for flash sale events from outside
   useEffect(() => {
     const handleFlashSaleMessage = (event) => {
       const { productName, discount, newPrice, saleType } = event.detail;
       
-      // Add message to chat
       const botMessage = {
         id: Date.now(),
         text: `🔥 **${saleType || 'Flash Sale'} Applied!**\n\n✅ **${productName}**\n💰 Discount: **${discount}**\n🆕 New Price: **LKR ${newPrice}**\n\n💡 This product is now on sale! Don't miss out!`,
@@ -60,7 +59,6 @@ function Chatbot() {
       
       setMessages(prev => [...prev, botMessage]);
       
-      // Also show a toast notification
       if (window.showToast) {
         window.showToast(`🔥 ${discount} applied to ${productName}!`);
       }
@@ -82,8 +80,8 @@ function Chatbot() {
       return "📅 **How to scan expiry dates:**\n\n1️⃣ Click 'Add Product'\n2️⃣ Select 'OCR Scanner'\n3️⃣ Point your camera at the expiry date\n4️⃣ Our AI will read it automatically!\n\n📱 You can also upload a photo of the label.";
     }
     
-    if (msg.includes('flash') || msg.includes('sale') || msg.includes('discount')) {
-      return "🔥 **Flash Sale Discounts:**\n\n• 50% OFF for items expiring in 24h\n• 40% OFF for items expiring in 48h\n• 30% OFF for items expiring in 7 days\n\n💡 Click 'Flash Sale' on any near-expiry product in your inventory!\n\n🛒 When you apply a flash sale, I'll notify you here!";
+    if (msg.includes('flash') || msg.includes('sale') || msg.includes('discount') || msg.includes('expired pricing')) {
+      return "🔥 **Flash Sale Pricing for Expired/Expiring Items:**\n\n• **24 hours or less** → 50% OFF (BOGO)\n• **48 hours or less** → 40% OFF\n• **7 days or less** → 30% OFF\n• **Expired items** → Return to supplier or dispose\n\n💡 Click 'Flash Sale' on any near-expiry product in your inventory!\n\n🛒 I'll notify you here when a flash sale is applied!";
     }
     
     if (msg.includes('inventory') || msg.includes('stock') || msg.includes('product')) {
@@ -102,10 +100,6 @@ function Chatbot() {
       return "💰 **Our Pricing Plans:**\n\n**Basic** - LKR 2,500/month\n• 200 products • 25 suppliers • Barcode scanning\n\n**Professional** - LKR 5,900/month\n• 1000 products • 100 suppliers • AI OCR scanning • Flash sales\n\n**Enterprise** - LKR 14,900/month\n• Unlimited • All features • API access\n\n✨ All plans include 14-day free trial!";
     }
     
-    if (msg.includes('help') || msg.includes('support') || msg.includes('assist')) {
-      return "🆘 **How can I help you today?**\n\nI can assist with:\n\n📷 **Scanning** - Barcode/OCR scanning guide\n📦 **Inventory** - Managing your products\n🔥 **Flash Sales** - Discount strategies\n🚚 **Suppliers** - Returns management\n📊 **Analytics** - Reports & insights\n💰 **Pricing** - Plans & billing\n👤 **Account** - Profile settings\n\nJust type your question!";
-    }
-    
     if (msg.includes('hello') || msg.includes('hi') || msg.includes('hey')) {
       return "👋 **Hello! Welcome to ShelfLife AI!**\n\nI'm your virtual assistant. I can help you with:\n\n• 📷 Scanning products\n• 📦 Inventory management\n• 🔥 Flash sales\n• 📊 Analytics\n• 💰 Pricing plans\n\nWhat would you like to know?";
     }
@@ -114,10 +108,7 @@ function Chatbot() {
       return "🙏 **You're very welcome!**\n\nI'm glad I could help. Is there anything else you'd like to know about ShelfLife AI?\n\n💡 Tip: Check out our video tutorials in the Help section!";
     }
     
-    if (msg.includes('discount') || msg.includes('sale')) {
-      return "🔥 **Current Discounts in Your Inventory**\n\nI'll notify you when you apply flash sales to products!\n\n💡 To apply a discount:\n1. Go to Inventory\n2. Find a product expiring soon\n3. Click the 'Flash' button\n4. I'll confirm the discount here!";
-    }
-    
+    // Default response
     return "🤔 **I'm not sure I understand.**\n\nCould you please rephrase your question? I can help with:\n\n📷 Product scanning (barcode/OCR)\n📦 Inventory management\n🔥 Flash sales\n🚚 Supplier returns\n📊 Analytics\n💰 Pricing & plans\n\nOr click **'Connect with Human Support'** below to talk to a real person!";
   };
 
@@ -190,11 +181,13 @@ function Chatbot() {
     setMessages(prev => [...prev, confirmationMessage]);
   };
 
+  // ✅ Shortened quick action labels - "📦 Expired Pricing" instead of long text
   const quickActions = [
     { label: '📷 How to scan?', action: 'How do I scan a product?' },
     { label: '📅 Expiry dates', action: 'How to scan expiry dates?' },
     { label: '🔥 Flash sales', action: 'How do flash sales work?' },
-    { label: '💰 Pricing', action: 'What are your pricing plans?' }
+    { label: '💰 Pricing', action: 'What are your pricing plans?' },
+    { label: '📦 Expired Pricing', action: 'How does flash sale pricing work for expired items?' }
   ];
 
   return (
@@ -244,6 +237,8 @@ function Chatbot() {
                         <strong>{line.replace(/\*\*/g, '')}</strong>
                       ) : line.startsWith('•') ? (
                         <span style={{ display: 'block', marginLeft: '8px' }}>{line}</span>
+                      ) : line.startsWith('1️⃣') || line.startsWith('2️⃣') || line.startsWith('3️⃣') || line.startsWith('4️⃣') ? (
+                        <span style={{ display: 'block' }}>{line}</span>
                       ) : (
                         line
                       )}

@@ -41,20 +41,59 @@ function App() {
   const [inventory, setInventory] = useState([])
   const [toastMsg, setToastMsg] = useState(null)
   const [actionLoading, setActionLoading] = useState(null)
+  const [subscription, setSubscription] = useState(null)
 
   // ✅ Setup global toast for Chatbot
   useEffect(() => {
     window.showToast = showToast;
-    
-    // Listen for flash sale events
+
     const handleFlashSaleEvent = (event) => {
-      // Toast already shown by Inventory, but we keep this for backup
       console.log('Flash sale event received:', event.detail);
     };
-    
+
     window.addEventListener('flashSaleApplied', handleFlashSaleEvent);
     return () => window.removeEventListener('flashSaleApplied', handleFlashSaleEvent);
   }, []);
+
+  // ✅ Load subscription from backend
+  const loadSubscription = async (userId) => {
+    if (!userId) return null;
+    try {
+      console.log('🔄 Loading subscription for user:', userId);
+      const response = await fetch(`http://localhost:5000/api/subscription/${userId}`);
+      const data = await response.json();
+      console.log('✅ Subscription loaded:', data);
+      
+      if (data && data.planId) {
+        setSubscription(data);
+        // Update user object
+        setUser(prev => ({
+          ...prev,
+          subscription: data,
+          planId: data.planId,
+          planName: data.planId === 'FREE_TRIAL' ? 'Free Trial' : data.planId
+        }));
+        // Update localStorage
+        const userData = JSON.parse(localStorage.getItem('shelflife_user') || '{}');
+        userData.subscription = data;
+        userData.planId = data.planId;
+        userData.planName = data.planId === 'FREE_TRIAL' ? 'Free Trial' : data.planId;
+        localStorage.setItem('shelflife_user', JSON.stringify(userData));
+        return data;
+      }
+    } catch (error) {
+      console.error('❌ Failed to load subscription:', error);
+      // Try localStorage fallback
+      try {
+        const userData = JSON.parse(localStorage.getItem('shelflife_user') || '{}');
+        if (userData.subscription) {
+          setSubscription(userData.subscription);
+          return userData.subscription;
+        }
+      } catch (e) {}
+    }
+    return null;
+  };
 
   // ✅ Load inventory from BACKEND
   const loadUserInventory = async (userId, forceRefresh = false) => {
@@ -158,7 +197,6 @@ function App() {
       if (result.success) {
         showToast(`🔥 ${saleType} applied to ${product.name}! New price: LKR ${newPrice}`);
         
-        // ✅ Send message to Chatbot
         const event = new CustomEvent('flashSaleApplied', {
           detail: {
             productName: product.name,
@@ -170,6 +208,7 @@ function App() {
         window.dispatchEvent(event);
         
         await loadUserInventory(user.uid, true);
+        await loadSubscription(user.uid); // ✅ Refresh subscription data
       } else {
         showToast(`❌ Failed to apply flash sale: ${result.error}`);
       }
@@ -275,6 +314,7 @@ function App() {
 
           if (role === 'user' || role === 'admin') {
             await loadUserInventory(firebaseUser.uid);
+            await loadSubscription(firebaseUser.uid); // ✅ Load subscription after login
           }
         } catch (error) {
           console.error("❌ Error loading user data:", error);
@@ -284,6 +324,7 @@ function App() {
         setUserRole('user');
         localStorage.removeItem('shelflife_user');
         setInventory([]);
+        setSubscription(null);
       }
       setLoading(false);
     });
@@ -303,6 +344,7 @@ function App() {
     showToast(`Welcome back, ${userData.name}!`);
     if (userData.uid) {
       loadUserInventory(userData.uid);
+      loadSubscription(userData.uid);
     }
   };
 
@@ -312,6 +354,7 @@ function App() {
       setUser(null);
       setUserRole('user');
       setInventory([]);
+      setSubscription(null);
       showToast('You have been signed out');
     } catch (error) {
       console.error("Logout error:", error);
@@ -325,7 +368,40 @@ function App() {
     }
   };
 
+  // ✅ Get plan name from subscription
+  const getPlanName = () => {
+    if (subscription) {
+      if (subscription.planId === 'FREE_TRIAL') return 'Free Trial';
+      if (subscription.planId === 'BASIC') return 'Basic';
+      if (subscription.planId === 'PROFESSIONAL') return 'Professional';
+      if (subscription.planId === 'ENTERPRISE') return 'Enterprise';
+      return subscription.planId;
+    }
+    // Fallback to user object
+    if (user?.planId) {
+      if (user.planId === 'FREE_TRIAL') return 'Free Trial';
+      if (user.planId === 'BASIC') return 'Basic';
+      if (user.planId === 'PROFESSIONAL') return 'Professional';
+      if (user.planId === 'ENTERPRISE') return 'Enterprise';
+      return user.planId;
+    }
+    return 'Free Trial';
+  };
+
+  // ✅ Get product limit from subscription
+  const getProductLimit = () => {
+    if (subscription?.limits?.maxProducts) {
+      return subscription.limits.maxProducts;
+    }
+    if (user?.subscription?.limits?.maxProducts) {
+      return user.subscription.limits.maxProducts;
+    }
+    return 50;
+  };
+
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const planName = getPlanName();
+  const productLimit = getProductLimit();
 
   if (loading) {
     return (
@@ -339,7 +415,6 @@ function App() {
   return (
     <Router>
       <div className="app-wrapper">
-        {/* Navbar with AlertDropdown props */}
         <Navbar
           onLoginClick={() => setShowLogin(true)}
           user={user}
@@ -365,6 +440,8 @@ function App() {
                     inventory={inventory}
                     onUpdateInventory={handleUpdateInventory}
                     showToast={showToast}
+                    subscriptionStatus={subscription?.status}
+                    trialDaysLeft={subscription?.trialEnd ? Math.ceil((new Date(subscription.trialEnd) - new Date()) / (1000 * 60 * 60 * 24)) : 0}
                   />
                 )}
               </ProtectedRoute>
@@ -379,6 +456,9 @@ function App() {
                     showToast={showToast}
                     user={user}
                     refreshInventory={() => loadUserInventory(user?.uid, true)}
+                    planName={planName}
+                    productLimit={productLimit}
+                    subscription={subscription}
                   />
                 )}
               </ProtectedRoute>
@@ -408,7 +488,7 @@ function App() {
 
             <Route path="/billing" element={
               <ProtectedRoute user={user}>
-                <BillingPage user={user} />
+                <BillingPage user={user} subscription={subscription} />
               </ProtectedRoute>
             } />
 
