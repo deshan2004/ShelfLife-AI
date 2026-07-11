@@ -9,16 +9,8 @@ const getApiUrl = () => {
   
   // Production mode (Vercel)
   if (import.meta.env.PROD) {
-    // Vercel environment variable එකෙන් API URL එක ගන්න
-    const apiUrl = import.meta.env.VITE_API_URL;
-    
-    // Vercel Backend URL එක Set කරලා නැත්නම්, relative path use කරන්න
-    if (apiUrl && apiUrl !== '') {
-      return apiUrl;
-    }
-    
-    // Relative path - same domain එකේ backend තියෙනවා නම්
-    return '';
+    // Vercel live backend URL eka direct set karala thiyenne phone access prashna nathara wenna
+    return 'https://shelf-life-ai.vercel.app';
   }
   
   return '';
