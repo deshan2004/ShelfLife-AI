@@ -1,8 +1,7 @@
-// src/pages/BillingPage.jsx - Beautiful Payment Page
+// src/pages/BillingPage.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import subscriptionService from '../services/subscriptionService';
-import paymentService from '../services/paymentService';
 import PayHereButton from '../components/Payment/PayHereButton';
 import { PLAN_PRICES } from '../config/payhereConfig';
 import './BillingPage.css';
@@ -12,7 +11,6 @@ function BillingPage({ user }) {
   const [subscription, setSubscription] = useState(null);
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPlan, setSelectedPlan] = useState('PROFESSIONAL');
 
   useEffect(() => {
     if (!user) {
@@ -38,6 +36,15 @@ function BillingPage({ user }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ✅ Fixed: getPlanDisplayName function
+  const getPlanDisplayName = (planId) => {
+    if (!planId || planId === 'FREE_TRIAL') return 'Free Trial';
+    if (planId === 'BASIC') return 'Basic';
+    if (planId === 'PROFESSIONAL') return 'Professional';
+    if (planId === 'ENTERPRISE') return 'Enterprise';
+    return planId;
   };
 
   const getDaysLeft = () => {
@@ -165,7 +172,7 @@ function BillingPage({ user }) {
               <i className="fas fa-check-circle" style={{ color: '#22c55e' }}></i>
               <div>
                 <h3>Active Subscription</h3>
-                <p>You are on the <strong>{subscription?.planId}</strong> plan</p>
+                <p>You are on the <strong>{getPlanDisplayName(subscription?.planId)}</strong> plan</p>
               </div>
             </div>
           </div>

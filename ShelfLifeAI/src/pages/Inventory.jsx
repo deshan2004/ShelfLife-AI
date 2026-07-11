@@ -24,7 +24,7 @@ function Inventory({
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterSupplier, setFilterSupplier] = useState('all')
-  const [filterSlow, setFilterSlow] = useState(false) // ✅ Slow moving filter
+  const [filterSlow, setFilterSlow] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [addingProduct, setAddingProduct] = useState(false)
@@ -57,6 +57,53 @@ function Inventory({
   });
   const [supplierPromptResolve, setSupplierPromptResolve] = useState(null);
 
+  // ✅ PLAN NAME DISPLAY - Get from localStorage or subscription data
+  const getPlanDisplayName = (subData) => {
+    if (!subData) {
+      // Try localStorage
+      try {
+        const userData = JSON.parse(localStorage.getItem('shelflife_user') || '{}');
+        if (userData.planName) return userData.planName;
+        if (userData.planId) {
+          const plan = userData.planId;
+          if (plan === 'FREE_TRIAL' || plan === 'free_trial') return 'Free Trial';
+          if (plan === 'BASIC') return 'Basic';
+          if (plan === 'PROFESSIONAL') return 'Professional';
+          if (plan === 'ENTERPRISE') return 'Enterprise';
+          return plan;
+        }
+      } catch (e) {}
+      return 'Free Trial';
+    }
+
+    const planId = subData.planId || subData.plan;
+    if (!planId) return 'Free Trial';
+    
+    if (planId === 'FREE_TRIAL' || planId === 'free_trial') return 'Free Trial';
+    if (planId === 'BASIC') return 'Basic';
+    if (planId === 'PROFESSIONAL') return 'Professional';
+    if (planId === 'ENTERPRISE') return 'Enterprise';
+    return planId;
+  };
+
+  // ✅ Load plan name from subscription
+  const [planNameDisplay, setPlanNameDisplay] = useState(() => {
+    // Try to get from localStorage first
+    try {
+      const userData = JSON.parse(localStorage.getItem('shelflife_user') || '{}');
+      if (userData.planName) return userData.planName;
+      if (userData.planId) {
+        const plan = userData.planId;
+        if (plan === 'FREE_TRIAL' || plan === 'free_trial') return 'Free Trial';
+        if (plan === 'BASIC') return 'Basic';
+        if (plan === 'PROFESSIONAL') return 'Professional';
+        if (plan === 'ENTERPRISE') return 'Enterprise';
+        return plan;
+      }
+    } catch (e) {}
+    return 'Free Trial';
+  });
+
   // ✅ Load suppliers from BACKEND
   useEffect(() => {
     const loadSuppliers = async () => {
@@ -88,10 +135,18 @@ function Inventory({
       try {
         const response = await fetch(`https://accustom-alias-altitude.grork-free.dev/api/subscription/${user.uid}`);
         const data = await response.json();
-        if (data && data.limits) {
+        if (data && data.planId) {
           setSubscription(data);
+          
+          // Update plan display
+          const displayName = getPlanDisplayName(data);
+          setPlanNameDisplay(displayName);
+          
+          // Update user object in localStorage
           const userData = JSON.parse(localStorage.getItem('shelflife_user') || '{}');
           userData.subscription = data;
+          userData.planId = data.planId;
+          userData.planName = displayName;
           localStorage.setItem('shelflife_user', JSON.stringify(userData));
         }
       } catch (error) {
@@ -100,6 +155,31 @@ function Inventory({
     };
     loadSubscription();
   }, [user]);
+
+  // ✅ Force refresh subscription data on mount
+  useEffect(() => {
+    const forceRefreshSubscription = async () => {
+      if (!user?.uid) return;
+      try {
+        const response = await fetch(`https://accustom-alias-altitude.grork-free.dev/api/subscription/${user.uid}`);
+        const data = await response.json();
+        if (data && data.planId) {
+          setSubscription(data);
+          const displayName = getPlanDisplayName(data);
+          setPlanNameDisplay(displayName);
+          
+          const userData = JSON.parse(localStorage.getItem('shelflife_user') || '{}');
+          userData.subscription = data;
+          userData.planId = data.planId;
+          userData.planName = displayName;
+          localStorage.setItem('shelflife_user', JSON.stringify(userData));
+        }
+      } catch (error) {
+        console.error('Force refresh subscription error:', error);
+      }
+    };
+    forceRefreshSubscription();
+  }, [user?.uid]);
 
   // Get pre-selected supplier from navigation state
   useEffect(() => {
@@ -115,7 +195,6 @@ function Inventory({
     const filterValue = localStorage.getItem('shelflife_filter_value');
     
     if (filterType && filterValue) {
-      // Reset filters first
       setFilterStatus('all');
       setFilterSupplier('all');
       setFilterSlow(false);
@@ -141,7 +220,6 @@ function Inventory({
         default:
           break;
       }
-      // Clear localStorage so it doesn't reapply on refresh
       localStorage.removeItem('shelflife_filter_type');
       localStorage.removeItem('shelflife_filter_value');
     }
@@ -153,6 +231,20 @@ function Inventory({
       setLoading(true);
       try {
         await refreshInventory();
+        // Reload subscription to keep sync
+        const response = await fetch(`https://accustom-alias-altitude.grork-free.dev/api/subscription/${user?.uid}`);
+        const data = await response.json();
+        if (data && data.planId) {
+          setSubscription(data);
+          const displayName = getPlanDisplayName(data);
+          setPlanNameDisplay(displayName);
+          
+          const userData = JSON.parse(localStorage.getItem('shelflife_user') || '{}');
+          userData.subscription = data;
+          userData.planId = data.planId;
+          userData.planName = displayName;
+          localStorage.setItem('shelflife_user', JSON.stringify(userData));
+        }
       } catch (error) {
         console.error('Refresh error:', error);
       } finally {
@@ -165,17 +257,17 @@ function Inventory({
   const getProductLimit = () => {
     if (subscription?.limits?.maxProducts) return subscription.limits.maxProducts;
     if (user?.subscription?.limits?.maxProducts) return user.subscription.limits.maxProducts;
+    // Check localStorage
+    try {
+      const userData = JSON.parse(localStorage.getItem('shelflife_user') || '{}');
+      if (userData.subscription?.limits?.maxProducts) {
+        return userData.subscription.limits.maxProducts;
+      }
+    } catch (e) {}
     return 50;
   };
 
-  const getPlanName = () => {
-    if (subscription?.planId) return subscription.planId;
-    if (user?.subscription?.planId) return user.subscription.planId;
-    return 'FREE_TRIAL';
-  };
-
   const productLimit = getProductLimit();
-  const planName = getPlanName();
   const canAdd = inventory.length < productLimit;
 
   const uniqueSuppliers = [...new Set(inventory.map(item => item.supplier))].filter(Boolean);
@@ -271,7 +363,7 @@ function Inventory({
   };
 
   // ============================================================
-  // ✅ SMART ACTIONS - DATABASE SAVE + AUTO REFRESH + CHATBOT NOTIFICATION
+  // ✅ SMART ACTIONS
   // ============================================================
 
   // 🔥 Flash Sale
@@ -316,7 +408,6 @@ function Inventory({
       if (result.success) {
         showToast(`🔥 ${saleType} applied to ${product.name}! New price: LKR ${newPrice}`);
         
-        // ✅ Send message to Chatbot
         const event = new CustomEvent('flashSaleApplied', {
           detail: {
             productName: product.name,
@@ -328,7 +419,6 @@ function Inventory({
         window.dispatchEvent(event);
         
         await refreshData();
-        // Clear selection after action
         setSelectedItems([]);
         setSelectAll(false);
       } else {
@@ -342,7 +432,7 @@ function Inventory({
     }
   };
 
-  // 📦 Order Now (Low Stock)
+  // 📦 Order Now
   const handleOrderNow = async (productId) => {
     const product = inventory.find(p => p.id === productId);
     if (!product) return;
@@ -456,7 +546,7 @@ function Inventory({
     }
   };
 
-  // 🗑️ Quick Delete
+  // 🗑️ Delete
   const handleDeleteProduct = async (productId) => {
     const product = inventory.find(p => p.id === productId);
     if (product && window.confirm(`Delete ${product.name} from inventory?`)) {
@@ -479,7 +569,6 @@ function Inventory({
   // ✅ BULK ACTIONS
   // ============================================================
 
-  // Toggle item selection
   const toggleItemSelection = (itemId) => {
     setSelectedItems(prev => 
       prev.includes(itemId) 
@@ -488,7 +577,6 @@ function Inventory({
     );
   };
 
-  // Toggle select all
   const toggleSelectAll = () => {
     if (selectAll) {
       setSelectedItems([]);
@@ -498,7 +586,6 @@ function Inventory({
     setSelectAll(!selectAll);
   };
 
-  // Bulk Flash Sale
   const handleBulkFlashSale = async () => {
     const products = inventory.filter(item => selectedItems.includes(item.id));
     const expiringProducts = products.filter(item => item.daysLeft > 0 && item.daysLeft <= 7);
@@ -527,7 +614,6 @@ function Inventory({
     }
   };
 
-  // Bulk Delete
   const handleBulkDelete = async () => {
     if (selectedItems.length === 0) {
       showToast('⚠️ No items selected');
@@ -827,12 +913,10 @@ function Inventory({
       matchesFilter = item.daysLeft <= 0;
     } else if (filterStatus === 'healthy') {
       matchesFilter = item.daysLeft > 7;
-    } // else 'all' -> matchesFilter stays true
+    }
 
-    // Supplier filter
     const matchesSupplier = filterSupplier === 'all' || item.supplier === filterSupplier;
 
-    // ✅ Slow moving filter
     let matchesSlow = true;
     if (filterSlow) {
       matchesSlow = item.daysLeft > 30 && item.stock > 15;
@@ -880,10 +964,7 @@ function Inventory({
             ></div>
           </div>
           <small style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>
-            {planName === 'FREE_TRIAL' ? 'Free Trial' : 
-             planName === 'PROFESSIONAL' ? 'Professional' : 
-             planName === 'BASIC' ? 'Basic' : 
-             planName === 'ENTERPRISE' ? 'Enterprise' : planName}
+            {planNameDisplay}
           </small>
         </div>
         
@@ -929,7 +1010,7 @@ function Inventory({
         </div>
       </div>
 
-      {/* ✅ ALERT BAR - Low Stock & Near Expiry Items */}
+      {/* Alert Bar */}
       <AlertBar 
         inventory={inventory}
         onFlashSale={handleFlashSale}
@@ -1060,7 +1141,7 @@ function Inventory({
         </div>
       )}
 
-      {/* ✅ Bulk Actions Bar */}
+      {/* Bulk Actions Bar */}
       {selectedItems.length > 0 && (
         <div className="bulk-actions-bar">
           <span className="bulk-selected">{selectedItems.length} items selected</span>
@@ -1102,9 +1183,7 @@ function Inventory({
         </div>
       )}
 
-      {/* ============================================================
-          INVENTORY TABLE - IMPROVED DESIGN
-          ============================================================ */}
+      {/* Inventory Table */}
       <div className="inventory-table-container">
         <table className="inventory-table">
           <thead>
@@ -1133,13 +1212,11 @@ function Inventory({
           </thead>
           <tbody>
             {filteredInventory.map(item => {
-              // Determine row class
               let rowClass = 'row-good';
               if (item.daysLeft <= 0) rowClass = 'row-expired';
               else if (item.daysLeft <= 3) rowClass = 'row-critical';
               else if (item.daysLeft <= 7) rowClass = 'row-warning';
 
-              // Stock badge
               let stockClass = '';
               let stockDisplay = `${item.stock} units`;
               if (item.stock <= 0) {
@@ -1149,7 +1226,6 @@ function Inventory({
                 stockClass = 'low';
               }
 
-              // Days left display
               let daysClass = 'good';
               let daysDisplay = `${item.daysLeft} days`;
               if (item.daysLeft <= 0) {
@@ -1161,7 +1237,6 @@ function Inventory({
                 daysClass = 'warning';
               }
 
-              // Status badge
               let statusClass = 'good';
               let statusText = 'Healthy';
               if (item.daysLeft <= 0) {
@@ -1192,128 +1267,54 @@ function Inventory({
                   </td>
                   <td>
                     <span className="product-name">{item.name}</span>
-                    
-                    {/* 🔥 Flash Sale Discount Badge */}
                     {item.flashSaleActive && item.flashSaleDiscount && (
-                      <span 
-                        className="discount-badge"
-                        data-discount={item.flashSaleDiscount}
-                      >
+                      <span className="discount-badge" data-discount={item.flashSaleDiscount}>
                         🔥 {item.flashSaleDiscount}
                       </span>
                     )}
-                    
-                    {/* ⚠️ Low Stock Badge */}
                     {item.stock <= item.lowStockThreshold && item.stock > 0 && (
-                      <span className="low-stock-badge">
-                        ⚠️ Low Stock
-                      </span>
+                      <span className="low-stock-badge">⚠️ Low Stock</span>
                     )}
                   </td>
-                  
                   <td>
                     <code className="batch-code">{item.batch}</code>
                   </td>
                   <td>
-                    <span 
-                      className="supplier-link"
-                      onClick={() => handleSupplierClick(item.supplier)}
-                    >
+                    <span className="supplier-link" onClick={() => handleSupplierClick(item.supplier)}>
                       {item.supplier}
                     </span>
                   </td>
                   <td>
-                    <span className={`stock-badge ${stockClass}`}>
-                      {stockDisplay}
-                    </span>
+                    <span className={`stock-badge ${stockClass}`}>{stockDisplay}</span>
                   </td>
                   <td>
-                    <span className={`days-left ${daysClass}`}>
-                      {daysDisplay}
-                    </span>
+                    <span className={`days-left ${daysClass}`}>{daysDisplay}</span>
                   </td>
                   <td>
-                    <span className={`status-badge ${statusClass}`}>
-                      {statusText}
-                    </span>
+                    <span className={`status-badge ${statusClass}`}>{statusText}</span>
                   </td>
                   <td>
                     <div className="action-buttons">
-                      {/* 🔥 Flash Sale - Only for near expiry (1-7 days) */}
                       {item.daysLeft > 0 && item.daysLeft <= 7 && (
-                        <button 
-                          className="action-btn flash" 
-                          onClick={() => handleFlashSale(item.id)}
-                          disabled={actionLoading === item.id}
-                          title="Apply flash sale discount"
-                        >
-                          {actionLoading === item.id ? (
-                            <i className="fas fa-spinner fa-pulse"></i>
-                          ) : (
-                            <i className="fas fa-tags"></i>
-                          )}
-                          Flash
+                        <button className="action-btn flash" onClick={() => handleFlashSale(item.id)} disabled={actionLoading === item.id}>
+                          {actionLoading === item.id ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fas fa-tags"></i>} Flash
                         </button>
                       )}
-
-                      {/* 📦 Order Now - Only for low stock */}
                       {item.stock <= item.lowStockThreshold && item.stock > 0 && (
-                        <button 
-                          className="action-btn order" 
-                          onClick={() => handleOrderNow(item.id)}
-                          disabled={actionLoading === item.id}
-                          title="Order more stock"
-                        >
-                          {actionLoading === item.id ? (
-                            <i className="fas fa-spinner fa-pulse"></i>
-                          ) : (
-                            <i className="fas fa-shopping-cart"></i>
-                          )}
-                          Order
+                        <button className="action-btn order" onClick={() => handleOrderNow(item.id)} disabled={actionLoading === item.id}>
+                          {actionLoading === item.id ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fas fa-shopping-cart"></i>} Order
                         </button>
                       )}
-
-                      {/* 🚚 Return - For near expiry or expired */}
                       {item.daysLeft <= 7 && (
-                        <button 
-                          className="action-btn return" 
-                          onClick={() => handleReturnToSupplier(item.id)}
-                          disabled={actionLoading === item.id}
-                          title="Return to supplier"
-                        >
-                          {actionLoading === item.id ? (
-                            <i className="fas fa-spinner fa-pulse"></i>
-                          ) : (
-                            <i className="fas fa-undo-alt"></i>
-                          )}
-                          Return
+                        <button className="action-btn return" onClick={() => handleReturnToSupplier(item.id)} disabled={actionLoading === item.id}>
+                          {actionLoading === item.id ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fas fa-undo-alt"></i>} Return
                         </button>
                       )}
-
-                      {/* ✏️ Edit - Always visible */}
-                      <button 
-                        className="action-btn edit" 
-                        onClick={() => {
-                          setSelectedProduct(item);
-                          setShowEditModal(true);
-                        }}
-                        title="Edit product"
-                      >
+                      <button className="action-btn edit" onClick={() => { setSelectedProduct(item); setShowEditModal(true); }}>
                         <i className="fas fa-edit"></i>
                       </button>
-
-                      {/* 🗑️ Delete - Always visible */}
-                      <button 
-                        className="action-btn delete" 
-                        onClick={() => handleDeleteProduct(item.id)}
-                        disabled={actionLoading === item.id}
-                        title="Delete product"
-                      >
-                        {actionLoading === item.id ? (
-                          <i className="fas fa-spinner fa-pulse"></i>
-                        ) : (
-                          <i className="fas fa-trash"></i>
-                        )}
+                      <button className="action-btn delete" onClick={() => handleDeleteProduct(item.id)} disabled={actionLoading === item.id}>
+                        {actionLoading === item.id ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fas fa-trash"></i>}
                       </button>
                     </div>
                   </td>
@@ -1327,13 +1328,9 @@ function Inventory({
             <i className="fas fa-box-open"></i>
             <p>No products found</p>
             {canAdd ? (
-              <button className="btn-primary" onClick={() => setShowScanner(true)}>
-                Add your first product
-              </button>
+              <button className="btn-primary" onClick={() => setShowScanner(true)}>Add your first product</button>
             ) : (
-              <button className="btn-primary" onClick={() => window.location.href = '/billing'}>
-                Upgrade to Add Products
-              </button>
+              <button className="btn-primary" onClick={() => window.location.href = '/billing'}>Upgrade to Add Products</button>
             )}
           </div>
         )}
@@ -1347,10 +1344,7 @@ function Inventory({
               <h2>Edit Product</h2>
               <button className="modal-close" onClick={() => setShowEditModal(false)}>✕</button>
             </div>
-            <form className="modal-form" onSubmit={(e) => {
-              e.preventDefault();
-              handleEditProduct(selectedProduct);
-            }}>
+            <form className="modal-form" onSubmit={(e) => { e.preventDefault(); handleEditProduct(selectedProduct); }}>
               <div className="form-group">
                 <label>Product Name</label>
                 <input type="text" value={selectedProduct.name} onChange={(e) => setSelectedProduct({...selectedProduct, name: e.target.value})} required />
@@ -1396,7 +1390,7 @@ function Inventory({
         </div>
       )}
 
-      {/* Product Name Modal */}
+      {/* Modals */}
       <ProductNameModal
         isOpen={showNamePrompt}
         title={namePromptConfig.title}
@@ -1406,7 +1400,6 @@ function Inventory({
         onCancel={handleNameCancel}
       />
 
-      {/* Supplier Prompt Modal */}
       <SupplierPromptModal
         isOpen={showSupplierPrompt}
         title={supplierPromptConfig.title}
