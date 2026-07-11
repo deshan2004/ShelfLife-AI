@@ -168,35 +168,35 @@ function Inventory({
   const [preSelectedSupplier, setPreSelectedSupplier] = useState('')
   const [actionLoading, setActionLoading] = useState(null)
 
-  // Auto-Flash All State
+  // ✅ Auto-Flash All State
   const [autoFlashing, setAutoFlashing] = useState(false);
   const [flashItems, setFlashItems] = useState([]);
   const [showFlashConfirm, setShowFlashConfirm] = useState(false);
 
-  // Order All Low Stock State
+  // ✅ Order All Low Stock State
   const [orderingLowStock, setOrderingLowStock] = useState(false);
   const [showOrderAllConfirm, setShowOrderAllConfirm] = useState(false);
   const [orderAllItems, setOrderAllItems] = useState([]);
 
-  // Supplier Notification State
+  // ✅ Supplier Notification State
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [notificationProduct, setNotificationProduct] = useState(null);
   const [isNotificationSending, setIsNotificationSending] = useState(false);
 
-  // Order Modal States
+  // ✅ Order Modal States
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [orderProduct, setOrderProduct] = useState(null);
 
-  // Bulk Actions States
+  // ✅ Bulk Actions States
   const [selectedItems, setSelectedItems] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
 
-  // Product Name Modal States
+  // ✅ Product Name Modal States
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [namePromptConfig, setNamePromptConfig] = useState({ title: '', message: '', defaultValue: '' });
   const [namePromptResolve, setNamePromptResolve] = useState(null);
 
-  // Supplier Prompt Modal States
+  // ✅ Supplier Prompt Modal States
   const [showSupplierPrompt, setShowSupplierPrompt] = useState(false);
   const [supplierPromptConfig, setSupplierPromptConfig] = useState({ title: '', message: '', suppliers: [], defaultSupplier: '' });
   const [supplierPromptResolve, setSupplierPromptResolve] = useState(null);
@@ -222,7 +222,7 @@ function Inventory({
     if (user?.uid) loadSuppliers();
   }, [user]);
 
-  // Handle navigation state for pre-selected supplier
+  // ✅ Handle navigation state for pre-selected supplier
   useEffect(() => {
     if (location.state?.supplier) {
       setPreSelectedSupplier(location.state.supplier);
@@ -230,7 +230,7 @@ function Inventory({
     }
   }, [location]);
 
-  // Handle filter from analytics
+  // ✅ Handle filter from analytics
   useEffect(() => {
     const filterType = localStorage.getItem('shelflife_filter_type');
     const filterValue = localStorage.getItem('shelflife_filter_value');
@@ -305,7 +305,7 @@ function Inventory({
   };
 
   // ============================================================
-  // HANDLE ADD PRODUCT
+  // ✅ HANDLE ADD PRODUCT
   // ============================================================
   const handleAddProduct = async (productData) => {
     let productName = productData.name;
@@ -381,7 +381,7 @@ function Inventory({
   };
 
   // ============================================================
-  // HANDLE SCAN (Barcode + OCR + MOBILE)
+  // ✅ HANDLE SCAN (Barcode + OCR + MOBILE)
   // ============================================================
   const handleScan = async (scanData) => {
     console.log('📷 Scan data received:', scanData);
@@ -464,7 +464,7 @@ function Inventory({
   };
 
   // ============================================================
-  // FLASH SALE FUNCTIONS
+  // 🔥 FLASH SALE FUNCTIONS
   // ============================================================
   const handleFlashSale = async (productId) => {
     const product = inventory.find(p => p.id === productId);
@@ -606,7 +606,7 @@ function Inventory({
   };
 
   // ============================================================
-  // ORDER FUNCTIONS
+  // 📦 ORDER FUNCTIONS
   // ============================================================
   const handleOrderAllLowStock = () => {
     const lowStockList = inventory.filter(item => item.stock > 0 && item.stock <= (item.lowStockThreshold || 10) && item.status !== 'sold_out');
@@ -718,7 +718,7 @@ function Inventory({
   };
 
   // ============================================================
-  // RETURN TO SUPPLIER
+  // 🚚 RETURN TO SUPPLIER
   // ============================================================
   const handleReturnToSupplier = async (productId) => {
     const product = inventory.find(p => p.id === productId);
@@ -777,7 +777,7 @@ function Inventory({
   };
 
   // ============================================================
-  // NOTIFY SUPPLIER
+  // 📧 NOTIFY SUPPLIER
   // ============================================================
   const handleNotifySupplier = (product) => {
     setNotificationProduct(product);
@@ -815,7 +815,7 @@ function Inventory({
   };
 
   // ============================================================
-  // UPDATE ORDER STATUS
+  // 📦 UPDATE ORDER STATUS
   // ============================================================
   const handleUpdateOrderStatus = async (productId, newStatus) => {
     const product = inventory.find(p => p.id === productId);
@@ -841,7 +841,7 @@ function Inventory({
   };
 
   // ============================================================
-  // DELETE PRODUCT
+  // 🗑️ DELETE PRODUCT
   // ============================================================
   const handleDeleteProduct = async (productId) => {
     const product = inventory.find(p => p.id === productId);
@@ -866,7 +866,7 @@ function Inventory({
   };
 
   // ============================================================
-  // EDIT PRODUCT
+  // ✏️ EDIT PRODUCT
   // ============================================================
   const handleEditProduct = async (updatedProduct) => {
     try {
@@ -893,14 +893,14 @@ function Inventory({
   };
 
   // ============================================================
-  // SUPPLIER CLICK
+  // 🏷️ SUPPLIER CLICK
   // ============================================================
   const handleSupplierClick = (supplierName) => {
     navigate('/suppliers', { state: { supplier: supplierName } });
   };
 
   // ============================================================
-  // BULK ACTIONS
+  // ✅ BULK ACTIONS
   // ============================================================
   const toggleItemSelection = (itemId) => {
     setSelectedItems(prev => prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]);
@@ -961,7 +961,7 @@ function Inventory({
   };
 
   // ============================================================
-  // FILTERED INVENTORY
+  // ✅ FILTERED INVENTORY
   // ============================================================
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -994,7 +994,7 @@ function Inventory({
   const pendingOrders = inventory.filter(item => item.orderStatus === 'ordered' || item.orderStatus === 'pending');
 
   // ============================================================
-  // RENDER
+  // ✅ RENDER
   // ============================================================
   if (loading) {
     return (
@@ -1149,7 +1149,7 @@ function Inventory({
       <AlertBar inventory={inventory} onFlashSale={handleFlashSale} onOrderNow={handleOrderNow} actionLoading={actionLoading} />
 
       {/* ============================================================
-          SCANNER SECTION - UPDATED WITH BEAUTIFUL UI
+          SCANNER SECTION - BEAUTIFUL CARD UI
           ============================================================ */}
       {showScanner && !scanType && (
         <div className="scanner-section">
@@ -1158,7 +1158,6 @@ function Inventory({
               <h3><i className="fas fa-qrcode"></i> Add Product</h3>
               <p>Choose how you want to scan your product</p>
             </div>
-            {/* ✅ Beautiful Close Button */}
             <button className="scanner-close-btn" onClick={() => setShowScanner(false)}>
               <i className="fas fa-times"></i>
             </button>
@@ -1183,7 +1182,7 @@ function Inventory({
               </div>
             </div>
 
-            {/* OCR Scanner - Purple (BETA removed) */}
+            {/* OCR Scanner - Purple */}
             <div 
               className={`scanner-method-card ocr-card ${!canAdd ? 'disabled' : ''}`}
               onClick={() => canAdd && setScanType('ocr')}
@@ -1323,19 +1322,23 @@ function Inventory({
         </div>
       )}
 
-      {/* Inventory Table */}
+      {/* ============================================================
+          INVENTORY TABLE - MOBILE FRIENDLY
+          ============================================================ */}
       <div className="inventory-table-container">
         <table className="inventory-table">
           <thead>
             <tr>
-              <th style={{ width: '40px' }}><input type="checkbox" checked={selectAll} onChange={toggleSelectAll} style={{ width: '16px', height: '16px', accentColor: '#39e75f', cursor: 'pointer' }} /></th>
+              <th style={{ width: '40px' }}>
+                <input type="checkbox" checked={selectAll} onChange={toggleSelectAll} style={{ width: '16px', height: '16px', accentColor: '#39e75f', cursor: 'pointer' }} />
+              </th>
               <th>Product</th>
-              <th>Batch</th>
+              <th className="hide-mobile">Batch</th>
               <th>Supplier</th>
               <th>Stock</th>
               <th>Expiry</th>
               <th>Status</th>
-              <th style={{ textAlign: 'center', minWidth: '340px' }}>Actions</th>
+              <th style={{ textAlign: 'center', minWidth: '200px' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1366,45 +1369,63 @@ function Inventory({
 
               return (
                 <tr key={item.id} className={rowClass}>
-                  <td><input type="checkbox" checked={selectedItems.includes(item.id)} onChange={() => toggleItemSelection(item.id)} style={{ width: '16px', height: '16px', accentColor: '#39e75f', cursor: 'pointer' }} /></td>
+                  <td>
+                    <input type="checkbox" checked={selectedItems.includes(item.id)} onChange={() => toggleItemSelection(item.id)} style={{ width: '16px', height: '16px', accentColor: '#39e75f', cursor: 'pointer' }} />
+                  </td>
                   <td>
                     <span className="product-name">{item.name}</span>
                     {item.flashSaleActive && item.flashSaleDiscount && (<span className="discount-badge" data-discount={item.flashSaleDiscount}>🔥 {item.flashSaleDiscount}</span>)}
-                    {item.stock <= item.lowStockThreshold && item.stock > 0 && (<span className="low-stock-badge">⚠️ Low Stock</span>)}
-                    {item.status === 'sold_out' && (<span className="sold-out-badge">✅ Sold Out</span>)}
+                    {item.stock <= item.lowStockThreshold && item.stock > 0 && (<span className="low-stock-badge">⚠️ Low</span>)}
+                    {item.status === 'sold_out' && (<span className="sold-out-badge">✅ Sold</span>)}
                   </td>
-                  <td><code className="batch-code">{item.batch}</code></td>
-                  <td><span className="supplier-link" onClick={() => handleSupplierClick(item.supplier)}>{item.supplier}</span></td>
-                  <td><span className={`stock-badge ${stockClass}`}>{stockDisplay}</span></td>
-                  <td><span className={`days-left ${daysClass}`}>{daysDisplay}</span></td>
-                  <td><span className={`status-badge ${statusClass}`}>{statusText}</span></td>
+                  <td className="hide-mobile">
+                    <code className="batch-code">{item.batch}</code>
+                  </td>
+                  <td>
+                    <span className="supplier-link" onClick={() => handleSupplierClick(item.supplier)}>
+                      {item.supplier}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`stock-badge ${stockClass}`}>{stockDisplay}</span>
+                  </td>
+                  <td>
+                    <span className={`days-left ${daysClass}`}>{daysDisplay}</span>
+                  </td>
+                  <td>
+                    <span className={`status-badge ${statusClass}`}>{statusText}</span>
+                  </td>
                   <td>
                     <div className="action-buttons">
                       {/* Flash Sale */}
                       {item.daysLeft > 0 && item.daysLeft <= 7 && item.stock > 0 && item.status !== 'sold_out' && (
                         <button className="action-btn flash" onClick={() => handleFlashSale(item.id)} disabled={actionLoading === item.id}>
-                          {actionLoading === item.id ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fas fa-tags"></i>} Flash
+                          {actionLoading === item.id ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fas fa-tags"></i>}
+                          <span className="action-label">Flash</span>
                         </button>
                       )}
 
                       {/* Order Now */}
                       {item.stock <= item.lowStockThreshold && item.stock > 0 && item.status !== 'sold_out' && (
                         <button className="action-btn order" onClick={() => handleOrderNow(item.id)} disabled={actionLoading === item.id}>
-                          {actionLoading === item.id ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fas fa-shopping-cart"></i>} Order
+                          {actionLoading === item.id ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fas fa-shopping-cart"></i>}
+                          <span className="action-label">Order</span>
                         </button>
                       )}
 
                       {/* Notify Supplier */}
                       {(item.stock <= item.lowStockThreshold || item.daysLeft <= 7) && item.stock > 0 && item.status !== 'sold_out' && (
                         <button className="action-btn notify" onClick={() => handleNotifySupplier(item)}>
-                          <i className="fas fa-envelope"></i> Notify
+                          <i className="fas fa-envelope"></i>
+                          <span className="action-label">Notify</span>
                         </button>
                       )}
 
                       {/* Return */}
                       {item.daysLeft <= 7 && (
                         <button className="action-btn return" onClick={() => handleReturnToSupplier(item.id)} disabled={actionLoading === item.id}>
-                          {actionLoading === item.id ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fas fa-undo-alt"></i>} Return
+                          {actionLoading === item.id ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fas fa-undo-alt"></i>}
+                          <span className="action-label">Return</span>
                         </button>
                       )}
 
