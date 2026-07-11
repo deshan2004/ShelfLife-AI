@@ -1,9 +1,9 @@
 // src/services/apiService.js
 
-// ✅ Dynamic API URL - Works everywhere (local & Vercel)
-const API_URL = import.meta.env.VITE_API_URL || '';
+// ✅ FIXED: Hardcoded Vercel URL for admin
+const API_URL = 'https://shelf-life-ai.vercel.app';
 
-console.log(`🔧 API URL: ${API_URL || 'Relative path (same domain)'}`);
+console.log(`🔧 API URL: ${API_URL}`);
 
 export const api = {
   // ===== HEALTH =====
