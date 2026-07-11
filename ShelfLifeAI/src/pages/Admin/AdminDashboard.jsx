@@ -1,5 +1,6 @@
 // src/pages/Admin/AdminDashboard.jsx
 import { useState, useEffect } from 'react'
+import { api } from '../../services/apiService'
 import './Admin.css'
 
 function AdminDashboard({ admin }) {
@@ -20,9 +21,7 @@ function AdminDashboard({ admin }) {
   const loadStats = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:5000/api/admin/stats')
-      if (!response.ok) throw new Error('Failed to fetch stats')
-      const data = await response.json()
+      const data = await api.getAdminStats()
       setStats(data)
     } catch (error) {
       console.error('Error loading stats:', error)
@@ -41,14 +40,9 @@ function AdminDashboard({ admin }) {
     if (!window.confirm('Add test data to the database? This will create 3 test users with inventory and subscriptions.')) return
     try {
       setSeedLoading(true)
-      const response = await fetch('http://localhost:5000/api/seed/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminUid: admin?.uid })
-      })
-      const result = await response.json()
+      const result = await api.seedData()
       if (result.success) {
-        alert(`✅ Test data added!\n\n${result.users} users created\n${result.subscriptions} subscriptions\nInventory added\n\nRefresh to see data.`)
+        alert(`✅ Test data added!\n\n${result.users} users created\n\nRefresh to see data.`)
         await loadStats()
       } else {
         alert('❌ Failed to add test data: ' + result.message)

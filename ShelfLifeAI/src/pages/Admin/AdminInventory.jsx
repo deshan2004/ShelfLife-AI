@@ -1,8 +1,9 @@
-// src/pages/Admin/AdminInventory.jsx (Updated - Grouped by Shop)
+// src/pages/Admin/AdminInventory.jsx
 import { useState, useEffect } from 'react'
+import { api } from '../../services/apiService'
 import './Admin.css'
 
-function AdminInventory() {
+function AdminInventory({ admin }) {
   const [shops, setShops] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
@@ -15,16 +16,9 @@ function AdminInventory() {
   const loadInventory = async () => {
     try {
       setLoading(true)
-      // Use grouped endpoint
-      const response = await fetch('http://localhost:5000/api/admin/inventory/by-shop')
-      if (!response.ok) throw new Error('Failed to fetch inventory')
-      const data = await response.json()
-      
-      // Filter out shops with no products (optional)
+      const data = await api.getAdminInventoryByShop()
       const filtered = data.filter(shop => shop.products.length > 0)
       setShops(filtered)
-      
-      // Auto-expand first shop
       if (filtered.length > 0) {
         setExpandedShops({ [filtered[0].shopId]: true })
       }

@@ -191,5 +191,104 @@ export const api = {
     if (!userId) throw new Error('User ID is required');
     const response = await fetch(`${API_URL}/api/usage/${userId}/${type}`);
     return response.json();
+  },
+
+  // ===== ADMIN =====
+  async getAdminUsers() {
+    const response = await fetch(`${API_URL}/api/admin/users`);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch users');
+    }
+    return response.json();
+  },
+
+  async getAdminSubscriptions() {
+    const response = await fetch(`${API_URL}/api/admin/subscriptions`);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch subscriptions');
+    }
+    return response.json();
+  },
+
+  async getAdminStats() {
+    const response = await fetch(`${API_URL}/api/admin/stats`);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch stats');
+    }
+    return response.json();
+  },
+
+  async getAdminInventoryByShop() {
+    const response = await fetch(`${API_URL}/api/admin/inventory/by-shop`);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch inventory');
+    }
+    return response.json();
+  },
+
+  async updateUserRole(userId, role) {
+    const response = await fetch(`${API_URL}/api/admin/users/${userId}/role`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role })
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update user role');
+    }
+    return response.json();
+  },
+
+  async deleteUser(userId) {
+    const response = await fetch(`${API_URL}/api/admin/users/${userId}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete user');
+    }
+    return response.json();
+  },
+
+  async extendTrial(userId, days) {
+    const response = await fetch(`${API_URL}/api/admin/subscriptions/${userId}/extend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ days })
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to extend trial');
+    }
+    return response.json();
+  },
+
+  async adminUpgrade(userId, planId) {
+    const response = await fetch(`${API_URL}/api/admin/subscriptions/${userId}/upgrade`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ planId })
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to upgrade user');
+    }
+    return response.json();
+  },
+
+  async seedData() {
+    const response = await fetch(`${API_URL}/api/seed/data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to seed data');
+    }
+    return response.json();
   }
 };

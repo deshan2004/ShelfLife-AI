@@ -1,8 +1,9 @@
 // src/pages/Admin/AdminSubscriptions.jsx
 import { useState, useEffect } from 'react'
+import { api } from '../../services/apiService'
 import './Admin.css'
 
-function AdminSubscriptions() {
+function AdminSubscriptions({ admin }) {
   const [subscriptions, setSubscriptions] = useState([])
   const [users, setUsers] = useState([])
   const [selectedPlan, setSelectedPlan] = useState('all')
@@ -22,18 +23,11 @@ function AdminSubscriptions() {
   const loadSubscriptions = async () => {
     try {
       setLoading(true)
-      // Fetch users
-      const usersRes = await fetch('http://localhost:5000/api/admin/users')
-      if (!usersRes.ok) throw new Error('Failed to fetch users')
-      const usersData = await usersRes.json()
+      const usersData = await api.getAdminUsers()
+      const subsData = await api.getAdminSubscriptions()
+      
       setUsers(usersData)
-
-      // Fetch subscriptions
-      const subsRes = await fetch('http://localhost:5000/api/admin/subscriptions')
-      if (!subsRes.ok) throw new Error('Failed to fetch subscriptions')
-      const subsData = await subsRes.json()
-
-      // Combine with user info
+      
       const subscriptionsWithUsers = subsData.map(sub => ({
         ...sub,
         user: usersData.find(u => u.uid === sub.userId)
@@ -49,12 +43,7 @@ function AdminSubscriptions() {
 
   const handleExtendTrial = async (userId, days) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/subscriptions/${userId}/extend`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ days })
-      })
-      if (!response.ok) throw new Error('Failed to extend trial')
+      await api.extendTrial(userId, days)
       await loadSubscriptions()
       showToast(`Trial extended by ${days} days`)
     } catch (error) {
@@ -65,12 +54,7 @@ function AdminSubscriptions() {
 
   const handleUpgrade = async (userId, planId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/subscriptions/${userId}/upgrade`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId })
-      })
-      if (!response.ok) throw new Error('Failed to upgrade')
+      await api.adminUpgrade(userId, planId)
       await loadSubscriptions()
       showToast(`Upgraded to ${planId}`)
     } catch (error) {

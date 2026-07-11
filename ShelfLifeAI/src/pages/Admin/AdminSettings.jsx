@@ -18,7 +18,6 @@ function AdminSettings({ admin }) {
 
   const handleSave = async () => {
     setSaving(true)
-    // Save settings to localStorage (in production, to Firestore)
     localStorage.setItem('shelflife_admin_settings', JSON.stringify(settings))
     setTimeout(() => {
       setSaving(false)

@@ -1,8 +1,9 @@
 // src/pages/Admin/AdminUsers.jsx
 import { useState, useEffect } from 'react'
+import { api } from '../../services/apiService'
 import './Admin.css'
 
-function AdminUsers() {
+function AdminUsers({ admin }) {
   const [users, setUsers] = useState([])
   const [subscriptions, setSubscriptions] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -26,17 +27,11 @@ function AdminUsers() {
   const loadUsers = async () => {
     try {
       setLoading(true)
-      // Fetch users
-      const usersRes = await fetch('http://localhost:5000/api/admin/users')
-      if (!usersRes.ok) throw new Error('Failed to fetch users')
-      const usersData = await usersRes.json()
       
-      // Fetch subscriptions
-      const subsRes = await fetch('http://localhost:5000/api/admin/subscriptions')
-      if (!subsRes.ok) throw new Error('Failed to fetch subscriptions')
-      const subsData = await subsRes.json()
+      // ✅ Using apiService - No more hardcoded localhost!
+      const usersData = await api.getAdminUsers()
+      const subsData = await api.getAdminSubscriptions()
       
-      // Combine data
       const usersWithSubs = usersData.map(user => ({
         ...user,
         subscription: subsData.find(s => s.userId === user.uid) || { status: 'none', planId: 'None' }
@@ -54,12 +49,7 @@ function AdminUsers() {
 
   const handleUpdateUserRole = async (userId, newRole) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/users/${userId}/role`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: newRole })
-      })
-      if (!response.ok) throw new Error('Failed to update role')
+      await api.updateUserRole(userId, newRole)
       await loadUsers()
       showToast(`User role updated to ${newRole}`)
     } catch (error) {
@@ -70,8 +60,6 @@ function AdminUsers() {
 
   const handleUpdateUser = async () => {
     try {
-      // In a real app, you'd have an update endpoint
-      // For now, we just update local state and show success
       showToast('User updated successfully (demo)')
       setShowEditModal(false)
       setShowUserModal(false)
@@ -85,10 +73,7 @@ function AdminUsers() {
   const handleDeleteUser = async (userId) => {
     if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) return
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/users/${userId}`, {
-        method: 'DELETE'
-      })
-      if (!response.ok) throw new Error('Failed to delete user')
+      await api.deleteUser(userId)
       await loadUsers()
       showToast('User deleted successfully')
     } catch (error) {
@@ -99,24 +84,10 @@ function AdminUsers() {
 
   const handleUpdateSubscription = async (userId, planId, status, trialEndDays) => {
     try {
-      let endpoint = 'http://localhost:5000/api/admin/subscriptions/' + userId
       if (status === 'trial_active' && trialEndDays) {
-        endpoint += '/extend'
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ days: trialEndDays })
-        })
-        if (!response.ok) throw new Error('Failed to extend trial')
+        await api.extendTrial(userId, trialEndDays)
       } else {
-        // Upgrade plan
-        endpoint += '/upgrade'
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ planId })
-        })
-        if (!response.ok) throw new Error('Failed to upgrade plan')
+        await api.adminUpgrade(userId, planId)
       }
       await loadUsers()
       showToast(`Subscription updated to ${planId}`)
@@ -289,7 +260,7 @@ function AdminUsers() {
         )}
       </div>
 
-      {/* User Detail Modal */}
+      {/* User Detail Modal - Same as before */}
       {showUserModal && selectedUser && (
         <div className="admin-modal-overlay" onClick={() => setShowUserModal(false)}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
