@@ -168,35 +168,35 @@ function Inventory({
   const [preSelectedSupplier, setPreSelectedSupplier] = useState('')
   const [actionLoading, setActionLoading] = useState(null)
 
-  // ✅ Auto-Flash All State
+  // Auto-Flash All State
   const [autoFlashing, setAutoFlashing] = useState(false);
   const [flashItems, setFlashItems] = useState([]);
   const [showFlashConfirm, setShowFlashConfirm] = useState(false);
 
-  // ✅ Order All Low Stock State
+  // Order All Low Stock State
   const [orderingLowStock, setOrderingLowStock] = useState(false);
   const [showOrderAllConfirm, setShowOrderAllConfirm] = useState(false);
   const [orderAllItems, setOrderAllItems] = useState([]);
 
-  // ✅ Supplier Notification State
+  // Supplier Notification State
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [notificationProduct, setNotificationProduct] = useState(null);
   const [isNotificationSending, setIsNotificationSending] = useState(false);
 
-  // ✅ Order Modal States
+  // Order Modal States
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [orderProduct, setOrderProduct] = useState(null);
 
-  // ✅ Bulk Actions States
+  // Bulk Actions States
   const [selectedItems, setSelectedItems] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
 
-  // ✅ Product Name Modal States
+  // Product Name Modal States
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [namePromptConfig, setNamePromptConfig] = useState({ title: '', message: '', defaultValue: '' });
   const [namePromptResolve, setNamePromptResolve] = useState(null);
 
-  // ✅ Supplier Prompt Modal States
+  // Supplier Prompt Modal States
   const [showSupplierPrompt, setShowSupplierPrompt] = useState(false);
   const [supplierPromptConfig, setSupplierPromptConfig] = useState({ title: '', message: '', suppliers: [], defaultSupplier: '' });
   const [supplierPromptResolve, setSupplierPromptResolve] = useState(null);
@@ -222,7 +222,7 @@ function Inventory({
     if (user?.uid) loadSuppliers();
   }, [user]);
 
-  // ✅ Handle navigation state for pre-selected supplier
+  // Handle navigation state for pre-selected supplier
   useEffect(() => {
     if (location.state?.supplier) {
       setPreSelectedSupplier(location.state.supplier);
@@ -230,7 +230,7 @@ function Inventory({
     }
   }, [location]);
 
-  // ✅ Handle filter from analytics
+  // Handle filter from analytics
   useEffect(() => {
     const filterType = localStorage.getItem('shelflife_filter_type');
     const filterValue = localStorage.getItem('shelflife_filter_value');
@@ -305,7 +305,7 @@ function Inventory({
   };
 
   // ============================================================
-  // ✅ HANDLE ADD PRODUCT
+  // HANDLE ADD PRODUCT
   // ============================================================
   const handleAddProduct = async (productData) => {
     let productName = productData.name;
@@ -381,7 +381,7 @@ function Inventory({
   };
 
   // ============================================================
-  // ✅ HANDLE SCAN (Barcode + OCR + MOBILE)
+  // HANDLE SCAN (Barcode + OCR + MOBILE)
   // ============================================================
   const handleScan = async (scanData) => {
     console.log('📷 Scan data received:', scanData);
@@ -464,7 +464,7 @@ function Inventory({
   };
 
   // ============================================================
-  // 🔥 FLASH SALE FUNCTIONS
+  // FLASH SALE FUNCTIONS
   // ============================================================
   const handleFlashSale = async (productId) => {
     const product = inventory.find(p => p.id === productId);
@@ -606,7 +606,7 @@ function Inventory({
   };
 
   // ============================================================
-  // 📦 ORDER FUNCTIONS
+  // ORDER FUNCTIONS
   // ============================================================
   const handleOrderAllLowStock = () => {
     const lowStockList = inventory.filter(item => item.stock > 0 && item.stock <= (item.lowStockThreshold || 10) && item.status !== 'sold_out');
@@ -718,7 +718,7 @@ function Inventory({
   };
 
   // ============================================================
-  // 🚚 RETURN TO SUPPLIER
+  // RETURN TO SUPPLIER
   // ============================================================
   const handleReturnToSupplier = async (productId) => {
     const product = inventory.find(p => p.id === productId);
@@ -777,7 +777,7 @@ function Inventory({
   };
 
   // ============================================================
-  // 📧 NOTIFY SUPPLIER
+  // NOTIFY SUPPLIER
   // ============================================================
   const handleNotifySupplier = (product) => {
     setNotificationProduct(product);
@@ -815,7 +815,7 @@ function Inventory({
   };
 
   // ============================================================
-  // 📦 UPDATE ORDER STATUS
+  // UPDATE ORDER STATUS
   // ============================================================
   const handleUpdateOrderStatus = async (productId, newStatus) => {
     const product = inventory.find(p => p.id === productId);
@@ -841,7 +841,7 @@ function Inventory({
   };
 
   // ============================================================
-  // 🗑️ DELETE PRODUCT
+  // DELETE PRODUCT
   // ============================================================
   const handleDeleteProduct = async (productId) => {
     const product = inventory.find(p => p.id === productId);
@@ -866,7 +866,7 @@ function Inventory({
   };
 
   // ============================================================
-  // ✏️ EDIT PRODUCT
+  // EDIT PRODUCT
   // ============================================================
   const handleEditProduct = async (updatedProduct) => {
     try {
@@ -893,14 +893,14 @@ function Inventory({
   };
 
   // ============================================================
-  // 🏷️ SUPPLIER CLICK
+  // SUPPLIER CLICK
   // ============================================================
   const handleSupplierClick = (supplierName) => {
     navigate('/suppliers', { state: { supplier: supplierName } });
   };
 
   // ============================================================
-  // ✅ BULK ACTIONS
+  // BULK ACTIONS
   // ============================================================
   const toggleItemSelection = (itemId) => {
     setSelectedItems(prev => prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]);
@@ -961,7 +961,7 @@ function Inventory({
   };
 
   // ============================================================
-  // ✅ FILTERED INVENTORY
+  // FILTERED INVENTORY
   // ============================================================
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -994,7 +994,7 @@ function Inventory({
   const pendingOrders = inventory.filter(item => item.orderStatus === 'ordered' || item.orderStatus === 'pending');
 
   // ============================================================
-  // ✅ RENDER
+  // RENDER
   // ============================================================
   if (loading) {
     return (
@@ -1148,79 +1148,102 @@ function Inventory({
       {/* Alert Bar */}
       <AlertBar inventory={inventory} onFlashSale={handleFlashSale} onOrderNow={handleOrderNow} actionLoading={actionLoading} />
 
-      {/* Scanner Section */}
+      {/* ============================================================
+          SCANNER SECTION - UPDATED WITH BEAUTIFUL UI
+          ============================================================ */}
       {showScanner && !scanType && (
         <div className="scanner-section">
-          <div className="scanner-tabs">
-            <button 
-              className="scanner-tab" 
-              onClick={() => setScanType('barcode')} 
-              disabled={!canAdd}
-            >
-              <i className="fas fa-barcode"></i> Barcode Scanner
-            </button>
-            <button 
-              className="scanner-tab" 
-              onClick={() => setScanType('ocr')} 
-              disabled={!canAdd}
-              style={{ 
-                background: canAdd ? 'linear-gradient(135deg, var(--green-deep), var(--green-neon))' : 'var(--bg-raised)', 
-                color: canAdd ? '#030a03' : 'var(--text-muted)' 
-              }}
-            >
-              <i className="fas fa-eye"></i> OCR Scanner 
-              <span style={{ fontSize: '0.7rem', background: '#fff', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px' }}>
-                BETA
-              </span>
-            </button>
-            <button 
-              className="scanner-tab" 
-              onClick={() => setScanType('mobile')}
-              style={{
-                background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
-                color: '#ffffff'
-              }}
-            >
-              <i className="fas fa-mobile-alt"></i> Mobile Scanner
-              <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px' }}>
-                📱
-              </span>
-            </button>
-            <button className="scanner-close" onClick={() => setShowScanner(false)}>
+          <div className="scanner-header-section">
+            <div className="scanner-header-left">
+              <h3><i className="fas fa-qrcode"></i> Add Product</h3>
+              <p>Choose how you want to scan your product</p>
+            </div>
+            {/* ✅ Beautiful Close Button */}
+            <button className="scanner-close-btn" onClick={() => setShowScanner(false)}>
               <i className="fas fa-times"></i>
             </button>
           </div>
-          <div className="scanner-prompt">
-            <p>Choose a scanning method to add products</p>
+
+          <div className="scanner-methods-grid">
+            {/* Barcode Scanner - Green */}
+            <div 
+              className={`scanner-method-card barcode-card ${!canAdd ? 'disabled' : ''}`}
+              onClick={() => canAdd && setScanType('barcode')}
+            >
+              <div className="scanner-method-icon barcode">
+                <i className="fas fa-barcode"></i>
+              </div>
+              <div className="scanner-method-info">
+                <h4>Barcode Scanner</h4>
+                <p>Scan product barcodes using your camera</p>
+                <span className="scanner-method-tag">Auto-detect</span>
+              </div>
+              <div className="scanner-method-arrow">
+                <i className="fas fa-arrow-right"></i>
+              </div>
+            </div>
+
+            {/* OCR Scanner - Purple (BETA removed) */}
+            <div 
+              className={`scanner-method-card ocr-card ${!canAdd ? 'disabled' : ''}`}
+              onClick={() => canAdd && setScanType('ocr')}
+            >
+              <div className="scanner-method-icon ocr">
+                <i className="fas fa-eye"></i>
+              </div>
+              <div className="scanner-method-info">
+                <h4>OCR Scanner</h4>
+                <p>Read expiry dates directly from packaging</p>
+                <span className="scanner-method-tag">AI Powered</span>
+              </div>
+              <div className="scanner-method-arrow">
+                <i className="fas fa-arrow-right"></i>
+              </div>
+            </div>
+
+            {/* Mobile Scanner - Amber/Gold */}
+            <div 
+              className={`scanner-method-card mobile-card ${!canAdd ? 'disabled' : ''}`}
+              onClick={() => canAdd && setScanType('mobile')}
+            >
+              <div className="scanner-method-icon mobile">
+                <i className="fas fa-mobile-alt"></i>
+              </div>
+              <div className="scanner-method-info">
+                <h4>Mobile Scanner <span className="phone-badge">📱</span></h4>
+                <p>Use your phone camera to scan from anywhere</p>
+                <span className="scanner-method-tag">Wireless</span>
+              </div>
+              <div className="scanner-method-arrow">
+                <i className="fas fa-arrow-right"></i>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="scanner-footer-section">
             {preSelectedSupplier && (
-              <p style={{ color: 'var(--green-neon)', fontWeight: 'bold' }}>
-                📦 Adding product for: <strong>{preSelectedSupplier}</strong>
-              </p>
+              <div className="scanner-supplier-info">
+                <i className="fas fa-truck"></i>
+                <span>Adding product for: <strong>{preSelectedSupplier}</strong></span>
+              </div>
             )}
             {!canAdd && (
-              <p style={{ color: 'var(--red)', fontWeight: 'bold' }}>
-                ⚠️ Product limit reached ({inventory.length}/{productLimit}).
-                <button 
-                  onClick={() => window.location.href = '/billing'} 
-                  style={{ 
-                    background: 'var(--green-neon)', 
-                    border: 'none', 
-                    padding: '4px 12px', 
-                    borderRadius: '20px', 
-                    marginLeft: '8px', 
-                    cursor: 'pointer', 
-                    fontWeight: 'bold', 
-                    color: '#030a03' 
-                  }}
-                >
-                  Upgrade Now
-                </button>
-              </p>
+              <div className="scanner-limit-warning">
+                <i className="fas fa-exclamation-triangle"></i>
+                <span>Product limit reached ({inventory.length}/{productLimit}). </span>
+                <button onClick={() => window.location.href = '/billing'}>Upgrade Now</button>
+              </div>
             )}
             {canAdd && (
-              <small className="scan-limit-info">
-                {productLimit === Infinity ? 'Unlimited' : productLimit - inventory.length} product slots remaining
-              </small>
+              <div className="scanner-slots-info">
+                <i className="fas fa-boxes"></i>
+                <span>
+                  {productLimit === Infinity 
+                    ? '♾️ Unlimited slots available' 
+                    : `${productLimit - inventory.length} product slots remaining`}
+                </span>
+              </div>
             )}
           </div>
         </div>
