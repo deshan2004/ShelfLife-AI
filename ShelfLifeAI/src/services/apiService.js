@@ -4,25 +4,31 @@
 const getApiUrl = () => {
   // Development mode (localhost)
   if (import.meta.env.DEV) {
-    return import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    return 'http://localhost:5000';
   }
   
-  // Production mode (Vercel) - use environment variable
+  // Production mode (Vercel)
   if (import.meta.env.PROD) {
+    // Vercel environment variable එකෙන් API URL එක ගන්න
     const apiUrl = import.meta.env.VITE_API_URL;
-    if (apiUrl) {
+    
+    // Vercel Backend URL එක Set කරලා නැත්නම්, relative path use කරන්න
+    if (apiUrl && apiUrl !== '') {
       return apiUrl;
     }
-    // Fallback: relative path (if backend is on same domain)
+    
+    // Relative path - same domain එකේ backend තියෙනවා නම්
     return '';
   }
   
   return '';
 };
 
+// ✅ Global API URL
 const API_URL = getApiUrl();
 
-console.log(`🔧 API URL: ${API_URL || 'Relative path'}`);
+// ✅ Log API URL (Debugging සඳහා)
+console.log(`🔧 API URL: ${API_URL || 'Relative path (same domain)'}`);
 
 export const api = {
   // ===== HEALTH =====
