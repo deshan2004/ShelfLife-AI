@@ -83,7 +83,7 @@ function FlashConfirmModal({ isOpen, items, onConfirm, onCancel }) {
 }
 
 // ============================================================
-// ✅ ORDER ALL CONFIRM MODAL - Inline Component
+// ✅ ORDER ALL CONFIRM MODAL
 // ============================================================
 function OrderAllConfirmModal({ isOpen, items, onConfirm, onCancel }) {
   if (!isOpen || !items || items.length === 0) return null;
@@ -139,7 +139,7 @@ function OrderAllConfirmModal({ isOpen, items, onConfirm, onCancel }) {
 }
 
 // ============================================================
-// ✅ RETURN CONFIRM MODAL - Beautiful Custom Modal
+// ✅ RETURN CONFIRM MODAL - Custom Modal
 // ============================================================
 function ReturnConfirmModal({ isOpen, product, onConfirm, onCancel }) {
   const [quantity, setQuantity] = useState(0);
@@ -301,7 +301,7 @@ function Inventory({
   const location = useLocation();
 
   const [showScanner, setShowScanner] = useState(false)
-  const [scanType, setScanType] = useState(null) // 'barcode', 'ocr', 'mobile'
+  const [scanType, setScanType] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterSupplier, setFilterSupplier] = useState('all')
@@ -314,40 +314,26 @@ function Inventory({
   const [preSelectedSupplier, setPreSelectedSupplier] = useState('')
   const [actionLoading, setActionLoading] = useState(null)
 
-  // ✅ Auto-Flash All State
+  // State variables
   const [autoFlashing, setAutoFlashing] = useState(false);
   const [flashItems, setFlashItems] = useState([]);
   const [showFlashConfirm, setShowFlashConfirm] = useState(false);
-
-  // ✅ Order All Low Stock State
   const [orderingLowStock, setOrderingLowStock] = useState(false);
   const [showOrderAllConfirm, setShowOrderAllConfirm] = useState(false);
   const [orderAllItems, setOrderAllItems] = useState([]);
-
-  // ✅ Supplier Notification State
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [notificationProduct, setNotificationProduct] = useState(null);
   const [isNotificationSending, setIsNotificationSending] = useState(false);
-
-  // ✅ Order Modal States
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [orderProduct, setOrderProduct] = useState(null);
-
-  // ✅ Bulk Actions States
   const [selectedItems, setSelectedItems] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
-
-  // ✅ Product Name Modal States
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [namePromptConfig, setNamePromptConfig] = useState({ title: '', message: '', defaultValue: '' });
   const [namePromptResolve, setNamePromptResolve] = useState(null);
-
-  // ✅ Supplier Prompt Modal States
   const [showSupplierPrompt, setShowSupplierPrompt] = useState(false);
   const [supplierPromptConfig, setSupplierPromptConfig] = useState({ title: '', message: '', suppliers: [], defaultSupplier: '' });
   const [supplierPromptResolve, setSupplierPromptResolve] = useState(null);
-
-  // ✅ Return Modal States
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnProduct, setReturnProduct] = useState(null);
 
@@ -372,7 +358,6 @@ function Inventory({
     if (user?.uid) loadSuppliers();
   }, [user]);
 
-  // ✅ Handle navigation state for pre-selected supplier
   useEffect(() => {
     if (location.state?.supplier) {
       setPreSelectedSupplier(location.state.supplier);
@@ -380,7 +365,6 @@ function Inventory({
     }
   }, [location]);
 
-  // ✅ Handle filter from analytics
   useEffect(() => {
     const filterType = localStorage.getItem('shelflife_filter_type');
     const filterValue = localStorage.getItem('shelflife_filter_value');
@@ -455,7 +439,7 @@ function Inventory({
   };
 
   // ============================================================
-  // ✅ HANDLE ADD PRODUCT
+  // HANDLE ADD PRODUCT
   // ============================================================
   const handleAddProduct = async (productData) => {
     let productName = productData.name;
@@ -531,7 +515,7 @@ function Inventory({
   };
 
   // ============================================================
-  // ✅ HANDLE SCAN (Barcode + OCR + MOBILE)
+  // HANDLE SCAN
   // ============================================================
   const handleScan = async (scanData) => {
     console.log('📷 Scan data received:', scanData);
@@ -541,7 +525,6 @@ function Inventory({
       return;
     }
 
-    // --- BARCODE SCAN ---
     if (scanData.type === 'barcode') {
       const existingProduct = inventory.find(p => p.batch === scanData.value);
       if (existingProduct) {
@@ -573,10 +556,7 @@ function Inventory({
       });
       setShowScanner(false);
       setScanType(null);
-    }
-
-    // --- OCR SCAN ---
-    else if (scanData.type === 'ocr') {
+    } else if (scanData.type === 'ocr') {
       if (scanData.productData) {
         handleAddProduct(scanData.productData);
         setShowScanner(false);
@@ -614,13 +594,11 @@ function Inventory({
   };
 
   // ============================================================
-  // 🔥 FLASH SALE FUNCTIONS
+  // FLASH SALE FUNCTIONS
   // ============================================================
   const handleFlashSale = async (productId) => {
     const product = inventory.find(p => p.id === productId);
     if (!product) return;
-
-    // ✅ Use beautiful modal instead of window.confirm
     setFlashItems([product]);
     setShowFlashConfirm(true);
   };
@@ -765,7 +743,7 @@ function Inventory({
   };
 
   // ============================================================
-  // 📦 ORDER FUNCTIONS
+  // ORDER FUNCTIONS
   // ============================================================
   const handleOrderAllLowStock = () => {
     const lowStockList = inventory.filter(item => item.stock > 0 && item.stock <= (item.lowStockThreshold || 10) && item.status !== 'sold_out');
@@ -877,7 +855,7 @@ function Inventory({
   };
 
   // ============================================================
-  // 🚚 RETURN TO SUPPLIER - Custom Modal
+  // RETURN TO SUPPLIER - Custom Modal
   // ============================================================
   const handleReturnToSupplier = (productId) => {
     const product = inventory.find(p => p.id === productId);
@@ -933,7 +911,7 @@ function Inventory({
   };
 
   // ============================================================
-  // 📧 NOTIFY SUPPLIER
+  // NOTIFY SUPPLIER
   // ============================================================
   const handleNotifySupplier = (product) => {
     setNotificationProduct(product);
@@ -971,7 +949,7 @@ function Inventory({
   };
 
   // ============================================================
-  // 📦 UPDATE ORDER STATUS
+  // UPDATE ORDER STATUS
   // ============================================================
   const handleUpdateOrderStatus = async (productId, newStatus) => {
     const product = inventory.find(p => p.id === productId);
@@ -997,7 +975,7 @@ function Inventory({
   };
 
   // ============================================================
-  // 🗑️ DELETE PRODUCT
+  // DELETE PRODUCT
   // ============================================================
   const handleDeleteProduct = async (productId) => {
     const product = inventory.find(p => p.id === productId);
@@ -1022,7 +1000,7 @@ function Inventory({
   };
 
   // ============================================================
-  // ✏️ EDIT PRODUCT
+  // EDIT PRODUCT
   // ============================================================
   const handleEditProduct = async (updatedProduct) => {
     try {
@@ -1049,14 +1027,14 @@ function Inventory({
   };
 
   // ============================================================
-  // 🏷️ SUPPLIER CLICK
+  // SUPPLIER CLICK
   // ============================================================
   const handleSupplierClick = (supplierName) => {
     navigate('/suppliers', { state: { supplier: supplierName } });
   };
 
   // ============================================================
-  // ✅ BULK ACTIONS
+  // BULK ACTIONS
   // ============================================================
   const toggleItemSelection = (itemId) => {
     setSelectedItems(prev => prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]);
@@ -1104,9 +1082,12 @@ function Inventory({
   };
 
   // ============================================================
-  // ✅ FILTERED INVENTORY
+  // FILTERED INVENTORY - Avoid duplicates
   // ============================================================
-  const filteredInventory = inventory.filter(item => {
+  const filteredInventory = inventory.filter((item, index, self) => {
+    // Remove duplicates based on id
+    return index === self.findIndex(i => i.id === item.id);
+  }).filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.batch.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.supplier.toLowerCase().includes(searchTerm.toLowerCase());
@@ -1137,7 +1118,7 @@ function Inventory({
   const pendingOrders = inventory.filter(item => item.orderStatus === 'ordered' || item.orderStatus === 'pending');
 
   // ============================================================
-  // ✅ RENDER
+  // RENDER
   // ============================================================
   if (loading) {
     return (
@@ -1305,7 +1286,6 @@ function Inventory({
           </div>
 
           <div className="scanner-methods-grid">
-            {/* Barcode Scanner - Green */}
             <div 
               className={`scanner-method-card barcode-card ${!canAdd ? 'disabled' : ''}`}
               onClick={() => canAdd && setScanType('barcode')}
@@ -1323,7 +1303,6 @@ function Inventory({
               </div>
             </div>
 
-            {/* OCR Scanner - Purple */}
             <div 
               className={`scanner-method-card ocr-card ${!canAdd ? 'disabled' : ''}`}
               onClick={() => canAdd && setScanType('ocr')}
@@ -1341,7 +1320,6 @@ function Inventory({
               </div>
             </div>
 
-            {/* Mobile Scanner - Amber/Gold */}
             <div 
               className={`scanner-method-card mobile-card ${!canAdd ? 'disabled' : ''}`}
               onClick={() => canAdd && setScanType('mobile')}
@@ -1360,7 +1338,6 @@ function Inventory({
             </div>
           </div>
 
-          {/* Footer */}
           <div className="scanner-footer-section">
             {preSelectedSupplier && (
               <div className="scanner-supplier-info">
@@ -1560,7 +1537,7 @@ function Inventory({
                         </button>
                       )}
 
-                      {/* Return - Uses Custom Modal */}
+                      {/* Return - Custom Modal */}
                       {item.daysLeft <= 7 && (
                         <button className="action-btn return" onClick={() => handleReturnToSupplier(item.id)} disabled={actionLoading === item.id}>
                           {actionLoading === item.id ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fas fa-undo-alt"></i>}
