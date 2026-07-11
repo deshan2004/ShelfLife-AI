@@ -13,7 +13,7 @@ import { api } from '../services/apiService'
 import './Pages.css'
 
 // ============================================================
-// ✅ FLASH CONFIRM MODAL - Inline Component
+// ✅ FLASH CONFIRM MODAL - Beautiful Custom Modal
 // ============================================================
 function FlashConfirmModal({ isOpen, items, onConfirm, onCancel }) {
   if (!isOpen || !items || items.length === 0) return null;
@@ -139,6 +139,152 @@ function OrderAllConfirmModal({ isOpen, items, onConfirm, onCancel }) {
 }
 
 // ============================================================
+// ✅ RETURN CONFIRM MODAL - Beautiful Custom Modal
+// ============================================================
+function ReturnConfirmModal({ isOpen, product, onConfirm, onCancel }) {
+  const [quantity, setQuantity] = useState(0);
+  const [reason, setReason] = useState('Near Expiry');
+
+  useEffect(() => {
+    if (isOpen && product) {
+      setQuantity(product.stock || 0);
+      setReason(product.daysLeft <= 0 ? 'Expired' : 'Near Expiry');
+    }
+  }, [isOpen, product]);
+
+  if (!isOpen || !product) return null;
+
+  const isExpired = product.daysLeft <= 0;
+  const maxQty = product.stock || 0;
+
+  const handleConfirm = () => {
+    if (quantity <= 0) {
+      alert('Please enter a valid quantity');
+      return;
+    }
+    if (quantity > maxQty) {
+      alert(`Cannot return more than available stock (${maxQty})`);
+      return;
+    }
+    onConfirm(quantity, reason);
+  };
+
+  return (
+    <div className="return-modal-overlay" onClick={onCancel}>
+      <div className="return-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="return-modal-header">
+          <div className="return-modal-icon">
+            <i className="fas fa-undo-alt"></i>
+          </div>
+          <div>
+            <h3>🚚 Return to Supplier</h3>
+            <p>{product.name} → {product.supplier}</p>
+          </div>
+          <button className="return-modal-close" onClick={onCancel}>
+            <i className="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div className="return-modal-body">
+          <div className="return-product-info">
+            <div className="return-info-grid">
+              <div className="return-info-item">
+                <span className="return-info-label">Current Stock</span>
+                <span className="return-info-value">{product.stock} units</span>
+              </div>
+              <div className="return-info-item">
+                <span className="return-info-label">Status</span>
+                <span className={`return-info-value ${isExpired ? 'expired' : 'warning'}`}>
+                  {isExpired ? '❌ Expired' : '⚠️ Near Expiry'}
+                </span>
+              </div>
+              <div className="return-info-item">
+                <span className="return-info-label">Days Left</span>
+                <span className={`return-info-value ${isExpired ? 'expired' : ''}`}>
+                  {isExpired ? '0' : product.daysLeft} days
+                </span>
+              </div>
+              <div className="return-info-item">
+                <span className="return-info-label">Supplier</span>
+                <span className="return-info-value highlight">{product.supplier}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="return-form-group">
+            <label className="return-form-label">
+              <i className="fas fa-box"></i> Quantity to Return
+            </label>
+            <div className="return-quantity-controls">
+              <button 
+                className="return-qty-btn" 
+                onClick={() => setQuantity(Math.max(0, quantity - 1))}
+              >
+                <i className="fas fa-minus"></i>
+              </button>
+              <input
+                type="number"
+                className="return-qty-input"
+                value={quantity}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  if (!isNaN(val) && val >= 0) setQuantity(val);
+                }}
+                min="0"
+                max={maxQty}
+              />
+              <button 
+                className="return-qty-btn" 
+                onClick={() => setQuantity(Math.min(maxQty, quantity + 1))}
+              >
+                <i className="fas fa-plus"></i>
+              </button>
+            </div>
+            <div className="return-qty-hint">
+              <span>Max: {maxQty} units</span>
+              <button 
+                className="return-max-btn"
+                onClick={() => setQuantity(maxQty)}
+              >
+                Return All
+              </button>
+            </div>
+          </div>
+
+          <div className="return-form-group">
+            <label className="return-form-label">
+              <i className="fas fa-pen"></i> Reason for Return
+            </label>
+            <select 
+              className="return-reason-select"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            >
+              <option value="Near Expiry">⏰ Near Expiry</option>
+              <option value="Expired">❌ Expired</option>
+              <option value="Damaged">💔 Damaged Goods</option>
+              <option value="Quality Issue">🔬 Quality Issue</option>
+              <option value="Overstock">📦 Overstock</option>
+              <option value="Supplier Recall">📢 Supplier Recall</option>
+              <option value="Other">📝 Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="return-modal-footer">
+          <button className="return-btn-cancel" onClick={onCancel}>
+            <i className="fas fa-times"></i> Cancel
+          </button>
+          <button className="return-btn-confirm" onClick={handleConfirm}>
+            <i className="fas fa-check"></i> Return {quantity} Units
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // MAIN INVENTORY COMPONENT
 // ============================================================
 function Inventory({
@@ -200,6 +346,10 @@ function Inventory({
   const [showSupplierPrompt, setShowSupplierPrompt] = useState(false);
   const [supplierPromptConfig, setSupplierPromptConfig] = useState({ title: '', message: '', suppliers: [], defaultSupplier: '' });
   const [supplierPromptResolve, setSupplierPromptResolve] = useState(null);
+
+  // ✅ Return Modal States
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnProduct, setReturnProduct] = useState(null);
 
   // ============================================================
   // LOAD SUPPLIERS
@@ -470,15 +620,23 @@ function Inventory({
     const product = inventory.find(p => p.id === productId);
     if (!product) return;
 
-    let discount = '30% OFF', saleType = 'Flash Sale', discountMultiplier = 0.7;
-    if (product.daysLeft <= 1) { discount = '50% OFF'; saleType = 'Buy 1 Get 1 Free'; discountMultiplier = 0.5; }
-    else if (product.daysLeft <= 2) { discount = '40% OFF'; saleType = 'Flash Sale'; discountMultiplier = 0.6; }
-    else if (product.daysLeft <= 7) { discount = '30% OFF'; saleType = 'Flash Sale'; discountMultiplier = 0.7; }
+    // ✅ Use beautiful modal instead of window.confirm
+    setFlashItems([product]);
+    setShowFlashConfirm(true);
+  };
 
-    if (!window.confirm(`Apply ${discount} ${saleType} to "${product.name}"?`)) return;
-    setActionLoading(productId);
+  const executeSingleFlash = async () => {
+    const product = flashItems[0];
+    if (!product) return;
+    
+    setShowFlashConfirm(false);
+    setActionLoading(product.id);
 
     try {
+      let discount = '30% OFF', saleType = 'Flash Sale', discountMultiplier = 0.7;
+      if (product.daysLeft <= 1) { discount = '50% OFF'; saleType = 'Buy 1 Get 1 Free'; discountMultiplier = 0.5; }
+      else if (product.daysLeft <= 2) { discount = '40% OFF'; saleType = 'Flash Sale'; discountMultiplier = 0.6; }
+
       const newPrice = Math.round(product.sellingPrice * discountMultiplier);
       const newStock = Math.max(0, product.stock - 1);
       const updates = {
@@ -496,7 +654,7 @@ function Inventory({
         updates.flashSaleActive = false;
       }
 
-      const result = await api.updateProduct(user.uid, productId, updates);
+      const result = await api.updateProduct(user.uid, product.id, updates);
       if (result.success) {
         showToast(`🔥 ${saleType} applied to ${product.name}! New price: LKR ${newPrice}`);
         const event = new CustomEvent('flashSaleApplied', {
@@ -505,7 +663,7 @@ function Inventory({
         window.dispatchEvent(event);
         if (refreshInventory) await refreshInventory();
         else if (onUpdateInventory) {
-          const updated = inventory.map(item => item.id === productId ? { ...item, ...updates } : item);
+          const updated = inventory.map(item => item.id === product.id ? { ...item, ...updates } : item);
           onUpdateInventory(updated);
         }
         setSelectedItems([]);
@@ -518,6 +676,7 @@ function Inventory({
       showToast(`❌ ${error.message || 'Failed to apply flash sale'}`);
     } finally {
       setActionLoading(null);
+      setFlashItems([]);
     }
   };
 
@@ -718,51 +877,42 @@ function Inventory({
   };
 
   // ============================================================
-  // 🚚 RETURN TO SUPPLIER
+  // 🚚 RETURN TO SUPPLIER - Custom Modal
   // ============================================================
-  const handleReturnToSupplier = async (productId) => {
+  const handleReturnToSupplier = (productId) => {
     const product = inventory.find(p => p.id === productId);
     if (!product) return;
+    setReturnProduct(product);
+    setShowReturnModal(true);
+  };
 
-    const isExpired = product.daysLeft <= 0;
-    const defaultQty = isExpired ? product.stock : 0;
+  const handleReturnConfirm = async (quantity, reason) => {
+    if (!returnProduct) return;
+    setShowReturnModal(false);
+    setActionLoading(returnProduct.id);
 
-    const returnQty = window.prompt(
-      `🚚 Return "${product.name}" to ${product.supplier}\nCurrent stock: ${product.stock}\nStatus: ${isExpired ? 'EXPIRED - Return recommended' : 'Near Expiry'}\n\nEnter quantity to return (or 0 to cancel):`,
-      defaultQty || product.stock
-    );
-    if (returnQty === null) return;
-    const qty = parseInt(returnQty);
-    if (isNaN(qty) || qty < 0) { showToast('❌ Invalid quantity'); return; }
-    if (qty === 0) { showToast('Return cancelled'); return; }
-    if (qty > product.stock) { showToast(`❌ Cannot return more than available stock (${product.stock})`); return; }
-
-    const reason = window.prompt('Reason for return:', isExpired ? 'Expired' : 'Near Expiry');
-    if (reason === null) return;
-    if (!window.confirm(`🚚 Return ${qty} units of "${product.name}" to ${product.supplier}?\nReason: ${reason || 'Not specified'}`)) return;
-
-    setActionLoading(productId);
     try {
-      const newStock = product.stock - qty;
+      const product = returnProduct;
+      const newStock = product.stock - quantity;
       const updates = {
         stock: newStock,
-        suggestion: `🚚 Returned ${qty} units to supplier on ${new Date().toLocaleDateString()} (${reason || 'No reason'})`,
+        suggestion: `🚚 Returned ${quantity} units to supplier on ${new Date().toLocaleDateString()} (${reason})`,
         lastReturnDate: new Date().toISOString(),
-        lastReturnQuantity: qty,
-        lastReturnReason: reason || 'Not specified',
+        lastReturnQuantity: quantity,
+        lastReturnReason: reason,
         orderStatus: 'cancelled'
       };
       if (newStock === 0) {
         updates.status = 'out_of_stock';
-        updates.suggestion = `🚚 All units returned to supplier. Reason: ${reason || 'Near expiry'}`;
+        updates.suggestion = `🚚 All units returned to supplier. Reason: ${reason}`;
       }
-      const result = await api.updateProduct(user.uid, productId, updates);
+      const result = await api.updateProduct(user.uid, product.id, updates);
       if (result.success) {
-        showToast(`🚚 ${qty} units of ${product.name} returned to ${product.supplier}! Remaining stock: ${newStock}`);
+        showToast(`🚚 ${quantity} units of ${product.name} returned to ${product.supplier}! Remaining stock: ${newStock}`);
         handleNotifySupplier(product);
         if (refreshInventory) await refreshInventory();
         else if (onUpdateInventory) {
-          const updated = inventory.map(item => item.id === productId ? { ...item, ...updates } : item);
+          const updated = inventory.map(item => item.id === product.id ? { ...item, ...updates } : item);
           onUpdateInventory(updated);
         }
       } else {
@@ -773,7 +923,13 @@ function Inventory({
       showToast(`❌ ${error.message || 'Failed to return product'}`);
     } finally {
       setActionLoading(null);
+      setReturnProduct(null);
     }
+  };
+
+  const handleReturnCancel = () => {
+    setShowReturnModal(false);
+    setReturnProduct(null);
   };
 
   // ============================================================
@@ -919,21 +1075,8 @@ function Inventory({
       showToast('⚠️ No expiring products selected');
       return;
     }
-    if (!window.confirm(`Apply flash sale to ${expiringProducts.length} selected products?`)) return;
-    setActionLoading('bulk');
-    try {
-      for (const product of expiringProducts) {
-        await handleFlashSale(product.id);
-      }
-      showToast(`✅ Bulk flash sale applied to ${expiringProducts.length} products!`);
-      setSelectedItems([]);
-      setSelectAll(false);
-    } catch (error) {
-      console.error('Bulk flash sale error:', error);
-      showToast('❌ Failed to apply bulk flash sale');
-    } finally {
-      setActionLoading(null);
-    }
+    setFlashItems(expiringProducts);
+    setShowFlashConfirm(true);
   };
 
   const handleBulkDelete = async () => {
@@ -1148,9 +1291,7 @@ function Inventory({
       {/* Alert Bar */}
       <AlertBar inventory={inventory} onFlashSale={handleFlashSale} onOrderNow={handleOrderNow} actionLoading={actionLoading} />
 
-      {/* ============================================================
-          SCANNER SECTION - BEAUTIFUL CARD UI
-          ============================================================ */}
+      {/* Scanner Section */}
       {showScanner && !scanType && (
         <div className="scanner-section">
           <div className="scanner-header-section">
@@ -1322,9 +1463,7 @@ function Inventory({
         </div>
       )}
 
-      {/* ============================================================
-          INVENTORY TABLE - MOBILE FRIENDLY
-          ============================================================ */}
+      {/* Inventory Table - Mobile Friendly */}
       <div className="inventory-table-container">
         <table className="inventory-table">
           <thead>
@@ -1421,7 +1560,7 @@ function Inventory({
                         </button>
                       )}
 
-                      {/* Return */}
+                      {/* Return - Uses Custom Modal */}
                       {item.daysLeft <= 7 && (
                         <button className="action-btn return" onClick={() => handleReturnToSupplier(item.id)} disabled={actionLoading === item.id}>
                           {actionLoading === item.id ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fas fa-undo-alt"></i>}
@@ -1439,7 +1578,7 @@ function Inventory({
                         {actionLoading === item.id ? <i className="fas fa-spinner fa-pulse"></i> : <i className="fas fa-trash"></i>}
                       </button>
 
-                      {/* Order Status Dropdown */}
+                      {/* Order Status Dropdown - Beautiful */}
                       <select
                         className="order-status-select"
                         value={item.orderStatus || 'pending'}
@@ -1493,10 +1632,23 @@ function Inventory({
       )}
 
       {/* Flash Confirm Modal */}
-      <FlashConfirmModal isOpen={showFlashConfirm} items={flashItems} onConfirm={executeAutoFlash} onCancel={() => { setShowFlashConfirm(false); setFlashItems([]); }} />
+      <FlashConfirmModal 
+        isOpen={showFlashConfirm} 
+        items={flashItems} 
+        onConfirm={flashItems.length === 1 ? executeSingleFlash : executeAutoFlash} 
+        onCancel={() => { setShowFlashConfirm(false); setFlashItems([]); }} 
+      />
 
       {/* Order All Confirm Modal */}
       <OrderAllConfirmModal isOpen={showOrderAllConfirm} items={orderAllItems} onConfirm={executeOrderAll} onCancel={() => { setShowOrderAllConfirm(false); setOrderAllItems([]); }} />
+
+      {/* Return Confirm Modal */}
+      <ReturnConfirmModal
+        isOpen={showReturnModal}
+        product={returnProduct}
+        onConfirm={handleReturnConfirm}
+        onCancel={handleReturnCancel}
+      />
 
       {/* Supplier Notification Modal */}
       <SupplierNotificationModal
