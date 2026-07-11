@@ -1,25 +1,8 @@
 // src/services/apiService.js
 
-// ✅ Dynamic API URL - Works on localhost and Vercel
-const getApiUrl = () => {
-  // Development mode (localhost)
-  if (import.meta.env.DEV) {
-    return 'http://localhost:5000';
-  }
-  
-  // Production mode (Vercel)
-  if (import.meta.env.PROD) {
-    // Vercel live backend URL eka direct set karala thiyenne phone access prashna nathara wenna
-    return 'https://shelf-life-ai.vercel.app';
-  }
-  
-  return '';
-};
+// ✅ Dynamic API URL - Works everywhere (local & Vercel)
+const API_URL = import.meta.env.VITE_API_URL || '';
 
-// ✅ Global API URL
-const API_URL = getApiUrl();
-
-// ✅ Log API URL (Debugging සඳහා)
 console.log(`🔧 API URL: ${API_URL || 'Relative path (same domain)'}`);
 
 export const api = {
