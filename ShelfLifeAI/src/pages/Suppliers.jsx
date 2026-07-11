@@ -226,7 +226,7 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
 
   const renderStars = (rating, editable = false, onChange = null) => {
     return (
-      <div className="rating-stars">
+      <div className="supplier-rating-stars">
         {[1, 2, 3, 4, 5].map((star) => (
           <span
             key={star}
@@ -351,7 +351,7 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
         </div>
       </div>
 
-      {/* Suppliers Grid */}
+      {/* Suppliers Grid - Beautiful Cards */}
       {filteredSuppliers.length === 0 ? (
         <div className="empty-state">
           <i className="fas fa-truck"></i>
@@ -378,44 +378,41 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
               <div 
                 key={supplier.id} 
                 id={`supplier-${supplier.name}`}
-                className={`supplier-card ${isHighlighted ? 'highlighted' : ''}`}
-                style={isHighlighted ? { 
-                  borderColor: 'var(--green-neon)',
-                  boxShadow: '0 0 30px rgba(57, 231, 95, 0.2)',
-                  transition: 'all 0.5s ease'
-                } : {}}
+                className={`supplier-card-modern ${isHighlighted ? 'highlighted' : ''}`}
               >
-                {/* Supplier Header */}
-                <div className="supplier-card-header" onClick={() => toggleSupplier(supplier.name)}>
-                  <div className="supplier-info">
-                    <div className="supplier-avatar">
-                      {supplier.name?.charAt(0) || 'S'}
+                {/* Card Header - Click to expand */}
+                <div className="supplier-card-header-modern" onClick={() => toggleSupplier(supplier.name)}>
+                  <div className="supplier-card-left">
+                    <div className="supplier-avatar-modern">
+                      {supplier.name?.charAt(0).toUpperCase() || 'S'}
                     </div>
-                    <div>
-                      <h3>{supplier.name}</h3>
-                      <div className="supplier-rating">
+                    <div className="supplier-name-section">
+                      <h3 className="supplier-name">{supplier.name}</h3>
+                      <div className="supplier-rating-row">
                         {renderStars(supplier.rating || 0)}
                         <span className="rating-text">({supplier.rating || 0})</span>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="supplier-stats">
-                    <span className="supplier-badge">
-                      <i className="fas fa-box"></i> {supplierProducts.length}
-                    </span>
-                    {expiringCount > 0 && (
-                      <span className="supplier-badge warning">
-                        ⚠️ {expiringCount}
+                  <div className="supplier-card-right">
+                    <div className="supplier-badges">
+                      <span className="badge-count">
+                        <i className="fas fa-box"></i> {supplierProducts.length}
                       </span>
-                    )}
-                    {expiredCount > 0 && (
-                      <span className="supplier-badge expired">
-                        ❌ {expiredCount}
-                      </span>
-                    )}
+                      {expiringCount > 0 && (
+                        <span className="badge-expiring">
+                          ⚠️ {expiringCount}
+                        </span>
+                      )}
+                      {expiredCount > 0 && (
+                        <span className="badge-expired">
+                          ❌ {expiredCount}
+                        </span>
+                      )}
+                    </div>
                     <button 
-                      className="supplier-toggle-btn"
+                      className="toggle-expand-btn"
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleSupplier(supplier.name);
@@ -426,44 +423,46 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
                   </div>
                 </div>
 
-                {/* Supplier Details */}
-                <div className="supplier-details">
-                  {supplier.contact && (
-                    <span><i className="fas fa-phone"></i> {supplier.contact}</span>
-                  )}
-                  {supplier.email && (
-                    <span><i className="fas fa-envelope"></i> {supplier.email}</span>
-                  )}
-                  {supplier.address && (
-                    <span><i className="fas fa-map-marker-alt"></i> {supplier.address}</span>
-                  )}
-                  {supplier.notes && (
-                    <span className="supplier-notes"><i className="fas fa-info-circle"></i> {supplier.notes}</span>
-                  )}
-                </div>
+                {/* Contact Details */}
+                {(supplier.contact || supplier.email || supplier.address || supplier.notes) && (
+                  <div className="supplier-contact-row">
+                    {supplier.contact && (
+                      <span><i className="fas fa-phone"></i> {supplier.contact}</span>
+                    )}
+                    {supplier.email && (
+                      <span><i className="fas fa-envelope"></i> {supplier.email}</span>
+                    )}
+                    {supplier.address && (
+                      <span><i className="fas fa-map-marker-alt"></i> {supplier.address}</span>
+                    )}
+                    {supplier.notes && (
+                      <span className="notes-text"><i className="fas fa-info-circle"></i> {supplier.notes}</span>
+                    )}
+                  </div>
+                )}
 
-                {/* Supplier Actions */}
-                <div className="supplier-actions-bar">
+                {/* Action Buttons */}
+                <div className="supplier-actions-modern">
                   <button 
-                    className="supplier-action-btn add-product"
+                    className="action-btn-modern primary"
                     onClick={() => handleAddProductForSupplier(supplier.name)}
                   >
                     <i className="fas fa-plus"></i> Add Product
                   </button>
                   <button 
-                    className="supplier-action-btn view-products"
+                    className="action-btn-modern secondary"
                     onClick={() => handleViewProducts(supplier.name)}
                   >
                     <i className="fas fa-eye"></i> View Products
                   </button>
                   <button 
-                    className="supplier-action-btn edit"
+                    className="action-btn-modern edit"
                     onClick={() => openEditModal(supplier)}
                   >
                     <i className="fas fa-edit"></i> Edit
                   </button>
                   <button 
-                    className="supplier-action-btn delete"
+                    className="action-btn-modern delete"
                     onClick={() => handleDeleteSupplier(supplier)}
                     disabled={actionLoading === supplier.id}
                   >
@@ -477,43 +476,50 @@ function Suppliers({ inventory, onUpdateInventory, showToast, user, refreshInven
 
                 {/* Products List (Expanded) */}
                 {isExpanded && (
-                  <div className="supplier-products-expanded">
-                    <div className="products-header">
-                      <span>📦 Products ({supplierProducts.length})</span>
+                  <div className="supplier-products-expanded-modern">
+                    <div className="products-header-modern">
+                      <span className="products-title">
+                        <i className="fas fa-box"></i> Products ({supplierProducts.length})
+                      </span>
                       {expiringCount > 0 && (
-                        <span className="expiring-count">⚠️ {expiringCount} expiring soon</span>
+                        <span className="expiring-badge">⚠️ {expiringCount} expiring soon</span>
                       )}
                       {lowStockCount > 0 && (
-                        <span className="low-stock-count">📉 {lowStockCount} low stock</span>
+                        <span className="lowstock-badge">📉 {lowStockCount} low stock</span>
                       )}
                     </div>
                     
                     {supplierProducts.length > 0 ? (
-                      <div className="products-list">
+                      <div className="products-list-modern">
                         {supplierProducts.map(product => (
-                          <div key={product.id} className="product-item">
-                            <span className="product-name">{product.name}</span>
-                            <span className="product-stock">{product.stock} units</span>
-                            <span className={`product-expiry ${product.daysLeft <= 0 ? 'expired' : product.daysLeft <= 3 ? 'critical' : product.daysLeft <= 7 ? 'warning' : ''}`}>
-                              {product.daysLeft <= 0 ? 'Expired' : `${product.daysLeft} days`}
-                            </span>
-                            {product.flashSaleActive && product.flashSaleDiscount && (
-                              <span className="discount-badge">🔥 {product.flashSaleDiscount}</span>
-                            )}
-                            <button 
-                              className="product-action-btn"
-                              onClick={() => {
-                                navigate('/inventory');
-                                localStorage.setItem('shelflife_filter_supplier', supplier.name);
-                              }}
-                            >
-                              <i className="fas fa-arrow-right"></i>
-                            </button>
+                          <div key={product.id} className="product-item-modern">
+                            <div className="product-info-left">
+                              <span className="product-name-modern">{product.name}</span>
+                              <span className="product-stock-modern">{product.stock} units</span>
+                            </div>
+                            <div className="product-info-right">
+                              <span className={`product-expiry-modern ${product.daysLeft <= 0 ? 'expired' : product.daysLeft <= 3 ? 'critical' : product.daysLeft <= 7 ? 'warning' : ''}`}>
+                                {product.daysLeft <= 0 ? 'Expired' : `${product.daysLeft} days`}
+                              </span>
+                              {product.flashSaleActive && product.flashSaleDiscount && (
+                                <span className="flash-badge">🔥 {product.flashSaleDiscount}</span>
+                              )}
+                              <button 
+                                className="goto-product-btn"
+                                onClick={() => {
+                                  navigate('/inventory');
+                                  localStorage.setItem('shelflife_filter_supplier', supplier.name);
+                                }}
+                                title="View in inventory"
+                              >
+                                <i className="fas fa-arrow-right"></i>
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="no-products">No products from this supplier yet</p>
+                      <p className="no-products-modern">No products from this supplier yet</p>
                     )}
                   </div>
                 )}
