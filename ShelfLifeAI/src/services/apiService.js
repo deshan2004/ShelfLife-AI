@@ -1,5 +1,28 @@
 // src/services/apiService.js
-const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:5000';
+
+// ✅ Dynamic API URL - Works on localhost and Vercel
+const getApiUrl = () => {
+  // Development mode (localhost)
+  if (import.meta.env.DEV) {
+    return import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  }
+  
+  // Production mode (Vercel) - use environment variable
+  if (import.meta.env.PROD) {
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (apiUrl) {
+      return apiUrl;
+    }
+    // Fallback: relative path (if backend is on same domain)
+    return '';
+  }
+  
+  return '';
+};
+
+const API_URL = getApiUrl();
+
+console.log(`🔧 API URL: ${API_URL || 'Relative path'}`);
 
 export const api = {
   // ===== HEALTH =====
