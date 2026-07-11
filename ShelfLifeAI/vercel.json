@@ -19,8 +19,12 @@
       "dest": "/server.cjs"
     },
     {
+      "src": "/(.*)\\.(.*)",
+      "dest": "/dist/$1.$2"
+    },
+    {
       "src": "/(.*)",
-      "dest": "/dist/$1"
+      "dest": "/dist/index.html"
     }
   ]
 }
