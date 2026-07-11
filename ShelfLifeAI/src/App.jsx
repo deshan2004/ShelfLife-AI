@@ -55,25 +55,22 @@ function App() {
     return () => window.removeEventListener('flashSaleApplied', handleFlashSaleEvent);
   }, []);
 
-  // ✅ Load subscription from backend
+  // ✅ Load subscription from backend using apiService
   const loadSubscription = async (userId) => {
     if (!userId) return null;
     try {
       console.log('🔄 Loading subscription for user:', userId);
-      const response = await fetch(`http://localhost:5000/api/subscription/${userId}`);
-      const data = await response.json();
+      const data = await api.getSubscription(userId);
       console.log('✅ Subscription loaded:', data);
       
       if (data && data.planId) {
         setSubscription(data);
-        // Update user object
         setUser(prev => ({
           ...prev,
           subscription: data,
           planId: data.planId,
           planName: data.planId === 'FREE_TRIAL' ? 'Free Trial' : data.planId
         }));
-        // Update localStorage
         const userData = JSON.parse(localStorage.getItem('shelflife_user') || '{}');
         userData.subscription = data;
         userData.planId = data.planId;
@@ -83,7 +80,6 @@ function App() {
       }
     } catch (error) {
       console.error('❌ Failed to load subscription:', error);
-      // Try localStorage fallback
       try {
         const userData = JSON.parse(localStorage.getItem('shelflife_user') || '{}');
         if (userData.subscription) {
@@ -208,7 +204,7 @@ function App() {
         window.dispatchEvent(event);
         
         await loadUserInventory(user.uid, true);
-        await loadSubscription(user.uid); // ✅ Refresh subscription data
+        await loadSubscription(user.uid);
       } else {
         showToast(`❌ Failed to apply flash sale: ${result.error}`);
       }
@@ -268,10 +264,9 @@ function App() {
   };
 
   // ============================================================
-  // END OF SMART ACTIONS
+  // AUTH STATE LISTENER
   // ============================================================
 
-  // ✅ Auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -314,7 +309,7 @@ function App() {
 
           if (role === 'user' || role === 'admin') {
             await loadUserInventory(firebaseUser.uid);
-            await loadSubscription(firebaseUser.uid); // ✅ Load subscription after login
+            await loadSubscription(firebaseUser.uid);
           }
         } catch (error) {
           console.error("❌ Error loading user data:", error);
@@ -368,7 +363,6 @@ function App() {
     }
   };
 
-  // ✅ Get plan name from subscription
   const getPlanName = () => {
     if (subscription) {
       if (subscription.planId === 'FREE_TRIAL') return 'Free Trial';
@@ -377,7 +371,6 @@ function App() {
       if (subscription.planId === 'ENTERPRISE') return 'Enterprise';
       return subscription.planId;
     }
-    // Fallback to user object
     if (user?.planId) {
       if (user.planId === 'FREE_TRIAL') return 'Free Trial';
       if (user.planId === 'BASIC') return 'Basic';
@@ -388,7 +381,6 @@ function App() {
     return 'Free Trial';
   };
 
-  // ✅ Get product limit from subscription
   const getProductLimit = () => {
     if (subscription?.limits?.maxProducts) {
       return subscription.limits.maxProducts;

@@ -1,8 +1,9 @@
 // src/pages/Admin/AdminAnalytics.jsx
 import { useState, useEffect } from 'react'
+import { api } from '../../services/apiService'
 import './Admin.css'
 
-function AdminAnalytics() {
+function AdminAnalytics({ admin }) {
   const [period, setPeriod] = useState('month')
   const [analytics, setAnalytics] = useState({
     revenueData: [],
@@ -19,13 +20,8 @@ function AdminAnalytics() {
   const loadAnalytics = async () => {
     try {
       setLoading(true)
-      // In a real app, you'd fetch from /api/admin/analytics
-      // For now, use mock data with real stats from backend
-      const statsRes = await fetch('http://localhost:5000/api/admin/stats')
-      if (!statsRes.ok) throw new Error('Failed to fetch stats')
-      const stats = await statsRes.json()
+      const stats = await api.getAdminStats()
 
-      // Use real user count for user growth chart
       const userGrowthData = {
         week: [12, 15, 18, 22, 25, 28, 32],
         month: [45, 62, 78, 95, 112, 128, 145, 162, 178, 195, 212, 228],
