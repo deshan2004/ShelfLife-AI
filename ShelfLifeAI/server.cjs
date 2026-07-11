@@ -1,4 +1,4 @@
-// server.cjs - Complete backend WITHOUT Email/SMS (No .env needed)
+// server.cjs - Complete backend with Firebase Admin SDK
 const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
@@ -16,9 +16,30 @@ app.use(cors({
 app.use(express.json());
 
 // ============================================================
-// 1. FIREBASE ADMIN SDK
+// 1. FIREBASE ADMIN SDK - Read from env var or local file
 // ============================================================
-const serviceAccount = require('./serviceAccountKey.json');
+let serviceAccount;
+
+// 1️⃣ Try to read from environment variable (Vercel / production)
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    console.log('✅ Firebase credentials loaded from environment variable.');
+  } catch (e) {
+    console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT:', e.message);
+  }
+}
+
+// 2️⃣ Fallback to local file (for local development)
+if (!serviceAccount) {
+  try {
+    serviceAccount = require('./serviceAccountKey.json');
+    console.log('✅ Firebase credentials loaded from local file.');
+  } catch (e) {
+    console.error('❌ serviceAccountKey.json not found. Please set FIREBASE_SERVICE_ACCOUNT env var.');
+    process.exit(1);
+  }
+}
 
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -384,7 +405,7 @@ app.delete('/api/suppliers/:userId/delete/:supplierId', async (req, res) => {
 });
 
 // ============================================================
-// 7. SUBSCRIPTION MANAGEMENT (✅ FIXED)
+// 7. SUBSCRIPTION MANAGEMENT
 // ============================================================
 app.get('/api/subscription/:userId', async (req, res) => {
     try {
@@ -452,7 +473,6 @@ app.get('/api/subscription/:userId', async (req, res) => {
     }
 });
 
-// ✅ FIXED: Upgrade subscription endpoint
 app.post('/api/subscription/upgrade', async (req, res) => {
     try {
         const { userId, planId } = req.body;
