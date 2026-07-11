@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import BarcodeScanner from '../components/AdvancedBarcodeScanner'
 import OCRScanner from '../components/AdvancedOCRScanner'
+import MobileScanner from '../components/MobileScanner'
 import ProductNameModal from '../components/ProductNameModal'
 import SupplierPromptModal from '../components/SupplierPromptModal'
 import AlertBar from '../components/AlertDropdown'
@@ -145,13 +146,16 @@ function Inventory({
   onUpdateInventory,
   showToast,
   user,
-  refreshInventory
+  refreshInventory,
+  planName,
+  productLimit,
+  subscription
 }) {
   const navigate = useNavigate();
   const location = useLocation();
 
   const [showScanner, setShowScanner] = useState(false)
-  const [scanType, setScanType] = useState(null)
+  const [scanType, setScanType] = useState(null) // 'barcode', 'ocr', 'mobile'
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterSupplier, setFilterSupplier] = useState('all')
@@ -162,7 +166,6 @@ function Inventory({
   const [loading, setLoading] = useState(false)
   const [suppliers, setSuppliers] = useState([])
   const [preSelectedSupplier, setPreSelectedSupplier] = useState('')
-  const [subscription, setSubscription] = useState(null)
   const [actionLoading, setActionLoading] = useState(null)
 
   // ✅ Auto-Flash All State
@@ -198,49 +201,9 @@ function Inventory({
   const [supplierPromptConfig, setSupplierPromptConfig] = useState({ title: '', message: '', suppliers: [], defaultSupplier: '' });
   const [supplierPromptResolve, setSupplierPromptResolve] = useState(null);
 
-  // ✅ Plan Name Display
-  const [planNameDisplay, setPlanNameDisplay] = useState('Free Trial');
-  const [productLimit, setProductLimit] = useState(50);
-  const [isLoadingSubscription, setIsLoadingSubscription] = useState(true);
-
   // ============================================================
-  // LOAD DATA
+  // LOAD SUPPLIERS
   // ============================================================
-  const loadSubscription = async () => {
-    if (!user?.uid) { setIsLoadingSubscription(false); return; }
-    try {
-      const response = await fetch(`https://accustom-alias-altitude.grork-free.dev/api/subscription/${user.uid}`);
-      if (!response.ok) throw new Error('Failed to fetch subscription');
-      const data = await response.json();
-      if (data && data.planId) {
-        setSubscription(data);
-        let planName = data.planId;
-        if (data.planId === 'FREE_TRIAL') planName = 'Free Trial';
-        else if (data.planId === 'BASIC') planName = 'Basic';
-        else if (data.planId === 'PROFESSIONAL') planName = 'Professional';
-        else if (data.planId === 'ENTERPRISE') planName = 'Enterprise';
-        setPlanNameDisplay(planName);
-        const maxProducts = data.limits?.maxProducts;
-        setProductLimit(maxProducts === Infinity ? Infinity : Number(maxProducts) || 50);
-        const userData = JSON.parse(localStorage.getItem('shelflife_user') || '{}');
-        userData.subscription = data;
-        userData.planId = data.planId;
-        userData.planName = planName;
-        localStorage.setItem('shelflife_user', JSON.stringify(userData));
-      } else {
-        setPlanNameDisplay('Free Trial');
-        setProductLimit(50);
-      }
-    } catch (error) {
-      console.error('❌ Failed to load subscription:', error);
-      try {
-        const userData = JSON.parse(localStorage.getItem('shelflife_user') || '{}');
-        if (userData.planName) setPlanNameDisplay(userData.planName);
-        if (userData.subscription?.limits?.maxProducts) setProductLimit(Number(userData.subscription.limits.maxProducts));
-      } catch (e) {}
-    } finally { setIsLoadingSubscription(false); }
-  };
-
   const loadSuppliers = async () => {
     if (!user?.uid) return;
     try {
@@ -256,20 +219,10 @@ function Inventory({
   };
 
   useEffect(() => {
-    if (user?.uid) { loadSubscription(); loadSuppliers(); }
-    else { setIsLoadingSubscription(false); }
+    if (user?.uid) loadSuppliers();
   }, [user]);
 
-  useEffect(() => {
-    if (user?.uid && refreshInventory) loadSubscription();
-  }, [inventory.length]);
-
-  useEffect(() => {
-    const handleFocus = () => { if (user?.uid) loadSubscription(); };
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [user]);
-
+  // ✅ Handle navigation state for pre-selected supplier
   useEffect(() => {
     if (location.state?.supplier) {
       setPreSelectedSupplier(location.state.supplier);
@@ -277,6 +230,7 @@ function Inventory({
     }
   }, [location]);
 
+  // ✅ Handle filter from analytics
   useEffect(() => {
     const filterType = localStorage.getItem('shelflife_filter_type');
     const filterValue = localStorage.getItem('shelflife_filter_value');
@@ -293,15 +247,6 @@ function Inventory({
       localStorage.removeItem('shelflife_filter_value');
     }
   }, []);
-
-  const refreshData = async () => {
-    if (refreshInventory) {
-      setLoading(true);
-      try { await refreshInventory(); await loadSubscription(); }
-      catch (error) { console.error('Refresh error:', error); }
-      finally { setLoading(false); }
-    }
-  };
 
   const canAdd = inventory.length < productLimit;
 
@@ -343,7 +288,7 @@ function Inventory({
   };
 
   const saveSupplierIfNotExists = async (supplierName) => {
-    if (!supplierName || supplierName === 'Manual Entry' || supplierName === 'OCR Scanned') return;
+    if (!supplierName || supplierName === 'Manual Entry' || supplierName === 'OCR Scanned' || supplierName === 'Mobile Scan') return;
     const existingSupplier = suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase());
     if (existingSupplier) return existingSupplier;
     try {
@@ -360,10 +305,167 @@ function Inventory({
   };
 
   // ============================================================
-  // ✅ SMART ACTIONS
+  // ✅ HANDLE ADD PRODUCT
   // ============================================================
+  const handleAddProduct = async (productData) => {
+    let productName = productData.name;
+    if (!productName || productName.startsWith('Product ') || productName === 'OCR Product' || productName === 'Mobile Scan') {
+      const result = await showProductNamePrompt('Add Product', 'Enter a name for this product', productData.name || 'New Product');
+      if (!result || result.trim().length < 2) { showToast('❌ Product name is required (min 2 characters)'); return; }
+      productName = result.trim();
+    }
 
-  // 🔥 Single Flash Sale
+    if (!productName || productName.trim().length < 2) { showToast('❌ Product name is required (min 2 characters)'); return; }
+    if (!canAdd) {
+      showToast(`⚠️ Product limit reached (${inventory.length}/${productLimit}). Please upgrade.`);
+      window.location.href = '/billing';
+      return;
+    }
+
+    let supplierName = productData.supplier || 'Manual Entry';
+    if (!preSelectedSupplier && supplierName !== 'Manual Entry' && supplierName !== 'OCR Scanned' && supplierName !== 'Mobile Scan') {
+      const supplierList = suppliers.map(s => s.name);
+      const selected = await showSupplierPromptFn('Select or Add Supplier', 'Choose an existing supplier or type a new one', supplierList, supplierName);
+      if (selected && selected.trim()) supplierName = selected.trim();
+      else supplierName = 'Manual Entry';
+    } else if (preSelectedSupplier) {
+      supplierName = preSelectedSupplier;
+    }
+
+    if (supplierName !== 'Manual Entry' && supplierName !== 'OCR Scanned' && supplierName !== 'Mobile Scan') await saveSupplierIfNotExists(supplierName);
+
+    const daysLeft = Math.ceil((new Date(productData.expiryDate || new Date(Date.now() + 30 * 86400000)) - new Date()) / (1000 * 60 * 60 * 24));
+
+    const newProduct = {
+      name: productName.trim(),
+      batch: productData.batch || `B${String(Date.now()).slice(-6)}`,
+      batchDate: new Date().toISOString().split('T')[0],
+      supplier: supplierName,
+      supplierContact: productData.supplierContact || 'N/A',
+      supplierEmail: productData.supplierEmail || 'N/A',
+      expiryDate: productData.expiryDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+      daysLeft: daysLeft,
+      status: daysLeft <= 0 ? 'expired' : daysLeft <= 7 ? 'warning' : 'good',
+      suggestion: daysLeft <= 7 ? 'Monitor closely' : 'Normal Stock',
+      stock: productData.stock || 1,
+      lowStockThreshold: 10,
+      costPrice: productData.costPrice || 100,
+      sellingPrice: productData.sellingPrice || 150,
+      flashSaleActive: false,
+      orderStatus: 'pending'
+    };
+
+    try {
+      setAddingProduct(true);
+      showToast(`📦 Adding ${newProduct.name}...`);
+      const result = await api.addProduct(user.uid, newProduct);
+      if (result.success) {
+        if (refreshInventory) await refreshInventory();
+        else if (onUpdateInventory) {
+          const updated = [...inventory, { ...newProduct, id: result.product?.id || Date.now() }];
+          onUpdateInventory(updated);
+        }
+        showToast(`✅ ${newProduct.name} added to inventory!`);
+        setScanType(null);
+        setShowScanner(false);
+        setPreSelectedSupplier('');
+      } else {
+        showToast(`❌ ${result.error || 'Failed to add product'}`);
+      }
+    } catch (error) {
+      console.error('Add product error:', error);
+      showToast(`❌ ${error.message || 'Failed to add product. Please try again.'}`);
+    } finally {
+      setAddingProduct(false);
+    }
+  };
+
+  // ============================================================
+  // ✅ HANDLE SCAN (Barcode + OCR + MOBILE)
+  // ============================================================
+  const handleScan = async (scanData) => {
+    console.log('📷 Scan data received:', scanData);
+
+    if (!scanData || !scanData.type) {
+      showToast('❌ Invalid scan data received');
+      return;
+    }
+
+    // --- BARCODE SCAN ---
+    if (scanData.type === 'barcode') {
+      const existingProduct = inventory.find(p => p.batch === scanData.value);
+      if (existingProduct) {
+        showToast(`📦 Product found: ${existingProduct.name} - Stock: ${existingProduct.stock}`);
+        setSelectedProduct(existingProduct);
+        setShowEditModal(true);
+        setShowScanner(false);
+        setScanType(null);
+        return;
+      }
+      const defaultName = scanData.productInfo?.name || `Product ${scanData.value.slice(-4)}`;
+      const productName = await showProductNamePrompt('Add Product', 'Enter a name for this product', defaultName);
+      if (!productName || productName.trim().length < 2) { showToast('❌ Product name is required'); setShowScanner(false); setScanType(null); return; }
+      let supplierName = preSelectedSupplier || 'Manual Entry';
+      if (!preSelectedSupplier) {
+        const supplierList = suppliers.map(s => s.name);
+        const selected = await showSupplierPromptFn('Select or Add Supplier', 'Choose an existing supplier or type a new one', supplierList, supplierName);
+        if (selected && selected.trim()) supplierName = selected.trim();
+        else supplierName = 'Manual Entry';
+      }
+      handleAddProduct({
+        name: productName,
+        batch: scanData.value,
+        supplier: supplierName,
+        expiryDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+        stock: 1,
+        costPrice: 100,
+        sellingPrice: 150
+      });
+      setShowScanner(false);
+      setScanType(null);
+    }
+
+    // --- OCR SCAN ---
+    else if (scanData.type === 'ocr') {
+      if (scanData.productData) {
+        handleAddProduct(scanData.productData);
+        setShowScanner(false);
+        setScanType(null);
+      } else {
+        showToast(`📅 Expiry date detected: ${scanData.value}`);
+        const existingProduct = inventory.find(p => p.expiryDate === scanData.value);
+        if (existingProduct) {
+          showToast(`📦 Product found: ${existingProduct.name} - Expires: ${scanData.value}`);
+          setSelectedProduct(existingProduct);
+          setShowEditModal(true);
+          setShowScanner(false);
+          setScanType(null);
+          return;
+        }
+        const productName = await showProductNamePrompt('Add Product (OCR)', 'We detected an expiry date. Please enter the product name.', 'OCR Product');
+        if (!productName || productName.trim().length < 2) { showToast('❌ Product name is required'); setShowScanner(false); setScanType(null); return; }
+        let supplierName = 'OCR Scanned';
+        const supplierList = suppliers.map(s => s.name);
+        const selected = await showSupplierPromptFn('Select or Add Supplier (OCR)', 'Choose an existing supplier or type a new one', supplierList, 'OCR Scanned');
+        if (selected && selected.trim()) supplierName = selected.trim();
+        handleAddProduct({
+          name: productName,
+          batch: `OCR-${Date.now().toString().slice(-6)}`,
+          supplier: supplierName,
+          expiryDate: scanData.value,
+          stock: 1,
+          costPrice: 100,
+          sellingPrice: 150
+        });
+        setShowScanner(false);
+        setScanType(null);
+      }
+    }
+  };
+
+  // ============================================================
+  // 🔥 FLASH SALE FUNCTIONS
+  // ============================================================
   const handleFlashSale = async (productId) => {
     const product = inventory.find(p => p.id === productId);
     if (!product) return;
@@ -401,7 +503,11 @@ function Inventory({
           detail: { productName: product.name, discount: discount, newPrice: newPrice, saleType: saleType }
         });
         window.dispatchEvent(event);
-        await refreshData();
+        if (refreshInventory) await refreshInventory();
+        else if (onUpdateInventory) {
+          const updated = inventory.map(item => item.id === productId ? { ...item, ...updates } : item);
+          onUpdateInventory(updated);
+        }
         setSelectedItems([]);
         setSelectAll(false);
       } else {
@@ -415,11 +521,10 @@ function Inventory({
     }
   };
 
-  // 🔥 Auto-Flash All
   const handleAutoFlashAll = () => {
     const expiringItems = inventory.filter(item => item.daysLeft > 0 && item.daysLeft <= 7 && !item.flashSaleActive && item.stock > 0);
     if (expiringItems.length === 0) {
-      showToast('✅ No items need flashing! All expiring items are already on sale or sold out.');
+      showToast('✅ No items need flashing!');
       return;
     }
     setFlashItems(expiringItems);
@@ -464,7 +569,29 @@ function Inventory({
           window.dispatchEvent(event);
         }
       }
-      await refreshData();
+      if (refreshInventory) await refreshInventory();
+      else if (onUpdateInventory) {
+        const updated = inventory.map(item => {
+          const found = flashItems.find(f => f.id === item.id);
+          if (found) {
+            let discount = '30% OFF', discountMultiplier = 0.7;
+            if (found.daysLeft <= 1) { discount = '50% OFF'; discountMultiplier = 0.5; }
+            else if (found.daysLeft <= 2) { discount = '40% OFF'; discountMultiplier = 0.6; }
+            const newPrice = Math.round(found.sellingPrice * discountMultiplier);
+            return {
+              ...item,
+              sellingPrice: newPrice,
+              suggestion: `🔥 Flash Sale ACTIVE - ${discount}`,
+              flashSaleActive: true,
+              flashSaleDiscount: discount,
+              flashSaleAppliedAt: new Date().toISOString(),
+              stock: Math.max(0, item.stock - 1)
+            };
+          }
+          return item;
+        });
+        onUpdateInventory(updated);
+      }
       showToast(`✅ ${successCount} flash sales applied successfully!`);
       setSelectedItems([]);
       setSelectAll(false);
@@ -478,69 +605,9 @@ function Inventory({
     }
   };
 
-  // 📧 Notify Supplier - Real API Call
-  const handleNotifySupplier = (product) => {
-    setNotificationProduct(product);
-    setShowNotificationModal(true);
-  };
-
-  const sendSupplierNotification = async (message) => {
-    if (!notificationProduct) return;
-    
-    setIsNotificationSending(true);
-    
-    try {
-      const response = await fetch('http://localhost:5000/api/suppliers/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          productId: notificationProduct.id,
-          notificationType: notificationProduct.stock <= notificationProduct.lowStockThreshold ? 'low_stock' : 'near_expiry',
-          customMessage: message || undefined
-        })
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        showToast(`📧 Email sent to ${result.supplier} (${result.email})`);
-      } else {
-        showToast(`❌ Failed: ${result.error}`);
-      }
-      
-      setShowNotificationModal(false);
-      setNotificationProduct(null);
-      
-    } catch (error) {
-      console.error('Send notification error:', error);
-      showToast(`❌ ${error.message || 'Failed to send notification'}`);
-    } finally {
-      setIsNotificationSending(false);
-    }
-  };
-
-  // 📦 Update Order Status
-  const handleUpdateOrderStatus = async (productId, newStatus) => {
-    const product = inventory.find(p => p.id === productId);
-    if (!product) return;
-    const updates = {
-      orderStatus: newStatus,
-      orderStatusUpdatedAt: new Date().toISOString()
-    };
-    try {
-      const result = await api.updateProduct(user.uid, productId, updates);
-      if (result.success) {
-        await refreshData();
-        showToast(`📦 Order status updated to ${newStatus}`);
-      }
-    } catch (error) {
-      console.error('Update order status error:', error);
-      showToast('❌ Failed to update order status');
-    }
-  };
-
-  // 📦 Order All Low Stock
+  // ============================================================
+  // 📦 ORDER FUNCTIONS
+  // ============================================================
   const handleOrderAllLowStock = () => {
     const lowStockList = inventory.filter(item => item.stock > 0 && item.stock <= (item.lowStockThreshold || 10) && item.status !== 'sold_out');
     if (lowStockList.length === 0) {
@@ -572,7 +639,26 @@ function Inventory({
         const result = await api.updateProduct(user.uid, item.id, updates);
         if (result.success) orderedCount++;
       }
-      await refreshData();
+      if (refreshInventory) await refreshInventory();
+      else if (onUpdateInventory) {
+        const updated = inventory.map(item => {
+          const found = orderAllItems.find(o => o.id === item.id);
+          if (found) {
+            const qty = (found.lowStockThreshold || 10) - found.stock + 10;
+            return {
+              ...item,
+              stock: found.stock + qty,
+              suggestion: `📦 Bulk order placed on ${new Date().toLocaleDateString()} (+${qty} units)`,
+              lastOrderDate: new Date().toISOString(),
+              lastOrderQuantity: qty,
+              lastOrderReason: 'Low Stock Bulk Order',
+              orderStatus: 'ordered'
+            };
+          }
+          return item;
+        });
+        onUpdateInventory(updated);
+      }
       showToast(`✅ Orders placed for ${orderedCount} items!`);
       setOrderAllItems([]);
     } catch (error) {
@@ -584,7 +670,6 @@ function Inventory({
     }
   };
 
-  // 📦 Single Order Now
   const handleOrderNow = (productId) => {
     const product = inventory.find(p => p.id === productId);
     if (!product) return;
@@ -610,7 +695,11 @@ function Inventory({
       const result = await api.updateProduct(user.uid, orderProduct.id, updates);
       if (result.success) {
         showToast(`📦 Order placed for ${quantity} units of ${orderProduct.name}! New stock: ${newStock}`);
-        await refreshData();
+        if (refreshInventory) await refreshInventory();
+        else if (onUpdateInventory) {
+          const updated = inventory.map(item => item.id === orderProduct.id ? { ...item, ...updates } : item);
+          onUpdateInventory(updated);
+        }
       } else {
         showToast(`❌ Failed to place order: ${result.error}`);
       }
@@ -628,7 +717,9 @@ function Inventory({
     setOrderProduct(null);
   };
 
-  // 🚚 Return to Supplier
+  // ============================================================
+  // 🚚 RETURN TO SUPPLIER
+  // ============================================================
   const handleReturnToSupplier = async (productId) => {
     const product = inventory.find(p => p.id === productId);
     if (!product) return;
@@ -668,9 +759,12 @@ function Inventory({
       const result = await api.updateProduct(user.uid, productId, updates);
       if (result.success) {
         showToast(`🚚 ${qty} units of ${product.name} returned to ${product.supplier}! Remaining stock: ${newStock}`);
-        // Notify supplier about return
         handleNotifySupplier(product);
-        await refreshData();
+        if (refreshInventory) await refreshInventory();
+        else if (onUpdateInventory) {
+          const updated = inventory.map(item => item.id === productId ? { ...item, ...updates } : item);
+          onUpdateInventory(updated);
+        }
       } else {
         showToast(`❌ Failed to return: ${result.error}`);
       }
@@ -682,14 +776,84 @@ function Inventory({
     }
   };
 
-  // 🗑️ Delete Product
+  // ============================================================
+  // 📧 NOTIFY SUPPLIER
+  // ============================================================
+  const handleNotifySupplier = (product) => {
+    setNotificationProduct(product);
+    setShowNotificationModal(true);
+  };
+
+  const sendSupplierNotification = async (message) => {
+    if (!notificationProduct) return;
+    setIsNotificationSending(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/suppliers/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          productId: notificationProduct.id,
+          notificationType: notificationProduct.stock <= notificationProduct.lowStockThreshold ? 'low_stock' : 'near_expiry',
+          customMessage: message || undefined
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        showToast(`📧 Email sent to ${result.supplier} (${result.email})`);
+      } else {
+        showToast(`❌ Failed: ${result.error}`);
+      }
+      setShowNotificationModal(false);
+      setNotificationProduct(null);
+    } catch (error) {
+      console.error('Send notification error:', error);
+      showToast(`❌ ${error.message || 'Failed to send notification'}`);
+    } finally {
+      setIsNotificationSending(false);
+    }
+  };
+
+  // ============================================================
+  // 📦 UPDATE ORDER STATUS
+  // ============================================================
+  const handleUpdateOrderStatus = async (productId, newStatus) => {
+    const product = inventory.find(p => p.id === productId);
+    if (!product) return;
+    const updates = {
+      orderStatus: newStatus,
+      orderStatusUpdatedAt: new Date().toISOString()
+    };
+    try {
+      const result = await api.updateProduct(user.uid, productId, updates);
+      if (result.success) {
+        if (refreshInventory) await refreshInventory();
+        else if (onUpdateInventory) {
+          const updated = inventory.map(item => item.id === productId ? { ...item, ...updates } : item);
+          onUpdateInventory(updated);
+        }
+        showToast(`📦 Order status updated to ${newStatus}`);
+      }
+    } catch (error) {
+      console.error('Update order status error:', error);
+      showToast('❌ Failed to update order status');
+    }
+  };
+
+  // ============================================================
+  // 🗑️ DELETE PRODUCT
+  // ============================================================
   const handleDeleteProduct = async (productId) => {
     const product = inventory.find(p => p.id === productId);
     if (product && window.confirm(`Delete ${product.name} from inventory?`)) {
       try {
         const result = await api.deleteProduct(user.uid, productId);
         if (result.success) {
-          await refreshData();
+          if (refreshInventory) await refreshInventory();
+          else if (onUpdateInventory) {
+            const updated = inventory.filter(item => item.id !== productId);
+            onUpdateInventory(updated);
+          }
           showToast(`🗑️ ${product.name} removed from inventory`);
           setSelectedItems([]);
           setSelectAll(false);
@@ -699,6 +863,40 @@ function Inventory({
         showToast('❌ Failed to delete product');
       }
     }
+  };
+
+  // ============================================================
+  // ✏️ EDIT PRODUCT
+  // ============================================================
+  const handleEditProduct = async (updatedProduct) => {
+    try {
+      if (updatedProduct.supplier && updatedProduct.supplier !== 'Manual Entry' && updatedProduct.supplier !== 'OCR Scanned') {
+        await saveSupplierIfNotExists(updatedProduct.supplier);
+      }
+      const result = await api.updateProduct(user.uid, updatedProduct.id, updatedProduct);
+      if (result.success) {
+        if (refreshInventory) await refreshInventory();
+        else if (onUpdateInventory) {
+          const updated = inventory.map(item => item.id === updatedProduct.id ? updatedProduct : item);
+          onUpdateInventory(updated);
+        }
+        showToast(`✏️ ${updatedProduct.name} updated`);
+        setShowEditModal(false);
+        setSelectedProduct(null);
+      } else {
+        showToast('❌ Failed to update product');
+      }
+    } catch (error) {
+      console.error('Update error:', error);
+      showToast('❌ Failed to update product');
+    }
+  };
+
+  // ============================================================
+  // 🏷️ SUPPLIER CLICK
+  // ============================================================
+  const handleSupplierClick = (supplierName) => {
+    navigate('/suppliers', { state: { supplier: supplierName } });
   };
 
   // ============================================================
@@ -718,7 +916,7 @@ function Inventory({
     const products = inventory.filter(item => selectedItems.includes(item.id));
     const expiringProducts = products.filter(item => item.daysLeft > 0 && item.daysLeft <= 7 && item.stock > 0);
     if (expiringProducts.length === 0) {
-      showToast('⚠️ No expiring products selected (only 1-7 days left and in stock)');
+      showToast('⚠️ No expiring products selected');
       return;
     }
     if (!window.confirm(`Apply flash sale to ${expiringProducts.length} selected products?`)) return;
@@ -746,7 +944,11 @@ function Inventory({
       for (const itemId of selectedItems) {
         await api.deleteProduct(user.uid, itemId);
       }
-      await refreshData();
+      if (refreshInventory) await refreshInventory();
+      else if (onUpdateInventory) {
+        const updated = inventory.filter(item => !selectedItems.includes(item.id));
+        onUpdateInventory(updated);
+      }
       showToast(`🗑️ ${selectedItems.length} products deleted`);
       setSelectedItems([]);
       setSelectAll(false);
@@ -756,198 +958,6 @@ function Inventory({
     } finally {
       setActionLoading(null);
     }
-  };
-
-  // ============================================================
-  // ✅ HANDLE ADD PRODUCT
-  // ============================================================
-  const handleAddProduct = async (productData) => {
-    let productName = productData.name;
-    if (!productName || productName.startsWith('Product ') || productName === 'OCR Product') {
-      const result = await showProductNamePrompt('Add Product', 'Enter a name for this product', productData.name || 'New Product');
-      if (!result || result.trim().length < 2) { showToast('❌ Product name is required (min 2 characters)'); return; }
-      productName = result.trim();
-    }
-
-    if (!productName || productName.trim().length < 2) { showToast('❌ Product name is required (min 2 characters)'); return; }
-    if (!canAdd) {
-      showToast(`⚠️ Product limit reached (${inventory.length}/${productLimit}). Please upgrade.`);
-      window.location.href = '/billing';
-      return;
-    }
-
-    let supplierName = productData.supplier || 'Manual Entry';
-    if (!preSelectedSupplier && supplierName !== 'Manual Entry' && supplierName !== 'OCR Scanned') {
-      const supplierList = suppliers.map(s => s.name);
-      const selected = await showSupplierPromptFn('Select or Add Supplier', 'Choose an existing supplier or type a new one', supplierList, supplierName);
-      if (selected && selected.trim()) supplierName = selected.trim();
-      else supplierName = 'Manual Entry';
-    } else if (preSelectedSupplier) {
-      supplierName = preSelectedSupplier;
-    }
-
-    if (supplierName !== 'Manual Entry' && supplierName !== 'OCR Scanned') await saveSupplierIfNotExists(supplierName);
-
-    const daysLeft = Math.ceil((new Date(productData.expiryDate || new Date(Date.now() + 30 * 86400000)) - new Date()) / (1000 * 60 * 60 * 24));
-
-    const newProduct = {
-      name: productName.trim(),
-      batch: productData.batch || `B${String(Date.now()).slice(-6)}`,
-      batchDate: new Date().toISOString().split('T')[0],
-      supplier: supplierName,
-      supplierContact: productData.supplierContact || 'N/A',
-      supplierEmail: productData.supplierEmail || 'N/A',
-      expiryDate: productData.expiryDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-      daysLeft: daysLeft,
-      status: daysLeft <= 0 ? 'expired' : daysLeft <= 7 ? 'warning' : 'good',
-      suggestion: daysLeft <= 7 ? 'Monitor closely' : 'Normal Stock',
-      stock: productData.stock || 1,
-      lowStockThreshold: 10,
-      costPrice: productData.costPrice || 100,
-      sellingPrice: productData.sellingPrice || 150,
-      flashSaleActive: false,
-      orderStatus: 'pending'
-    };
-
-    try {
-      setAddingProduct(true);
-      showToast(`📦 Adding ${newProduct.name}...`);
-      const result = await api.addProduct(user.uid, newProduct);
-      if (result.success) {
-        await refreshData();
-        showToast(`✅ ${newProduct.name} added to inventory!`);
-        setScanType(null);
-        setShowScanner(false);
-        setPreSelectedSupplier('');
-      } else {
-        showToast(`❌ ${result.error || 'Failed to add product'}`);
-      }
-    } catch (error) {
-      console.error('Add product error:', error);
-      showToast(`❌ ${error.message || 'Failed to add product. Please try again.'}`);
-    } finally {
-      setAddingProduct(false);
-    }
-  };
-
-  // ============================================================
-  // ✅ HANDLE SCAN (Barcode + OCR)
-  // ============================================================
-  const handleScan = async (scanData) => {
-    console.log('📷 Scan data received:', scanData);
-
-    if (scanData.type === 'barcode') {
-      const existingProduct = inventory.find(p => p.batch === scanData.value);
-      if (existingProduct) {
-        showToast(`📦 Product found: ${existingProduct.name} - Stock: ${existingProduct.stock}`);
-        setSelectedProduct(existingProduct);
-        setShowEditModal(true);
-        setShowScanner(false);
-        setScanType(null);
-        return;
-      }
-      const defaultName = scanData.productInfo?.name || `Product ${scanData.value.slice(-4)}`;
-      const productName = await showProductNamePrompt('Add Product', 'Enter a name for this product', defaultName);
-      if (!productName || productName.trim().length < 2) { showToast('❌ Product name is required'); setShowScanner(false); setScanType(null); return; }
-      let supplierName = preSelectedSupplier || 'Manual Entry';
-      if (!preSelectedSupplier) {
-        const supplierList = suppliers.map(s => s.name);
-        const selected = await showSupplierPromptFn('Select or Add Supplier', 'Choose an existing supplier or type a new one', supplierList, supplierName);
-        if (selected && selected.trim()) supplierName = selected.trim();
-        else supplierName = 'Manual Entry';
-      }
-      handleAddProduct({
-        name: productName,
-        batch: scanData.value,
-        supplier: supplierName,
-        expiryDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-        stock: 1,
-        costPrice: 100,
-        sellingPrice: 150
-      });
-      setShowScanner(false);
-      setScanType(null);
-
-    } else if (scanData.type === 'ocr') {
-      if (scanData.productData) {
-        handleAddProduct(scanData.productData);
-        setShowScanner(false);
-        setScanType(null);
-      } else {
-        showToast(`📅 Expiry date detected: ${scanData.value}`);
-        const expiringProducts = inventory.filter(p => p.daysLeft <= 14 && p.daysLeft > 0);
-        if (expiringProducts.length > 0) {
-          const productToUpdate = expiringProducts[0];
-          if (window.confirm(`Update expiry for ${productToUpdate.name} to ${scanData.value}?`)) {
-            const daysLeft = Math.ceil((new Date(scanData.value) - new Date()) / (1000 * 60 * 60 * 24));
-            const updatedProduct = {
-              ...productToUpdate,
-              expiryDate: scanData.value,
-              daysLeft: daysLeft,
-              status: daysLeft <= 0 ? 'expired' : daysLeft <= 7 ? 'warning' : 'good'
-            };
-            try {
-              const result = await api.updateProduct(user.uid, productToUpdate.id, updatedProduct);
-              if (result.success) {
-                await refreshData();
-                showToast(`✅ Expiry updated for ${productToUpdate.name}`);
-              }
-            } catch (error) {
-              console.error('Update error:', error);
-              showToast('❌ Failed to update product');
-            }
-          }
-        } else {
-          const productName = await showProductNamePrompt('Add Product (OCR)', 'We detected an expiry date. Please enter the product name.', 'OCR Product');
-          if (!productName || productName.trim().length < 2) { showToast('❌ Product name is required'); setShowScanner(false); setScanType(null); return; }
-          let supplierName = 'OCR Scanned';
-          const supplierList = suppliers.map(s => s.name);
-          const selected = await showSupplierPromptFn('Select or Add Supplier (OCR)', 'Choose an existing supplier or type a new one', supplierList, 'OCR Scanned');
-          if (selected && selected.trim()) supplierName = selected.trim();
-          handleAddProduct({
-            name: productName,
-            batch: `OCR-${Date.now().toString().slice(-6)}`,
-            supplier: supplierName,
-            expiryDate: scanData.value,
-            stock: 1,
-            costPrice: 100,
-            sellingPrice: 150
-          });
-        }
-        setShowScanner(false);
-        setScanType(null);
-      }
-    }
-  };
-
-  // ============================================================
-  // ✅ HANDLE EDIT PRODUCT
-  // ============================================================
-  const handleEditProduct = async (updatedProduct) => {
-    try {
-      if (updatedProduct.supplier && updatedProduct.supplier !== 'Manual Entry' && updatedProduct.supplier !== 'OCR Scanned') {
-        await saveSupplierIfNotExists(updatedProduct.supplier);
-      }
-      const result = await api.updateProduct(user.uid, updatedProduct.id, updatedProduct);
-      if (result.success) {
-        await refreshData();
-        showToast(`✏️ ${updatedProduct.name} updated`);
-        setShowEditModal(false);
-        setSelectedProduct(null);
-      } else {
-        showToast('❌ Failed to update product');
-      }
-    } catch (error) {
-      console.error('Update error:', error);
-      showToast('❌ Failed to update product');
-    }
-  };
-
-  // ============================================================
-  // ✅ HANDLE SUPPLIER CLICK
-  // ============================================================
-  const handleSupplierClick = (supplierName) => {
-    navigate('/suppliers', { state: { supplier: supplierName } });
   };
 
   // ============================================================
@@ -978,12 +988,9 @@ function Inventory({
     lowStockCount: inventory.filter(i => i.stock <= i.lowStockThreshold && i.stock > 0).length
   };
 
-  // ✅ Separate lists for alerts
   const lowStockItems = inventory.filter(item => item.stock > 0 && item.stock <= (item.lowStockThreshold || 10) && item.status !== 'sold_out');
   const expiringItems = inventory.filter(item => item.daysLeft > 0 && item.daysLeft <= 7 && !item.flashSaleActive && item.stock > 0);
   const criticalExpiring = expiringItems.filter(item => item.daysLeft <= 2);
-
-  // ✅ Pending Orders
   const pendingOrders = inventory.filter(item => item.orderStatus === 'ordered' || item.orderStatus === 'pending');
 
   // ============================================================
@@ -1015,7 +1022,7 @@ function Inventory({
               background: productLimit === Infinity ? 'linear-gradient(90deg, #39e75f, #6eef8b)' : undefined
             }}></div>
           </div>
-          <small style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>{planNameDisplay}</small>
+          <small style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>{planName || 'Free Trial'}</small>
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1036,7 +1043,7 @@ function Inventory({
         </div>
       </div>
 
-      {/* 🔵 Low Stock Alert Banner */}
+      {/* Low Stock Alert Banner */}
       {lowStockItems.length > 0 && (
         <div className="low-stock-alert-banner">
           <div className="low-stock-alert-icon"><i className="fas fa-boxes"></i></div>
@@ -1057,7 +1064,7 @@ function Inventory({
         </div>
       )}
 
-      {/* 🟡 Expiry Alert Banner */}
+      {/* Expiry Alert Banner */}
       {expiringItems.length > 0 && (
         <div className={`expiry-alert-banner ${criticalExpiring.length > 0 ? 'critical' : 'warning'}`}>
           <i className={`fas ${criticalExpiring.length > 0 ? 'fa-exclamation-triangle' : 'fa-clock'}`}></i>
@@ -1080,7 +1087,7 @@ function Inventory({
         </div>
       )}
 
-      {/* 📦 Pending Orders Section */}
+      {/* Pending Orders Section */}
       {pendingOrders.length > 0 && (
         <div className="pending-orders-section">
           <div className="pending-orders-header">
@@ -1145,32 +1152,117 @@ function Inventory({
       {showScanner && !scanType && (
         <div className="scanner-section">
           <div className="scanner-tabs">
-            <button className="scanner-tab" onClick={() => setScanType('barcode')} disabled={!canAdd}><i className="fas fa-barcode"></i> Barcode Scanner</button>
-            <button className="scanner-tab" onClick={() => setScanType('ocr')} disabled={!canAdd} style={{ background: canAdd ? 'linear-gradient(135deg, var(--green-deep), var(--green-neon))' : 'var(--bg-raised)', color: canAdd ? '#030a03' : 'var(--text-muted)' }}>
-              <i className="fas fa-eye"></i> OCR Scanner <span style={{ fontSize: '0.7rem', background: '#fff', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px' }}>BETA</span>
+            <button 
+              className="scanner-tab" 
+              onClick={() => setScanType('barcode')} 
+              disabled={!canAdd}
+            >
+              <i className="fas fa-barcode"></i> Barcode Scanner
             </button>
-            <button className="scanner-close" onClick={() => setShowScanner(false)}><i className="fas fa-times"></i></button>
+            <button 
+              className="scanner-tab" 
+              onClick={() => setScanType('ocr')} 
+              disabled={!canAdd}
+              style={{ 
+                background: canAdd ? 'linear-gradient(135deg, var(--green-deep), var(--green-neon))' : 'var(--bg-raised)', 
+                color: canAdd ? '#030a03' : 'var(--text-muted)' 
+              }}
+            >
+              <i className="fas fa-eye"></i> OCR Scanner 
+              <span style={{ fontSize: '0.7rem', background: '#fff', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px' }}>
+                BETA
+              </span>
+            </button>
+            <button 
+              className="scanner-tab" 
+              onClick={() => setScanType('mobile')}
+              style={{
+                background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                color: '#ffffff'
+              }}
+            >
+              <i className="fas fa-mobile-alt"></i> Mobile Scanner
+              <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px' }}>
+                📱
+              </span>
+            </button>
+            <button className="scanner-close" onClick={() => setShowScanner(false)}>
+              <i className="fas fa-times"></i>
+            </button>
           </div>
           <div className="scanner-prompt">
-            <p>Scan barcode or expiry date to add or update products</p>
-            {preSelectedSupplier && <p style={{ color: 'var(--green-neon)', fontWeight: 'bold' }}>📦 Adding product for: <strong>{preSelectedSupplier}</strong></p>}
+            <p>Choose a scanning method to add products</p>
+            {preSelectedSupplier && (
+              <p style={{ color: 'var(--green-neon)', fontWeight: 'bold' }}>
+                📦 Adding product for: <strong>{preSelectedSupplier}</strong>
+              </p>
+            )}
             {!canAdd && (
               <p style={{ color: 'var(--red)', fontWeight: 'bold' }}>
                 ⚠️ Product limit reached ({inventory.length}/{productLimit}).
-                <button onClick={() => window.location.href = '/billing'} style={{ background: 'var(--green-neon)', border: 'none', padding: '4px 12px', borderRadius: '20px', marginLeft: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#030a03' }}>Upgrade Now</button>
+                <button 
+                  onClick={() => window.location.href = '/billing'} 
+                  style={{ 
+                    background: 'var(--green-neon)', 
+                    border: 'none', 
+                    padding: '4px 12px', 
+                    borderRadius: '20px', 
+                    marginLeft: '8px', 
+                    cursor: 'pointer', 
+                    fontWeight: 'bold', 
+                    color: '#030a03' 
+                  }}
+                >
+                  Upgrade Now
+                </button>
               </p>
             )}
-            {canAdd && <small className="scan-limit-info">{productLimit === Infinity ? 'Unlimited' : productLimit - inventory.length} product slots remaining</small>}
+            {canAdd && (
+              <small className="scan-limit-info">
+                {productLimit === Infinity ? 'Unlimited' : productLimit - inventory.length} product slots remaining
+              </small>
+            )}
           </div>
         </div>
       )}
 
-      {scanType === 'barcode' && (<div className="scanner-section"><BarcodeScanner onScan={handleScan} onClose={() => setScanType(null)} /></div>)}
-      {scanType === 'ocr' && (<div className="scanner-section"><OCRScanner onScan={handleScan} onClose={() => setScanType(null)} existingSuppliers={suppliers.map(s => ({ id: s.id, name: s.name }))} /></div>)}
+      {scanType === 'barcode' && (
+        <div className="scanner-section">
+          <BarcodeScanner onScan={handleScan} onClose={() => setScanType(null)} />
+        </div>
+      )}
+      {scanType === 'ocr' && (
+        <div className="scanner-section">
+          <OCRScanner 
+            onScan={handleScan} 
+            onClose={() => setScanType(null)} 
+            existingSuppliers={suppliers.map(s => ({ id: s.id, name: s.name }))} 
+          />
+        </div>
+      )}
+      {scanType === 'mobile' && (
+        <div className="scanner-section">
+          <MobileScanner 
+            onScan={handleScan} 
+            onClose={() => {
+              setScanType(null);
+              setShowScanner(false);
+            }} 
+          />
+        </div>
+      )}
 
       {/* Search and Filter */}
       <div className="search-filter-bar">
-        <div className="search-box"><i className="fas fa-search"></i><input type="text" placeholder="Search by name, batch, or supplier..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+        <div className="search-box">
+          <i className="fas fa-search"></i>
+          <input 
+            type="text" 
+            placeholder="Search by name, batch, or supplier..." 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+          />
+        </div>
       </div>
 
       <div className="filter-buttons" style={{ marginBottom: '1rem' }}>

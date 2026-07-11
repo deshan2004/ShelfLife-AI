@@ -489,4 +489,97 @@
     flex-direction: column;
     text-align: center;
   }
+}/* src/components/MobileScanner.css - Add these missing styles */
+
+/* Scan History */
+.scan-history-section {
+  margin-top: 20px;
+  padding: 12px 16px;
+  background: rgba(13, 22, 13, 0.6);
+  border-radius: 16px;
+}
+
+.scan-history-section h4 {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.scan-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.scan-history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 0.7rem;
+}
+
+.scan-history-item .scan-type {
+  font-size: 0.9rem;
+}
+
+.scan-history-item .scan-value {
+  flex: 1;
+  color: var(--text-secondary);
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-history-item .scan-time {
+  color: var(--text-muted);
+  font-size: 0.6rem;
+}
+
+/* Scan Result */
+.scan-result-success {
+  padding: 12px 16px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: slideIn 0.3s ease;
+  background: rgba(57, 231, 95, 0.1);
+  border: 1px solid rgba(57, 231, 95, 0.2);
+  margin-bottom: 16px;
+}
+
+.scan-result-success i {
+  font-size: 1.5rem;
+  color: #4ade80;
+}
+
+.scan-result-success strong {
+  display: block;
+  font-size: 0.85rem;
+  color: #ffffff;
+}
+
+.scan-result-success p {
+  font-size: 0.8rem;
+  color: #9bbf9b;
+  font-family: monospace;
+  margin-top: 2px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+  .scan-history-item {
+    font-size: 0.6rem;
+    padding: 4px 6px;
+  }
+  
+  .scan-history-item .scan-value {
+    max-width: 120px;
+  }
 }
