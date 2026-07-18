@@ -30,15 +30,19 @@ function MobileScanner({ onScan, onClose, pairingCode: propPairingCode }) {
       if (!event.data) return;
       
       // Handle scan result
-      if (event.data.type === 'scan' && event.data.code === code) {
-        const scanData = event.data.scanData;
+      if (event.data.type === 'scanResult' && event.data.code === code) {
+        const scanData = {
+          type: event.data.scanType,
+          value: event.data.value,
+          data: event.data.data
+        };
         console.log('📥 Scan received from mobile:', scanData);
         
         setScanResult({ 
           success: true, 
           type: scanData.type,
           value: scanData.value,
-          productData: scanData.productData || null
+          productData: scanData.data || null
         });
         
         // Add to history

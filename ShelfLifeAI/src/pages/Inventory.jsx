@@ -442,9 +442,18 @@ function Inventory({
   // HANDLE ADD PRODUCT
   // ============================================================
   const handleAddProduct = async (productData) => {
-    let productName = productData.name;
+    let finalProductData = { ...productData };
+    
+    if (!finalProductData.isComplete) {
+      // Prompt for full product details using AddProductModal on laptop
+      const result = await showAddProductPrompt('Add Product', finalProductData);
+      if (!result) return; // User cancelled
+      finalProductData = { ...finalProductData, ...result };
+    }
+
+    let productName = finalProductData.name;
     if (!productName || productName.startsWith('Product ') || productName === 'OCR Product' || productName === 'Mobile Scan') {
-      const result = await showProductNamePrompt('Add Product', 'Enter a name for this product', productData.name || 'New Product');
+      const result = await showProductNamePrompt('Add Product', 'Enter a name for this product', finalProductData.name || 'New Product');
       if (!result || result.trim().length < 2) { showToast('❌ Product name is required (min 2 characters)'); return; }
       productName = result.trim();
     }
@@ -535,6 +544,14 @@ function Inventory({
         setScanType(null);
         return;
       }
+      
+      if (scanData.data && scanData.data.isComplete) {
+        handleAddProduct({ ...scanData.data, batch: scanData.value });
+        setShowScanner(false);
+        setScanType(null);
+        return;
+      }
+
       const defaultName = scanData.productInfo?.name || `Product ${scanData.value.slice(-4)}`;
       const productName = await showProductNamePrompt('Add Product', 'Enter a name for this product', defaultName);
       if (!productName || productName.trim().length < 2) { showToast('❌ Product name is required'); setShowScanner(false); setScanType(null); return; }
@@ -557,8 +574,8 @@ function Inventory({
       setShowScanner(false);
       setScanType(null);
     } else if (scanData.type === 'ocr') {
-      if (scanData.productData) {
-        handleAddProduct(scanData.productData);
+      if (scanData.data && scanData.data.isComplete) {
+        handleAddProduct({ ...scanData.data, batch: `OCR-${Date.now().toString().slice(-6)}` });
         setShowScanner(false);
         setScanType(null);
       } else {
