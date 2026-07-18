@@ -216,8 +216,8 @@ function ReturnConfirmModal({ isOpen, product, onConfirm, onCancel }) {
               <i className="fas fa-box"></i> Quantity to Return
             </label>
             <div className="return-quantity-controls">
-              <button 
-                className="return-qty-btn" 
+              <button
+                className="return-qty-btn"
                 onClick={() => setQuantity(Math.max(0, quantity - 1))}
               >
                 <i className="fas fa-minus"></i>
@@ -233,8 +233,8 @@ function ReturnConfirmModal({ isOpen, product, onConfirm, onCancel }) {
                 min="0"
                 max={maxQty}
               />
-              <button 
-                className="return-qty-btn" 
+              <button
+                className="return-qty-btn"
                 onClick={() => setQuantity(Math.min(maxQty, quantity + 1))}
               >
                 <i className="fas fa-plus"></i>
@@ -242,7 +242,7 @@ function ReturnConfirmModal({ isOpen, product, onConfirm, onCancel }) {
             </div>
             <div className="return-qty-hint">
               <span>Max: {maxQty} units</span>
-              <button 
+              <button
                 className="return-max-btn"
                 onClick={() => setQuantity(maxQty)}
               >
@@ -255,7 +255,7 @@ function ReturnConfirmModal({ isOpen, product, onConfirm, onCancel }) {
             <label className="return-form-label">
               <i className="fas fa-pen"></i> Reason for Return
             </label>
-            <select 
+            <select
               className="return-reason-select"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -606,7 +606,7 @@ function Inventory({
   const executeSingleFlash = async () => {
     const product = flashItems[0];
     if (!product) return;
-    
+
     setShowFlashConfirm(false);
     setActionLoading(product.id);
 
@@ -1286,7 +1286,7 @@ function Inventory({
           </div>
 
           <div className="scanner-methods-grid">
-            <div 
+            <div
               className={`scanner-method-card barcode-card ${!canAdd ? 'disabled' : ''}`}
               onClick={() => canAdd && setScanType('barcode')}
             >
@@ -1303,7 +1303,7 @@ function Inventory({
               </div>
             </div>
 
-            <div 
+            <div
               className={`scanner-method-card ocr-card ${!canAdd ? 'disabled' : ''}`}
               onClick={() => canAdd && setScanType('ocr')}
             >
@@ -1320,7 +1320,7 @@ function Inventory({
               </div>
             </div>
 
-            <div 
+            <div
               className={`scanner-method-card mobile-card ${!canAdd ? 'disabled' : ''}`}
               onClick={() => canAdd && setScanType('mobile')}
             >
@@ -1356,8 +1356,8 @@ function Inventory({
               <div className="scanner-slots-info">
                 <i className="fas fa-boxes"></i>
                 <span>
-                  {productLimit === Infinity 
-                    ? '♾️ Unlimited slots available' 
+                  {productLimit === Infinity
+                    ? '♾️ Unlimited slots available'
                     : `${productLimit - inventory.length} product slots remaining`}
                 </span>
               </div>
@@ -1373,21 +1373,21 @@ function Inventory({
       )}
       {scanType === 'ocr' && (
         <div className="scanner-section">
-          <OCRScanner 
-            onScan={handleScan} 
-            onClose={() => setScanType(null)} 
-            existingSuppliers={suppliers.map(s => ({ id: s.id, name: s.name }))} 
+          <OCRScanner
+            onScan={handleScan}
+            onClose={() => setScanType(null)}
+            existingSuppliers={suppliers.map(s => ({ id: s.id, name: s.name }))}
           />
         </div>
       )}
       {scanType === 'mobile' && (
         <div className="scanner-section">
-          <MobileScanner 
-            onScan={handleScan} 
+          <MobileScanner
+            onScan={handleScan}
             onClose={() => {
               setScanType(null);
               setShowScanner(false);
-            }} 
+            }}
           />
         </div>
       )}
@@ -1396,11 +1396,11 @@ function Inventory({
       <div className="search-filter-bar">
         <div className="search-box">
           <i className="fas fa-search"></i>
-          <input 
-            type="text" 
-            placeholder="Search by name, batch, or supplier..." 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)} 
+          <input
+            type="text"
+            placeholder="Search by name, batch, or supplier..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
@@ -1609,11 +1609,11 @@ function Inventory({
       )}
 
       {/* Flash Confirm Modal */}
-      <FlashConfirmModal 
-        isOpen={showFlashConfirm} 
-        items={flashItems} 
-        onConfirm={flashItems.length === 1 ? executeSingleFlash : executeAutoFlash} 
-        onCancel={() => { setShowFlashConfirm(false); setFlashItems([]); }} 
+      <FlashConfirmModal
+        isOpen={showFlashConfirm}
+        items={flashItems}
+        onConfirm={flashItems.length === 1 ? executeSingleFlash : executeAutoFlash}
+        onCancel={() => { setShowFlashConfirm(false); setFlashItems([]); }}
       />
 
       {/* Order All Confirm Modal */}
