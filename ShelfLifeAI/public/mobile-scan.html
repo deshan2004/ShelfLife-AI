@@ -10,6 +10,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         
         const firebaseConfig = {
             apiKey: "AIzaSyAsGToU-W0r3TkTK9BR1E6jFNzSJ4UE7Vw",
@@ -20,10 +21,25 @@
             appId: "1:916781512926:web:5e2500ab7c7055bfccaa4f"
         };
         
-        const app = initializeApp(firebaseConfig);
-        window.db = getFirestore(app);
-        window.setDoc = setDoc;
-        window.doc = doc;
+        try {
+            const app = initializeApp(firebaseConfig);
+            window.db = getFirestore(app);
+            window.setDoc = setDoc;
+            window.doc = doc;
+            
+            // Try to authenticate anonymously to bypass some basic security rules
+            try {
+                const auth = getAuth(app);
+                await signInAnonymously(auth);
+            } catch (e) {
+                console.log("Anonymous auth failed (might be disabled), proceeding without auth", e);
+            }
+            
+            // Dispatch event when Firebase is ready
+            window.dispatchEvent(new Event('firebaseReady'));
+        } catch (error) {
+            console.error("Firebase initialization failed:", error);
+        }
     </script>
     <style>
         * {
@@ -1242,7 +1258,21 @@
         // ============================================================
         updateModeUI();
         startCamera();
-        sendReady();
+        
+        // Wait for Firebase to be ready if not opened as popup
+        if (!window.opener) {
+            if (window.db) {
+                sendReady();
+            } else {
+                window.addEventListener('firebaseReady', sendReady);
+                // Fallback if it fails
+                setTimeout(() => {
+                    if (!window.db) sendReady();
+                }, 3000);
+            }
+        } else {
+            sendReady();
+        }
 
         console.log('📱 ShelfLife AI Mobile Scanner initialized');
         console.log(`🔑 Pairing Code: ${pairingCode}`);
