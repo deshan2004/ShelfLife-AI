@@ -1,5 +1,6 @@
 // src/components/AdvancedBarcodeScanner.jsx
 import { useState, useRef, useEffect } from 'react';
+import { BrowserMultiFormatReader } from '@zxing/library';
 import './AdvancedBarcodeScanner.css';
 
 function AdvancedBarcodeScanner({ onScan, onClose }) {
@@ -142,7 +143,48 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
           setCameraError("No barcode detected in the image.");
         }
       } else {
-        setCameraError("Barcode detection is not supported in this browser.");
+        // Fallback to ZXing for file upload if native API is missing
+        const reader = new BrowserMultiFormatReader();
+        const imageUrl = URL.createObjectURL(file);
+        
+        const img = new Image();
+        img.src = imageUrl;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        
+        try {
+          const result = await reader.decodeFromImageElement(img);
+          if (result) {
+            const barcodeValue = result.getText();
+            
+            try {
+              const audio = new Audio('/beep.mp3');
+              audio.volume = 0.3;
+              audio.play();
+            } catch (e) {}
+            
+            setScanResult({ success: true, value: barcodeValue });
+            
+            onScan({ 
+              type: 'barcode', 
+              value: barcodeValue,
+              productInfo: { 
+                name: `Product ${barcodeValue.slice(-4)}`, 
+                brand: 'Scanned from Photo' 
+              }
+            });
+            
+            setTimeout(() => {
+              setScanResult(null);
+            }, 3000);
+          }
+        } catch (err) {
+          setCameraError("No barcode detected in the image.");
+        } finally {
+          URL.revokeObjectURL(imageUrl);
+        }
       }
     } catch (error) {
       console.error('File scan error:', error);
