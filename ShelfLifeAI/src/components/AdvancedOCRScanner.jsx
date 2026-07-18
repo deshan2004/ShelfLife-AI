@@ -283,14 +283,14 @@ function AdvancedOCRScanner({ onScan, onClose, existingSuppliers = [] }) {
     if (!text) return null;
     const cleanText = text.replace(/\s+/g, ' ').trim();
     const patterns = [
-      { regex: /(\d{4})[-/](\d{1,2})[-/](\d{1,2})/, groups: [1, 2, 3] },
-      { regex: /(\d{1,2})[-/](\d{1,2})[-/](\d{4})/, groups: [3, 1, 2] },
+      { regex: /(\d{4})[-/\s\.](\d{1,2})[-/\s\.](\d{1,2})/, groups: [1, 2, 3] },
+      { regex: /(\d{1,2})[-/\s\.](\d{1,2})[-/\s\.](\d{4})/, groups: [3, 1, 2] },
       { regex: /(\d{2})(\d{2})(\d{4})/, groups: [3, 1, 2] },
-      { regex: /(?:exp|expiry|expiration|best before|use by|bb|bestby)[:\s]*(\d{4}[-/]\d{1,2}[-/]\d{1,2})/i, groups: [1, null, null] },
-      { regex: /(?:exp|expiry)[:\s]*(\d{1,2})[-/](\d{1,2})[-/](\d{4})/i, groups: [3, 1, 2] },
-      { regex: /(?:exp|expiry)[:\s]*(\d{1,2})[-/](\d{4})/i, groups: [2, 1, null] },
-      { regex: /\b(\d{4})[-/](\d{1,2})[-/](\d{1,2})\b/, groups: [1, 2, 3] },
-      { regex: /\b(\d{1,2})[-/](\d{1,2})[-/](\d{4})\b/, groups: [3, 1, 2] },
+      { regex: /(?:exp|expiry|expiration|best before|use by|bb|bestby)[:\s]*(\d{4}[-/\s\.]\d{1,2}[-/\s\.]\d{1,2})/i, groups: [1, null, null] },
+      { regex: /(?:exp|expiry)[:\s]*(\d{1,2})[-/\s\.](\d{1,2})[-/\s\.](\d{4})/i, groups: [3, 1, 2] },
+      { regex: /(?:exp|expiry)[:\s]*(\d{1,2})[-/\s\.](\d{4})/i, groups: [2, 1, null] },
+      { regex: /\b(\d{4})[-/\s\.](\d{1,2})[-/\s\.](\d{1,2})\b/, groups: [1, 2, 3] },
+      { regex: /\b(\d{1,2})[-/\s\.](\d{1,2})[-/\s\.](\d{4})\b/, groups: [3, 1, 2] },
     ];
 
     const digits = cleanText.replace(/\D/g, '');
@@ -323,15 +323,12 @@ function AdvancedOCRScanner({ onScan, onClose, existingSuppliers = [] }) {
             month = parseInt(parts[1]); year = parseInt(parts[0]); day = 1;
           } else {
             const dateStr = match[1];
-            if (dateStr.includes('-') || dateStr.includes('/')) {
-              const sep = dateStr.includes('-') ? '-' : '/';
-              const parts2 = dateStr.split(sep);
-              if (parts2.length === 3) {
-                const a = parseInt(parts2[0]), b = parseInt(parts2[1]), c = parseInt(parts2[2]);
-                if (a >= 2000 && a <= 2100) { year = a; month = b; day = c; }
-                else if (c >= 2000 && c <= 2100) { year = c; month = a; day = b; }
-                else continue;
-              }
+            const parts2 = dateStr.split(/[-/\s\.]/);
+            if (parts2.length >= 3) {
+              const a = parseInt(parts2[0]), b = parseInt(parts2[1]), c = parseInt(parts2[2]);
+              if (a >= 2000 && a <= 2100) { year = a; month = b; day = c; }
+              else if (c >= 2000 && c <= 2100) { year = c; month = a; day = b; }
+              else continue;
             }
           }
         }

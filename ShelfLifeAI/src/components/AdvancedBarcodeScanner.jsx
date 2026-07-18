@@ -13,6 +13,7 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
   const [selectedCamera, setSelectedCamera] = useState('');
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectedCount, setDetectedCount] = useState(0);
+  const lastDecodeTimeRef = useRef(0);
   
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -85,13 +86,58 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
           return;
         }
       } else {
-        // Mock detection for demo
-        if (Math.random() < 0.03) {
-          const mockBarcode = '8901234567890';
-          setScanResult({ success: true, value: mockBarcode });
-          onScan({ type: 'barcode', value: mockBarcode });
-          stopCamera();
-          setTimeout(() => setScanResult(null), 3000);
+        // Fallback to ZXing if native BarcodeDetector is unavailable
+        if (!window.zxingReader) {
+          window.zxingReader = new BrowserMultiFormatReader();
+        }
+        
+        const now = Date.now();
+        if (now - lastDecodeTimeRef.current > 500) {
+          lastDecodeTimeRef.current = now;
+          const canvas = document.createElement('canvas');
+          canvas.width = videoRef.current.videoWidth || 640;
+          canvas.height = videoRef.current.videoHeight || 480;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+          
+          const img = new Image();
+          img.src = canvas.toDataURL('image/jpeg', 0.8);
+          await new Promise(r => { img.onload = r; img.onerror = r; });
+          
+          try {
+            const result = await window.zxingReader.decodeFromImageElement(img);
+            if (result) {
+              setIsDetecting(true);
+              const barcodeValue = result.getText();
+              setDetectedCount(prev => prev + 1);
+              
+              try {
+                const audio = new Audio('/beep.mp3');
+                audio.volume = 0.3;
+                audio.play();
+              } catch (e) {}
+              
+              setScanResult({ success: true, value: barcodeValue });
+              
+              onScan({ 
+                type: 'barcode', 
+                value: barcodeValue,
+                productInfo: { 
+                  name: `Product ${barcodeValue.slice(-4)}`, 
+                  brand: 'Scanned Item' 
+                }
+              });
+              
+              stopCamera();
+              setTimeout(() => {
+                setScanResult(null);
+                setIsDetecting(false);
+              }, 2500);
+              return;
+            }
+          } catch (e) {
+            // ZXing throws if no barcode is found
+          }
         }
       }
     } catch (error) {
