@@ -147,6 +147,81 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
     animationRef.current = requestAnimationFrame(detectBarcode);
   };
 
+  const manualCaptureBarcode = async () => {
+    if (!videoRef.current || videoRef.current.readyState < 2) return;
+    
+    setIsDetecting(true);
+    
+    // First try native BarcodeDetector if available
+    if ('BarcodeDetector' in window) {
+      try {
+        const barcodeDetector = new BarcodeDetector({
+          formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'codabar', 'itf']
+        });
+        const barcodes = await barcodeDetector.detect(videoRef.current);
+        if (barcodes.length > 0) {
+          const barcodeValue = barcodes[0].rawValue;
+          handleSuccess(barcodeValue);
+          return;
+        }
+      } catch (e) {
+        console.error('Native barcode error:', e);
+      }
+    }
+    
+    // Fallback to ZXing
+    try {
+      if (!window.zxingReader) {
+        window.zxingReader = new BrowserMultiFormatReader();
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth || 640;
+      canvas.height = videoRef.current.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      
+      const img = new Image();
+      img.src = canvas.toDataURL('image/jpeg', 0.8);
+      await new Promise(r => { img.onload = r; img.onerror = r; });
+      
+      const result = await window.zxingReader.decodeFromImageElement(img);
+      if (result) {
+        handleSuccess(result.getText());
+        return;
+      }
+      showToast('No barcode detected. Try again.', 'error');
+      setIsDetecting(false);
+    } catch (e) {
+      showToast('No barcode detected. Try again.', 'error');
+      setIsDetecting(false);
+    }
+  };
+
+  const handleSuccess = (barcodeValue) => {
+    setDetectedCount(prev => prev + 1);
+    try {
+      const audio = new Audio('/beep.mp3');
+      audio.volume = 0.3;
+      audio.play();
+    } catch (e) {}
+    
+    setScanResult({ success: true, value: barcodeValue });
+    onScan({ 
+      type: 'barcode', 
+      value: barcodeValue,
+      productInfo: { 
+        name: `Product ${barcodeValue.slice(-4)}`, 
+        brand: 'Scanned Item' 
+      }
+    });
+    
+    stopCamera();
+    setTimeout(() => {
+      setScanResult(null);
+      setIsDetecting(false);
+    }, 2500);
+  };
+
   // Handle file upload
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
@@ -435,14 +510,23 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
             </div>
 
             {/* Camera Controls */}
-            <div className="scanner-controls">
-              <button className="scanner-stop-btn" onClick={stopCamera}>
+            <div className="scanner-controls" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button className="scanner-stop-btn" onClick={stopCamera} style={{ flex: 1 }}>
                 <i className="fas fa-stop"></i> Stop
               </button>
+              
+              <button 
+                className="scanner-start-btn" 
+                onClick={manualCaptureBarcode}
+                style={{ flex: 2, margin: 0, padding: '15px' }}
+                disabled={isDetecting}
+              >
+                <i className="fas fa-camera"></i> {isDetecting ? 'Scanning...' : 'Scan Now'}
+              </button>
+              
               <button className="scanner-flash-btn" onClick={() => {
-                // Toggle flash if available
                 showToast('💡 Flash toggled');
-              }}>
+              }} style={{ flex: 1 }}>
                 <i className="fas fa-bolt"></i>
               </button>
             </div>
