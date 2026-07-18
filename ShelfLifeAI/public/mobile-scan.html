@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>Mobile Scanner - ShelfLife AI</title>
+    <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -472,6 +474,11 @@
         let isConnected = false;
         let scanHistory = [];
         let isProcessing = false;
+        let lastDecodeTime = 0;
+        let zxingReader = null;
+        try {
+            zxingReader = new ZXing.BrowserMultiFormatReader();
+        } catch(e) {}
 
         // DOM Elements
         const video = document.getElementById('video');
@@ -642,21 +649,41 @@
                         }, 2000);
                         return;
                     }
-                } else {
-                    // Fallback: Simulate detection for demo
-                    if (Math.random() < 0.02 && currentMode === 'barcode') {
-                        const mockBarcode = '8901234567890';
-                        isScanning = false;
-                        isProcessing = true;
-                        sendResult('barcode', mockBarcode);
-                        setTimeout(() => {
-                            isProcessing = false;
-                            if (currentMode === 'barcode' && isConnected) {
-                                isScanning = true;
-                                animationId = requestAnimationFrame(detectBarcode);
+                } else if (zxingReader) {
+                    const now = Date.now();
+                    if (now - lastDecodeTime > 500) {
+                        lastDecodeTime = now;
+                        const canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth || 640;
+                        canvas.height = video.videoHeight || 480;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        
+                        const img = new Image();
+                        img.src = canvas.toDataURL('image/jpeg', 0.8);
+                        await new Promise(r => {
+                            img.onload = r;
+                            img.onerror = r;
+                        });
+                        
+                        try {
+                            const result = await zxingReader.decodeFromImageElement(img);
+                            if (result && currentMode === 'barcode') {
+                                isScanning = false;
+                                isProcessing = true;
+                                sendResult('barcode', result.getText());
+                                setTimeout(() => {
+                                    isProcessing = false;
+                                    if (currentMode === 'barcode' && isConnected) {
+                                        isScanning = true;
+                                        animationId = requestAnimationFrame(detectBarcode);
+                                    }
+                                }, 2000);
+                                return;
                             }
-                        }, 2000);
-                        return;
+                        } catch (e) {
+                            // No barcode found
+                        }
                     }
                 }
             } catch (error) {
@@ -779,50 +806,36 @@
             showProcessing();
             
             try {
-                // Load Tesseract.js
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-                script.onload = async () => {
-                    try {
-                        if (typeof Tesseract === 'undefined') {
-                            throw new Error('Tesseract not loaded');
-                        }
-                        const result = await Tesseract.recognize(imageData, 'eng');
-                        const text = result.data.text;
-                        const expiryDate = parseExpiryDate(text);
-                        
-                        if (expiryDate) {
-                            sendResult('ocr', expiryDate, {
-                                name: 'OCR Product',
-                                supplier: 'OCR Scanned',
-                                expiryDate: expiryDate,
-                                stock: 1,
-                                costPrice: 100,
-                                sellingPrice: 150
-                            });
-                        } else {
-                            showToast('No expiry date found. Try better lighting.', 'error');
-                            if (currentMode === 'barcode' && isConnected) {
-                                isScanning = true;
-                                animationId = requestAnimationFrame(detectBarcode);
-                            }
-                        }
-                    } catch (err) {
-                        console.error('OCR error:', err);
-                        showToast('OCR failed. Please try again.', 'error');
+                if (typeof Tesseract === 'undefined') {
+                    showToast('OCR engine not loaded yet. Please wait a moment and try again.', 'error');
+                    hideProcessing();
+                    isProcessing = false;
+                    return;
+                }
+                const result = await Tesseract.recognize(imageData, 'eng');
+                const text = result.data.text;
+                const expiryDate = parseExpiryDate(text);
+                
+                if (expiryDate) {
+                    sendResult('ocr', expiryDate, {
+                        name: 'OCR Product',
+                        supplier: 'OCR Scanned',
+                        expiryDate: expiryDate,
+                        stock: 1,
+                        costPrice: 100,
+                        sellingPrice: 150
+                    });
+                } else {
+                    showToast('No expiry date found. Try better lighting.', 'error');
+                    if (currentMode === 'barcode' && isConnected) {
+                        isScanning = true;
+                        animationId = requestAnimationFrame(detectBarcode);
                     }
-                    hideProcessing();
-                    isProcessing = false;
-                };
-                script.onerror = () => {
-                    showToast('Failed to load OCR engine. Check internet connection.', 'error');
-                    hideProcessing();
-                    isProcessing = false;
-                };
-                document.head.appendChild(script);
+                }
             } catch (error) {
                 console.error('OCR error:', error);
                 showToast('OCR failed. Please try again.', 'error');
+            } finally {
                 hideProcessing();
                 isProcessing = false;
             }
@@ -855,41 +868,30 @@
             reader.onload = async (event) => {
                 showProcessing();
                 try {
-                    const script = document.createElement('script');
-                    script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-                    script.onload = async () => {
-                        try {
-                            if (typeof Tesseract === 'undefined') {
-                                throw new Error('Tesseract not loaded');
-                            }
-                            const result = await Tesseract.recognize(event.target.result, 'eng');
-                            const text = result.data.text;
-                            const expiryDate = parseExpiryDate(text);
-                            
-                            if (expiryDate) {
-                                sendResult('ocr', expiryDate, {
-                                    name: 'Uploaded Product',
-                                    supplier: 'Manual Upload',
-                                    expiryDate: expiryDate,
-                                    stock: 1,
-                                    costPrice: 100,
-                                    sellingPrice: 150
-                                });
-                            } else {
-                                showToast('No expiry date found in image', 'error');
-                            }
-                        } catch (err) {
-                            showToast('OCR failed', 'error');
-                        }
+                    if (typeof Tesseract === 'undefined') {
+                        showToast('OCR engine not loaded yet. Please wait a moment and try again.', 'error');
                         hideProcessing();
-                    };
-                    script.onerror = () => {
-                        showToast('Failed to load OCR engine', 'error');
-                        hideProcessing();
-                    };
-                    document.head.appendChild(script);
+                        return;
+                    }
+                    const result = await Tesseract.recognize(event.target.result, 'eng');
+                    const text = result.data.text;
+                    const expiryDate = parseExpiryDate(text);
+                    
+                    if (expiryDate) {
+                        sendResult('ocr', expiryDate, {
+                            name: 'Uploaded Product',
+                            supplier: 'Manual Upload',
+                            expiryDate: expiryDate,
+                            stock: 1,
+                            costPrice: 100,
+                            sellingPrice: 150
+                        });
+                    } else {
+                        showToast('No expiry date found in image', 'error');
+                    }
                 } catch (error) {
                     showToast('OCR failed', 'error');
+                } finally {
                     hideProcessing();
                 }
             };
