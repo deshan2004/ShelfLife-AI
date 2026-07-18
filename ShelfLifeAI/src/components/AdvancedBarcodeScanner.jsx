@@ -25,7 +25,10 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
         setAvailableCameras(videoDevices);
-        if (videoDevices.length > 0) {
+        const backCamera = videoDevices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment'));
+        if (backCamera) {
+          setSelectedCamera(backCamera.deviceId);
+        } else if (videoDevices.length > 0) {
           setSelectedCamera(videoDevices[0].deviceId);
         }
       } catch (error) {
@@ -95,6 +98,58 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
     }
     
     animationRef.current = requestAnimationFrame(detectBarcode);
+  };
+
+  // Handle file upload
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      const imageBitmap = await createImageBitmap(file);
+      
+      if ('BarcodeDetector' in window) {
+        const barcodeDetector = new BarcodeDetector({
+          formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'codabar', 'itf']
+        });
+        
+        const barcodes = await barcodeDetector.detect(imageBitmap);
+        
+        if (barcodes.length > 0) {
+          const barcodeValue = barcodes[0].rawValue;
+          
+          try {
+            const audio = new Audio('/beep.mp3');
+            audio.volume = 0.3;
+            audio.play();
+          } catch (e) {}
+          
+          setScanResult({ success: true, value: barcodeValue });
+          
+          onScan({ 
+            type: 'barcode', 
+            value: barcodeValue,
+            productInfo: { 
+              name: `Product ${barcodeValue.slice(-4)}`, 
+              brand: 'Scanned from Photo' 
+            }
+          });
+          
+          setTimeout(() => {
+            setScanResult(null);
+          }, 3000);
+        } else {
+          setCameraError("No barcode detected in the image.");
+        }
+      } else {
+        setCameraError("Barcode detection is not supported in this browser.");
+      }
+    } catch (error) {
+      console.error('File scan error:', error);
+      setCameraError("Failed to process the image.");
+    }
+    
+    e.target.value = '';
   };
 
   // Start camera
@@ -232,7 +287,7 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
 
         {/* Start Camera Button */}
         {!cameraActive && !scanResult && (
-          <div className="scanner-start-section">
+          <div className="scanner-start-section" style={{ display: 'flex', gap: '10px', flexDirection: 'column' }}>
             <button 
               onClick={startCamera} 
               className="scanner-start-btn" 
@@ -244,6 +299,16 @@ function AdvancedBarcodeScanner({ onScan, onClose }) {
                 <><i className="fas fa-camera"></i> Start Scanner</>
               )}
             </button>
+            <input 
+              type="file" 
+              id="barcode-upload" 
+              accept="image/*" 
+              style={{ display: 'none' }} 
+              onChange={handleFileUpload}
+            />
+            <label htmlFor="barcode-upload" className="scanner-start-btn" style={{ background: 'var(--color-secondary, #2a3d2a)', color: '#9bbf9b', border: '1px solid rgba(57, 231, 95, 0.2)' }}>
+              <i className="fas fa-image"></i> Upload Photo
+            </label>
           </div>
         )}
 
