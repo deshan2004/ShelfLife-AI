@@ -6,6 +6,25 @@
     <title>Mobile Scanner - ShelfLife AI</title>
     <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyAsGToU-W0r3TkTK9BR1E6jFNzSJ4UE7Vw",
+            authDomain: "shelflife-ai-141df.firebaseapp.com",
+            projectId: "shelflife-ai-141df",
+            storageBucket: "shelflife-ai-141df.firebasestorage.app",
+            messagingSenderId: "916781512926",
+            appId: "1:916781512926:web:5e2500ab7c7055bfccaa4f"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        window.db = getFirestore(app);
+        window.setDoc = setDoc;
+        window.doc = doc;
+    </script>
     <style>
         * {
             margin: 0;
@@ -580,7 +599,14 @@
 
         // Get URL parameters
         const urlParams = new URLSearchParams(window.location.search);
-        const pairingCode = urlParams.get('pair');
+        let pairingCode = urlParams.get('pair');
+        
+        if (!pairingCode && !window.opener) {
+            const manualCode = prompt("Enter the pairing code shown on your laptop to connect via Cloud:");
+            if (manualCode && manualCode.trim().length > 0) {
+                pairingCode = manualCode.trim().toUpperCase();
+            }
+        }
         const scanType = urlParams.get('type') || 'barcode';
 
         let currentMode = scanType;
@@ -690,7 +716,7 @@
         // ============================================================
         // SEND READY EVENT TO PARENT
         // ============================================================
-        function sendReady() {
+        async function sendReady() {
             if (window.opener) {
                 window.opener.postMessage({
                     type: 'ready',
@@ -704,15 +730,32 @@
                     isScanning = true;
                     animationId = requestAnimationFrame(detectBarcode);
                 }
+            } else if (window.db && pairingCode !== 'MANUAL') {
+                try {
+                    await window.setDoc(window.doc(window.db, 'mobile_scans', pairingCode), {
+                        type: 'ready',
+                        timestamp: new Date().toISOString()
+                    });
+                    connectionStatus.innerHTML = '<i class="fas fa-cloud"></i><span>Cloud Paired! Ready to scan</span>';
+                    connectionStatus.classList.add('connected');
+                    isConnected = true;
+                    
+                    if (currentMode === 'barcode') {
+                        isScanning = true;
+                        animationId = requestAnimationFrame(detectBarcode);
+                    }
+                } catch (e) {
+                    connectionStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span>Failed to connect to cloud.</span>';
+                }
             } else {
-                connectionStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span>Not connected to computer. Please open from the ShelfLife AI website.</span>';
+                connectionStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span>Not connected. Open from ShelfLife AI on computer.</span>';
             }
         }
 
         // ============================================================
         // SEND SCAN RESULT TO PARENT
         // ============================================================
-        function sendResult(type, value, productData = null) {
+        async function sendResult(type, value, productData = null) {
             const extraData = productData || {};
             
             // Add to history
@@ -727,11 +770,23 @@
                     data: extraData
                 }, '*');
                 showToast(`Sent ${type} to computer`, 'success');
-                if (navigator.vibrate) {
-                    navigator.vibrate(200);
+                if (navigator.vibrate) navigator.vibrate(200);
+            } else if (window.db && pairingCode !== 'MANUAL') {
+                try {
+                    await window.setDoc(window.doc(window.db, 'mobile_scans', pairingCode), {
+                        type: 'scanResult',
+                        scanType: type,
+                        value: value,
+                        data: extraData,
+                        timestamp: new Date().toISOString()
+                    });
+                    showToast(`Sent ${type} to computer via Cloud`, 'success');
+                    if (navigator.vibrate) navigator.vibrate(200);
+                } catch (e) {
+                    showToast(`Failed to send ${type} to cloud`, 'error');
                 }
             } else {
-                addToHistory(type, value);
+                showToast('Scan saved locally. Connect to computer to sync.', 'error');
             }
         }
 

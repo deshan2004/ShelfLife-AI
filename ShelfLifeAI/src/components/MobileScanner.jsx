@@ -1,5 +1,7 @@
 // src/components/MobileScanner.jsx
 import { useState, useEffect, useRef } from 'react';
+import { db } from '../firebaseConfig';
+import { doc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import './MobileScanner.css';
 
 function MobileScanner({ onScan, onClose, pairingCode: propPairingCode }) {
@@ -80,7 +82,53 @@ function MobileScanner({ onScan, onClose, pairingCode: propPairingCode }) {
     };
     
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+
+    // Also listen to Firestore for cross-device pairing (e.g. from Vercel)
+    const unsubscribe = onSnapshot(doc(db, 'mobile_scans', code), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data.type === 'ready') {
+          setIsPaired(true);
+        } else if (data.type === 'scanResult') {
+          const scanData = {
+            type: data.scanType,
+            value: data.value,
+            data: data.data
+          };
+          console.log('📥 Scan received from Firestore:', scanData);
+          
+          setScanResult({ 
+            success: true, 
+            type: scanData.type,
+            value: scanData.value,
+            productData: scanData.data || null
+          });
+          
+          setScanHistory(prev => [
+            { type: scanData.type, value: scanData.value, time: new Date().toLocaleTimeString() },
+            ...prev
+          ].slice(0, 10));
+          
+          try {
+            const audio = new Audio('/beep.mp3');
+            audio.volume = 0.3;
+            audio.play().catch(e => console.log('Audio not supported'));
+          } catch (e) {}
+          
+          if (onScan) onScan(scanData);
+          
+          setTimeout(() => setScanResult(null), 5000);
+          
+          // Clear document after processing
+          deleteDoc(doc(db, 'mobile_scans', code)).catch(console.error);
+        }
+      }
+    });
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      unsubscribe();
+    };
   }, [onScan, scanType, propPairingCode]);
 
   const openMobileScanner = () => {
