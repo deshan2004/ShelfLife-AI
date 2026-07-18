@@ -649,40 +649,45 @@
                         }, 2000);
                         return;
                     }
-                } else if (zxingReader) {
-                    const now = Date.now();
-                    if (now - lastDecodeTime > 500) {
-                        lastDecodeTime = now;
-                        const canvas = document.createElement('canvas');
-                        canvas.width = video.videoWidth || 640;
-                        canvas.height = video.videoHeight || 480;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        
-                        const img = new Image();
-                        img.src = canvas.toDataURL('image/jpeg', 0.8);
-                        await new Promise(r => {
-                            img.onload = r;
-                            img.onerror = r;
-                        });
-                        
-                        try {
-                            const result = await zxingReader.decodeFromImageElement(img);
-                            if (result && currentMode === 'barcode') {
-                                isScanning = false;
-                                isProcessing = true;
-                                sendResult('barcode', result.getText());
-                                setTimeout(() => {
-                                    isProcessing = false;
-                                    if (currentMode === 'barcode' && isConnected) {
-                                        isScanning = true;
-                                        animationId = requestAnimationFrame(detectBarcode);
-                                    }
-                                }, 2000);
-                                return;
+                } else {
+                    if (!zxingReader && typeof ZXing !== 'undefined') {
+                        zxingReader = new ZXing.BrowserMultiFormatReader();
+                    }
+                    if (zxingReader) {
+                        const now = Date.now();
+                        if (now - lastDecodeTime > 500) {
+                            lastDecodeTime = now;
+                            const canvas = document.createElement('canvas');
+                            canvas.width = video.videoWidth || 640;
+                            canvas.height = video.videoHeight || 480;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            
+                            const img = new Image();
+                            img.src = canvas.toDataURL('image/jpeg', 0.8);
+                            await new Promise(r => {
+                                img.onload = r;
+                                img.onerror = r;
+                            });
+                            
+                            try {
+                                const result = await zxingReader.decodeFromImageElement(img);
+                                if (result && currentMode === 'barcode') {
+                                    isScanning = false;
+                                    isProcessing = true;
+                                    sendResult('barcode', result.getText());
+                                    setTimeout(() => {
+                                        isProcessing = false;
+                                        if (currentMode === 'barcode' && isConnected) {
+                                            isScanning = true;
+                                            animationId = requestAnimationFrame(detectBarcode);
+                                        }
+                                    }, 2000);
+                                    return;
+                                }
+                            } catch (e) {
+                                // No barcode found
                             }
-                        } catch (e) {
-                            // No barcode found
                         }
                     }
                 }
@@ -737,20 +742,29 @@
             const cleanText = text.replace(/\s+/g, ' ').trim();
             
             const patterns = [
-                /(\d{4})[-/](\d{1,2})[-/](\d{1,2})/,
-                /(\d{1,2})[-/](\d{1,2})[-/](\d{4})/,
-                /(?:exp|expiry|expiration|best before|use by|bb|bestby)[:\s]*(\d{4}[-/]\d{1,2}[-/]\d{1,2})/i,
-                /(?:exp|expiry)[:\s]*(\d{2})[-/](\d{2})[-/](\d{4})/i,
+                /(\d{4})[-/\s\.](\d{1,2})[-/\s\.](\d{1,2})/,
+                /(\d{1,2})[-/\s\.](\d{1,2})[-/\s\.](\d{4})/,
+                /(?:exp|expiry|expiration|best before|use by|bb|bestby)[:\s]*(\d{4}[-/\s\.]\d{1,2}[-/\s\.]\d{1,2})/i,
+                /(?:exp|expiry)[:\s]*(\d{2})[-/\s\.](\d{2})[-/\s\.](\d{4})/i,
                 /(\d{2})(\d{2})(\d{4})/,
                 /\b(\d{2})(\d{2})(\d{4})\b/,
-                /\b(\d{1,2})[-/](\d{1,2})[-/](\d{4})\b/
+                /\b(\d{1,2})[-/\s\.](\d{1,2})[-/\s\.](\d{4})\b/
             ];
             
             for (const pattern of patterns) {
                 const match = cleanText.match(pattern);
                 if (match) {
                     let year, month, day;
-                    if (match[1] && match[1].length === 4) {
+                    const match1 = match[1];
+                    // If match 1 contains separators, split it (for pattern #3)
+                    if (match1 && (match1.includes('-') || match1.includes('/') || match1.includes(' ') || match1.includes('.'))) {
+                        const parts = match1.split(/[-/\s\.]/);
+                        if (parts.length >= 3) {
+                            year = parseInt(parts[0]);
+                            month = parseInt(parts[1]);
+                            day = parseInt(parts[2]);
+                        }
+                    } else if (match[1] && match[1].length === 4) {
                         year = parseInt(match[1]);
                         month = parseInt(match[2]);
                         day = parseInt(match[3]);
@@ -904,15 +918,42 @@
         // ============================================================
 
         // Capture Button
-        captureBtn.addEventListener('click', () => {
+        captureBtn.addEventListener('click', async () => {
             if (currentMode === 'barcode') {
-                // In barcode mode, trigger manual detection
-                if (!isScanning && !isProcessing) {
-                    isScanning = true;
-                    if (animationId) cancelAnimationFrame(animationId);
-                    animationId = requestAnimationFrame(detectBarcode);
-                    showToast('📷 Scanning for barcode...', 'success');
+                if (!video || isProcessing) return;
+                showProcessing();
+                try {
+                    if ('BarcodeDetector' in window) {
+                        const barcodeDetector = new BarcodeDetector({ formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'codabar', 'itf'] });
+                        const barcodes = await barcodeDetector.detect(video);
+                        if (barcodes.length > 0) {
+                            sendResult('barcode', barcodes[0].rawValue);
+                            hideProcessing();
+                            return;
+                        }
+                    }
+                    if (!zxingReader && typeof ZXing !== 'undefined') zxingReader = new ZXing.BrowserMultiFormatReader();
+                    if (zxingReader) {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth || 640;
+                        canvas.height = video.videoHeight || 480;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        const img = new Image();
+                        img.src = canvas.toDataURL('image/jpeg', 0.8);
+                        await new Promise(r => { img.onload = r; img.onerror = r; });
+                        const result = await zxingReader.decodeFromImageElement(img);
+                        if (result) {
+                            sendResult('barcode', result.getText());
+                            hideProcessing();
+                            return;
+                        }
+                    }
+                    showToast('No barcode detected. Try again.', 'error');
+                } catch (e) {
+                    showToast('No barcode detected. Try again.', 'error');
                 }
+                hideProcessing();
             } else {
                 captureForOCR();
             }
