@@ -608,8 +608,84 @@
         const closeBtn = document.getElementById('closeBtn');
         const fileInput = document.getElementById('file-input');
 
+        // Modal Elements
+        const addProductModal = document.getElementById('addProductModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const modalBarcode = document.getElementById('modalBarcode');
+        const modalName = document.getElementById('modalName');
+        const modalExpiry = document.getElementById('modalExpiry');
+        const modalStock = document.getElementById('modalStock');
+        const modalPrice = document.getElementById('modalPrice');
+        const saveProductBtn = document.getElementById('saveProductBtn');
+
+        let pendingScanType = '';
+        let pendingScanValue = '';
+
         // Display pairing code
         pairingCodeEl.textContent = pairingCode || 'MANUAL';
+
+        // Modal Event Listeners
+        closeModalBtn.addEventListener('click', () => {
+            addProductModal.style.display = 'none';
+            if (currentMode === 'barcode' && isConnected) {
+                isScanning = true;
+                animationId = requestAnimationFrame(detectBarcode);
+            }
+        });
+
+        saveProductBtn.addEventListener('click', () => {
+            const name = modalName.value.trim();
+            if (!name) {
+                showToast('Product Name is required', 'error');
+                return;
+            }
+            
+            const productData = {
+                name: name,
+                barcode: modalBarcode.value.trim() || pendingScanValue,
+                expiryDate: modalExpiry.value,
+                stock: parseInt(modalStock.value) || 1,
+                sellingPrice: parseFloat(modalPrice.value) || 0,
+                isComplete: true
+            };
+
+            addProductModal.style.display = 'none';
+            sendResult(pendingScanType, pendingScanValue, productData);
+            
+            // Reset modal
+            modalName.value = '';
+            modalStock.value = '1';
+            modalPrice.value = '0';
+            
+            if (currentMode === 'barcode' && isConnected) {
+                isScanning = true;
+                animationId = requestAnimationFrame(detectBarcode);
+            }
+        });
+
+        // Function to show modal
+        function promptProductDetails(type, value, parsedData = null) {
+            isScanning = false;
+            if (animationId) cancelAnimationFrame(animationId);
+            
+            pendingScanType = type;
+            pendingScanValue = value;
+            
+            if (type === 'barcode') {
+                modalBarcode.value = value;
+                modalExpiry.value = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+            } else if (type === 'ocr') {
+                modalBarcode.value = `OCR-${Date.now().toString().slice(-6)}`;
+                modalExpiry.value = value;
+            }
+            
+            if (parsedData) {
+                if (parsedData.name) modalName.value = parsedData.name;
+            }
+            
+            addProductModal.style.display = 'flex';
+            modalName.focus();
+        }
 
         // ============================================================
         // SEND READY EVENT TO PARENT
@@ -748,13 +824,15 @@
                         isScanning = false;
                         isProcessing = true;
                         const barcodeValue = barcodes[0].rawValue;
-                        sendResult('barcode', barcodeValue);
+                        
+                        isScanning = false;
+                        isProcessing = true;
+                        
+                        // Trigger modal instead of sending immediately
+                        promptProductDetails('barcode', barcodeValue);
+                        
                         setTimeout(() => {
                             isProcessing = false;
-                            if (currentMode === 'barcode' && isConnected) {
-                                isScanning = true;
-                                animationId = requestAnimationFrame(detectBarcode);
-                            }
                         }, 2000);
                         return;
                     }
@@ -784,13 +862,12 @@
                                 if (result && currentMode === 'barcode') {
                                     isScanning = false;
                                     isProcessing = true;
-                                    sendResult('barcode', result.getText());
+                                    
+                                    // Trigger modal instead of sending immediately
+                                    promptProductDetails('barcode', result.getText());
+                                    
                                     setTimeout(() => {
                                         isProcessing = false;
-                                        if (currentMode === 'barcode' && isConnected) {
-                                            isScanning = true;
-                                            animationId = requestAnimationFrame(detectBarcode);
-                                        }
                                     }, 2000);
                                     return;
                                 }
@@ -940,16 +1017,9 @@
                 const expiryDate = parseExpiryDate(text);
                 
                 if (expiryDate) {
-                    sendResult('ocr', expiryDate, {
-                        name: 'OCR Product',
-                        supplier: 'OCR Scanned',
-                        expiryDate: expiryDate,
-                        stock: 1,
-                        costPrice: 100,
-                        sellingPrice: 150
-                    });
+                    promptProductDetails('ocr', expiryDate);
                 } else {
-                    showToast('No expiry date found. Try better lighting.', 'error');
+                    showToast('No valid expiry date found', 'error');
                     if (currentMode === 'barcode' && isConnected) {
                         isScanning = true;
                         animationId = requestAnimationFrame(detectBarcode);
@@ -1001,14 +1071,7 @@
                     const expiryDate = parseExpiryDate(text);
                     
                     if (expiryDate) {
-                        sendResult('ocr', expiryDate, {
-                            name: 'Uploaded Product',
-                            supplier: 'Manual Upload',
-                            expiryDate: expiryDate,
-                            stock: 1,
-                            costPrice: 100,
-                            sellingPrice: 150
-                        });
+                        promptProductDetails('ocr', expiryDate);
                     } else {
                         showToast('No expiry date found in image', 'error');
                     }
@@ -1036,7 +1099,8 @@
                         const barcodeDetector = new BarcodeDetector({ formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'codabar', 'itf'] });
                         const barcodes = await barcodeDetector.detect(video);
                         if (barcodes.length > 0) {
-                            sendResult('barcode', barcodes[0].rawValue);
+                            isScanning = false;
+                            promptProductDetails('barcode', barcodes[0].rawValue);
                             hideProcessing();
                             return;
                         }
@@ -1053,7 +1117,8 @@
                         await new Promise(r => { img.onload = r; img.onerror = r; });
                         const result = await zxingReader.decodeFromImageElement(img);
                         if (result) {
-                            sendResult('barcode', result.getText());
+                            isScanning = false;
+                            promptProductDetails('barcode', result.getText());
                             hideProcessing();
                             return;
                         }
