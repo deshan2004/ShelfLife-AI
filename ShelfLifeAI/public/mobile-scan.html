@@ -6,41 +6,6 @@
     <title>Mobile Scanner - ShelfLife AI</title>
     <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <!-- Firebase -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        
-        const firebaseConfig = {
-            apiKey: "AIzaSyAsGToU-W0r3TkTK9BR1E6jFNzSJ4UE7Vw",
-            authDomain: "shelflife-ai-141df.firebaseapp.com",
-            projectId: "shelflife-ai-141df",
-            storageBucket: "shelflife-ai-141df.firebasestorage.app",
-            messagingSenderId: "916781512926",
-            appId: "1:916781512926:web:5e2500ab7c7055bfccaa4f"
-        };
-        
-        try {
-            const app = initializeApp(firebaseConfig);
-            window.db = getFirestore(app);
-            window.setDoc = setDoc;
-            window.doc = doc;
-            
-            // Try to authenticate anonymously to bypass some basic security rules
-            try {
-                const auth = getAuth(app);
-                await signInAnonymously(auth);
-            } catch (e) {
-                console.log("Anonymous auth failed (might be disabled), proceeding without auth", e);
-            }
-            
-            // Dispatch event when Firebase is ready
-            window.dispatchEvent(new Event('firebaseReady'));
-        } catch (error) {
-            console.error("Firebase initialization failed:", error);
-        }
-    </script>
     <style>
         * {
             margin: 0;
@@ -734,34 +699,23 @@
         // ============================================================
         async function sendReady() {
             if (window.opener) {
-                window.opener.postMessage({
-                    type: 'ready',
-                    code: pairingCode
-                }, '*');
+                window.opener.postMessage({ type: 'ready', code: pairingCode }, '*');
                 connectionStatus.innerHTML = '<i class="fas fa-check-circle"></i><span>Connected! Ready to scan</span>';
                 connectionStatus.classList.add('connected');
                 isConnected = true;
-                
-                if (currentMode === 'barcode') {
-                    isScanning = true;
-                    animationId = requestAnimationFrame(detectBarcode);
-                }
-            } else if (window.db && pairingCode !== 'MANUAL') {
+                if (currentMode === 'barcode') { isScanning = true; animationId = requestAnimationFrame(detectBarcode); }
+            } else if (pairingCode && pairingCode !== 'MANUAL') {
                 try {
-                    await window.setDoc(window.doc(window.db, 'mobile_scans', pairingCode), {
-                        type: 'ready',
-                        timestamp: new Date().toISOString()
+                    await fetch(`https://ntfy.sh/shelflife_scan_${pairingCode}`, {
+                        method: 'POST',
+                        body: JSON.stringify({ type: 'ready', timestamp: new Date().toISOString() })
                     });
                     connectionStatus.innerHTML = '<i class="fas fa-cloud"></i><span>Cloud Paired! Ready to scan</span>';
                     connectionStatus.classList.add('connected');
                     isConnected = true;
-                    
-                    if (currentMode === 'barcode') {
-                        isScanning = true;
-                        animationId = requestAnimationFrame(detectBarcode);
-                    }
+                    if (currentMode === 'barcode') { isScanning = true; animationId = requestAnimationFrame(detectBarcode); }
                 } catch (e) {
-                    connectionStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span>Failed to connect to cloud.</span>';
+                    connectionStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span>Failed to connect to cloud relay.</span>';
                 }
             } else {
                 connectionStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span>Not connected. Open from ShelfLife AI on computer.</span>';
@@ -773,28 +727,17 @@
         // ============================================================
         async function sendResult(type, value, productData = null) {
             const extraData = productData || {};
-            
-            // Add to history
             addToHistory(type, value);
             
             if (window.opener) {
-                window.opener.postMessage({
-                    type: 'scanResult',
-                    code: pairingCode,
-                    scanType: type,
-                    value: value,
-                    data: extraData
-                }, '*');
+                window.opener.postMessage({ type: 'scanResult', code: pairingCode, scanType: type, value: value, data: extraData }, '*');
                 showToast(`Sent ${type} to computer`, 'success');
                 if (navigator.vibrate) navigator.vibrate(200);
-            } else if (window.db && pairingCode !== 'MANUAL') {
+            } else if (pairingCode && pairingCode !== 'MANUAL') {
                 try {
-                    await window.setDoc(window.doc(window.db, 'mobile_scans', pairingCode), {
-                        type: 'scanResult',
-                        scanType: type,
-                        value: value,
-                        data: extraData,
-                        timestamp: new Date().toISOString()
+                    await fetch(`https://ntfy.sh/shelflife_scan_${pairingCode}`, {
+                        method: 'POST',
+                        body: JSON.stringify({ type: 'scanResult', scanType: type, value: value, data: extraData, timestamp: new Date().toISOString() })
                     });
                     showToast(`Sent ${type} to computer via Cloud`, 'success');
                     if (navigator.vibrate) navigator.vibrate(200);
@@ -1258,21 +1201,7 @@
         // ============================================================
         updateModeUI();
         startCamera();
-        
-        // Wait for Firebase to be ready if not opened as popup
-        if (!window.opener) {
-            if (window.db) {
-                sendReady();
-            } else {
-                window.addEventListener('firebaseReady', sendReady);
-                // Fallback if it fails
-                setTimeout(() => {
-                    if (!window.db) sendReady();
-                }, 3000);
-            }
-        } else {
-            sendReady();
-        }
+        sendReady();
 
         console.log('📱 ShelfLife AI Mobile Scanner initialized');
         console.log(`🔑 Pairing Code: ${pairingCode}`);
