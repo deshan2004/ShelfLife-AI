@@ -310,7 +310,7 @@
 }
 
 /* Quick Actions */
-.quick-actions {
+.chat-quick-actions {
   padding: 8px 12px 10px;
   display: flex;
   gap: 6px;
@@ -322,11 +322,11 @@
   scrollbar-width: none;
 }
 
-.quick-actions::-webkit-scrollbar {
+.chat-quick-actions::-webkit-scrollbar {
   display: none;
 }
 
-.quick-action-btn {
+.chat-quick-action-btn {
   flex-shrink: 0;
   background: rgba(57, 231, 95, 0.08);
   border: 1px solid rgba(57, 231, 95, 0.12);
@@ -341,7 +341,7 @@
   min-height: 30px;
 }
 
-.quick-action-btn:hover {
+.chat-quick-action-btn:hover {
   background: rgba(57, 231, 95, 0.18);
   border-color: #39e75f;
   color: #39e75f;
@@ -623,7 +623,7 @@
     max-width: 90%;
   }
   
-  .quick-action-btn {
+  .chat-quick-action-btn {
     font-size: 0.6rem;
     padding: 4px 10px;
   }
