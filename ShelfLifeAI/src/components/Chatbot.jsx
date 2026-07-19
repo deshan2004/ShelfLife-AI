@@ -261,11 +261,11 @@ function Chatbot() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="quick-actions">
+          <div className="chat-quick-actions">
             {quickActions.map((action, index) => (
               <button
                 key={index}
-                className="quick-action-btn"
+                className="chat-quick-action-btn"
                 onClick={() => handleQuickAction(action.action)}
               >
                 {action.label}
