@@ -1024,6 +1024,21 @@ function Inventory({
       if (updatedProduct.supplier && updatedProduct.supplier !== 'Manual Entry' && updatedProduct.supplier !== 'OCR Scanned') {
         await saveSupplierIfNotExists(updatedProduct.supplier);
       }
+      
+      // Recalculate daysLeft
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const expDate = new Date(updatedProduct.expiryDate);
+      const diffTime = expDate - today;
+      const newDaysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Clear flash sale if expiry date is extended beyond 7 days
+      if (newDaysLeft > 7 && updatedProduct.flashSaleActive) {
+        updatedProduct.flashSaleActive = false;
+        updatedProduct.flashSaleDiscount = null;
+        updatedProduct.suggestion = 'Healthy Stock';
+      }
+
       const result = await api.updateProduct(user.uid, updatedProduct.id, updatedProduct);
       if (result.success) {
         if (refreshInventory) await refreshInventory();
