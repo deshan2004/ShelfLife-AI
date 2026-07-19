@@ -200,7 +200,11 @@ function Chatbot() {
           if (notificationCount > 0) setNotificationCount(0);
         }}
       >
-        <i className="fas fa-comment-dots"></i>
+        {isOpen ? (
+          <i className="fas fa-times"></i>
+        ) : (
+          <i className="fas fa-comment-dots"></i>
+        )}
         {notificationCount > 0 && !isOpen && (
           <span className="notification-badge">{notificationCount}</span>
         )}
