@@ -1122,7 +1122,8 @@
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   margin: 1.5rem 0;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
@@ -1428,6 +1429,8 @@
   
   .inventory-table .action-buttons {
     gap: 3px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
   }
   
   .inventory-table .action-btn {
@@ -3302,25 +3305,37 @@
   }
 }
 
-/* --- Sticky First Column (Product) - For better context --- */
+/* --- Sticky First Columns (Checkbox & Product) - For better context --- */
 @media (max-width: 768px) {
+  /* Checkbox Column */
   .inventory-table tbody td:first-child,
   .inventory-table thead th:first-child {
     position: sticky;
     left: 0;
-    z-index: 8;
+    z-index: 10;
     background: var(--bg-panel);
-    min-width: 100px;
-    max-width: 120px;
+    width: 30px;
   }
   
-  .inventory-table thead th:first-child {
+  /* Product Name Column */
+  .inventory-table tbody td:nth-child(2),
+  .inventory-table thead th:nth-child(2) {
+    position: sticky;
+    left: 40px; /* Offset by checkbox width */
+    z-index: 10;
+    background: var(--bg-panel);
+    min-width: 130px;
+    max-width: 150px;
+  }
+  
+  .inventory-table thead th:first-child,
+  .inventory-table thead th:nth-child(2) {
     background: var(--bg-raised);
     z-index: 11;
   }
   
-  .inventory-table tbody td:first-child {
-    box-shadow: 2px 0 8px rgba(0,0,0,0.2);
+  .inventory-table tbody td:nth-child(2) {
+    box-shadow: 4px 0 8px -2px rgba(0,0,0,0.2);
   }
 }
 
