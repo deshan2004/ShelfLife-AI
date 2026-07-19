@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AlertDropdown.css';
 
-function AlertDropdown({ inventory, onFlashSale, onOrderNow, actionLoading }) {
+function AlertDropdown({ inventory, onFlashSale, onOrderNow, actionLoading, align = 'right' }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
@@ -52,7 +52,7 @@ function AlertDropdown({ inventory, onFlashSale, onOrderNow, actionLoading }) {
       </button>
 
       {isOpen && (
-        <div className="alert-dropdown-menu">
+        <div className={`alert-dropdown-menu align-${align}`}>
           <div className="alert-dropdown-header">
             <span className="alert-dropdown-title">
               <i className="fas fa-bell"></i>
