@@ -65,7 +65,6 @@
 .alert-dropdown-menu {
   position: absolute;
   top: calc(100% + 8px);
-  right: 0;
   width: 380px;
   max-height: 480px;
   background: var(--bg-panel);
@@ -77,6 +76,16 @@
   flex-direction: column;
   overflow: hidden;
   animation: dropdownSlide 0.25s ease;
+}
+
+.alert-dropdown-menu.align-right {
+  right: 0;
+  left: auto;
+}
+
+.alert-dropdown-menu.align-left {
+  left: 0;
+  right: auto;
 }
 
 @keyframes dropdownSlide {

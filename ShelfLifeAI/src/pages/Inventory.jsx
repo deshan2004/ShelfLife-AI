@@ -1287,7 +1287,7 @@ function Inventory({
       </div>
 
       {/* Alert Bar */}
-      <AlertBar inventory={inventory} onFlashSale={handleFlashSale} onOrderNow={handleOrderNow} actionLoading={actionLoading} />
+      <AlertBar inventory={inventory} onFlashSale={handleFlashSale} onOrderNow={handleOrderNow} actionLoading={actionLoading} align="left" />
 
       {/* Scanner Section */}
       {showScanner && !scanType && (
