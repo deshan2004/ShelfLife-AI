@@ -1184,111 +1184,6 @@ function Inventory({
         </div>
       </div>
 
-      {/* Low Stock Alert Banner */}
-      {lowStockItems.length > 0 && (
-        <div className="low-stock-alert-banner">
-          <div className="low-stock-alert-icon"><i className="fas fa-boxes"></i></div>
-          <div className="low-stock-alert-content">
-            <strong>{lowStockItems.length} item{lowStockItems.length > 1 ? 's' : ''} low on stock!</strong>
-            <div className="low-stock-item-list">
-              {lowStockItems.slice(0, 5).map((item, idx) => (
-                <span key={idx} className="low-stock-tag">
-                  {item.name} <span className="low-stock-qty">({item.stock}/{item.lowStockThreshold || 10})</span>
-                </span>
-              ))}
-              {lowStockItems.length > 5 && (<span className="low-stock-tag more">+{lowStockItems.length - 5} more</span>)}
-            </div>
-          </div>
-          <button className="low-stock-order-btn" onClick={handleOrderAllLowStock} disabled={orderingLowStock || actionLoading === 'bulkOrder'}>
-            {orderingLowStock ? <><i className="fas fa-spinner fa-pulse"></i> Ordering...</> : <><i className="fas fa-shopping-cart"></i> Order All</>}
-          </button>
-        </div>
-      )}
-
-      {/* Expiry Alert Banner */}
-      {expiringItems.length > 0 && (
-        <div className={`expiry-alert-banner ${criticalExpiring.length > 0 ? 'critical' : 'warning'}`}>
-          <i className={`fas ${criticalExpiring.length > 0 ? 'fa-exclamation-triangle' : 'fa-clock'}`}></i>
-          <div className="expiry-alert-content">
-            <strong>{expiringItems.length} item{expiringItems.length > 1 ? 's' : ''} expiring soon!</strong>
-            <div className="expiry-item-list">
-              {expiringItems.slice(0, 5).map((item, idx) => (
-                <span key={idx} className="expiry-tag">
-                  {item.name}
-                  <span className={`expiry-days ${item.daysLeft <= 2 ? 'critical' : ''}`}>({item.daysLeft}d)</span>
-                  <span className="expiry-discount-badge">{item.daysLeft <= 1 ? '50%' : item.daysLeft <= 2 ? '40%' : '30%'} OFF</span>
-                </span>
-              ))}
-              {expiringItems.length > 5 && (<span className="expiry-tag more">+{expiringItems.length - 5} more</span>)}
-            </div>
-          </div>
-          <button className="expiry-alert-btn" onClick={handleAutoFlashAll} disabled={autoFlashing}>
-            {autoFlashing ? 'Applying...' : '🔥 Apply Flash Sale'}
-          </button>
-        </div>
-      )}
-
-      {/* Pending Orders Section */}
-      {pendingOrders.length > 0 && (
-        <div className="pending-orders-section">
-          <div className="pending-orders-header">
-            <h3><i className="fas fa-clock"></i> Pending Orders ({pendingOrders.length})</h3>
-            <span className="pending-orders-sub">Orders placed but not yet delivered</span>
-          </div>
-          <div className="pending-orders-list">
-            {pendingOrders.slice(0, 5).map((item) => (
-              <div key={item.id} className="pending-order-item">
-                <span className="pending-order-name">{item.name}</span>
-                <span className="pending-order-stock">{item.stock} units</span>
-                <span className="pending-order-supplier"><i className="fas fa-truck"></i> {item.supplier}</span>
-                <span className={`pending-order-status ${item.orderStatus}`}>
-                  {item.orderStatus === 'ordered' ? '📦 Ordered' : '⏳ Pending'}
-                </span>
-                <button className="pending-order-deliver" onClick={() => handleUpdateOrderStatus(item.id, 'delivered')}>
-                  <i className="fas fa-check"></i> Mark Delivered
-                </button>
-              </div>
-            ))}
-            {pendingOrders.length > 5 && (<div className="pending-orders-more">+ {pendingOrders.length - 5} more</div>)}
-          </div>
-        </div>
-      )}
-
-      {/* Stats Cards */}
-      <div className="stats-grid-inline">
-        <div className="stat-card-mini">
-          <div className="stat-icon"><i className="fas fa-box"></i></div>
-          <div className="stat-info">
-            <span className="stat-number">{stats.total}</span>
-            <span className="stat-label">Total Products</span>
-          </div>
-        </div>
-        <div className="stat-card-mini">
-          <div className="stat-icon"><i className="fas fa-rupee-sign"></i></div>
-          <div className="stat-info">
-            <span className="stat-number">LKR {stats.totalValue.toLocaleString()}</span>
-            <span className="stat-label">Inventory Value</span>
-          </div>
-        </div>
-        <div className="stat-card-mini">
-          <div className="stat-icon"><i className="fas fa-clock"></i></div>
-          <div className="stat-info">
-            <span className="stat-number">LKR {stats.expiringValue.toLocaleString()}</span>
-            <span className="stat-label">At Risk Value</span>
-          </div>
-        </div>
-        <div className="stat-card-mini">
-          <div className="stat-icon"><i className="fas fa-exclamation-triangle"></i></div>
-          <div className="stat-info">
-            <span className="stat-number">{stats.lowStockCount}</span>
-            <span className="stat-label">Low Stock Items</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Alert Bar */}
-      <AlertBar inventory={inventory} onFlashSale={handleFlashSale} onOrderNow={handleOrderNow} actionLoading={actionLoading} align="left" />
-
       {/* Scanner Section */}
       {showScanner && !scanType && (
         <div className="scanner-section">
@@ -1408,6 +1303,113 @@ function Inventory({
           />
         </div>
       )}
+
+
+      {/* Low Stock Alert Banner */}
+      {lowStockItems.length > 0 && (
+        <div className="low-stock-alert-banner">
+          <div className="low-stock-alert-icon"><i className="fas fa-boxes"></i></div>
+          <div className="low-stock-alert-content">
+            <strong>{lowStockItems.length} item{lowStockItems.length > 1 ? 's' : ''} low on stock!</strong>
+            <div className="low-stock-item-list">
+              {lowStockItems.slice(0, 5).map((item, idx) => (
+                <span key={idx} className="low-stock-tag">
+                  {item.name} <span className="low-stock-qty">({item.stock}/{item.lowStockThreshold || 10})</span>
+                </span>
+              ))}
+              {lowStockItems.length > 5 && (<span className="low-stock-tag more">+{lowStockItems.length - 5} more</span>)}
+            </div>
+          </div>
+          <button className="low-stock-order-btn" onClick={handleOrderAllLowStock} disabled={orderingLowStock || actionLoading === 'bulkOrder'}>
+            {orderingLowStock ? <><i className="fas fa-spinner fa-pulse"></i> Ordering...</> : <><i className="fas fa-shopping-cart"></i> Order All</>}
+          </button>
+        </div>
+      )}
+
+      {/* Expiry Alert Banner */}
+      {expiringItems.length > 0 && (
+        <div className={`expiry-alert-banner ${criticalExpiring.length > 0 ? 'critical' : 'warning'}`}>
+          <i className={`fas ${criticalExpiring.length > 0 ? 'fa-exclamation-triangle' : 'fa-clock'}`}></i>
+          <div className="expiry-alert-content">
+            <strong>{expiringItems.length} item{expiringItems.length > 1 ? 's' : ''} expiring soon!</strong>
+            <div className="expiry-item-list">
+              {expiringItems.slice(0, 5).map((item, idx) => (
+                <span key={idx} className="expiry-tag">
+                  {item.name}
+                  <span className={`expiry-days ${item.daysLeft <= 2 ? 'critical' : ''}`}>({item.daysLeft}d)</span>
+                  <span className="expiry-discount-badge">{item.daysLeft <= 1 ? '50%' : item.daysLeft <= 2 ? '40%' : '30%'} OFF</span>
+                </span>
+              ))}
+              {expiringItems.length > 5 && (<span className="expiry-tag more">+{expiringItems.length - 5} more</span>)}
+            </div>
+          </div>
+          <button className="expiry-alert-btn" onClick={handleAutoFlashAll} disabled={autoFlashing}>
+            {autoFlashing ? 'Applying...' : '🔥 Apply Flash Sale'}
+          </button>
+        </div>
+      )}
+
+      {/* Pending Orders Section */}
+      {pendingOrders.length > 0 && (
+        <div className="pending-orders-section">
+          <div className="pending-orders-header">
+            <h3><i className="fas fa-clock"></i> Pending Orders ({pendingOrders.length})</h3>
+            <span className="pending-orders-sub">Orders placed but not yet delivered</span>
+          </div>
+          <div className="pending-orders-list">
+            {pendingOrders.slice(0, 5).map((item) => (
+              <div key={item.id} className="pending-order-item">
+                <span className="pending-order-name">{item.name}</span>
+                <span className="pending-order-stock">{item.stock} units</span>
+                <span className="pending-order-supplier"><i className="fas fa-truck"></i> {item.supplier}</span>
+                <span className={`pending-order-status ${item.orderStatus}`}>
+                  {item.orderStatus === 'ordered' ? '📦 Ordered' : '⏳ Pending'}
+                </span>
+                <button className="pending-order-deliver" onClick={() => handleUpdateOrderStatus(item.id, 'delivered')}>
+                  <i className="fas fa-check"></i> Mark Delivered
+                </button>
+              </div>
+            ))}
+            {pendingOrders.length > 5 && (<div className="pending-orders-more">+ {pendingOrders.length - 5} more</div>)}
+          </div>
+        </div>
+      )}
+
+      {/* Stats Cards */}
+      <div className="stats-grid-inline">
+        <div className="stat-card-mini">
+          <div className="stat-icon"><i className="fas fa-box"></i></div>
+          <div className="stat-info">
+            <span className="stat-number">{stats.total}</span>
+            <span className="stat-label">Total Products</span>
+          </div>
+        </div>
+        <div className="stat-card-mini">
+          <div className="stat-icon"><i className="fas fa-rupee-sign"></i></div>
+          <div className="stat-info">
+            <span className="stat-number">LKR {stats.totalValue.toLocaleString()}</span>
+            <span className="stat-label">Inventory Value</span>
+          </div>
+        </div>
+        <div className="stat-card-mini">
+          <div className="stat-icon"><i className="fas fa-clock"></i></div>
+          <div className="stat-info">
+            <span className="stat-number">LKR {stats.expiringValue.toLocaleString()}</span>
+            <span className="stat-label">At Risk Value</span>
+          </div>
+        </div>
+        <div className="stat-card-mini">
+          <div className="stat-icon"><i className="fas fa-exclamation-triangle"></i></div>
+          <div className="stat-info">
+            <span className="stat-number">{stats.lowStockCount}</span>
+            <span className="stat-label">Low Stock Items</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Alert Bar */}
+      <AlertBar inventory={inventory} onFlashSale={handleFlashSale} onOrderNow={handleOrderNow} actionLoading={actionLoading} align="left" />
+
 
       {/* Search and Filter */}
       <div className="search-filter-bar">
